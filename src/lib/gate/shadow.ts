@@ -54,9 +54,12 @@ const ROUTINE = [
   /\bprettier\b/i,
   /\bcomment/i,
   /\bcss\b/i,
+  /\bmobile\b/i,
   /\bcopy\b|\bwording\b/i,
   /\breadme\b/i,
+  /\bdocument\b/i,
   /\badd (a |an )?(unit |regression )?test/i,
+  /\bregression test\b/i,
   /\bfix (the )?import/i,
   /\bdead code\b/i,
   /\bunused\b/i,
@@ -126,14 +129,19 @@ export function shadowAnswers(prompt: string): GateAnswers {
   );
 
   const highStakes = clamp(0.06 + signals.highStakes * 0.85, 0.03, 0.97);
+  const scopedMundane =
+    signals.specificity >= 0.4 && highStakes < 0.2 && signals.complexity < 0.2
+      ? 0.14
+      : 0;
 
   const localRaw = clamp(
-    0.52 +
-      signals.routine * 0.32 +
-      signals.specificity * 0.28 -
+    0.54 +
+      signals.routine * 0.4 +
+      signals.specificity * 0.28 +
+      scopedMundane -
       signals.complexity * 0.38 -
       highStakes * 0.22 -
-      underspecified * 0.25,
+      underspecified * 0.2,
     0.04,
     0.96,
   );
@@ -169,7 +177,7 @@ export function shadowAnswers(prompt: string): GateAnswers {
 function hitRate(text: string, patterns: RegExp[]): number {
   if (patterns.length === 0) return 0;
   const hits = patterns.filter((p) => p.test(text)).length;
-  return Math.min(1, hits / Math.min(3, patterns.length));
+  return Math.min(1, hits / 2);
 }
 
 function normalizeRouteMass(mass: Record<Route, number>): Record<Route, number> {

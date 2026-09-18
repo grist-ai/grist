@@ -30,7 +30,7 @@ const SPECS: SeedSpec[] = [
   {
     id: "tsk_seed_02",
     prompt:
-      "Add a regression test for the ownership miner skipping bot commits and merges.",
+      "Add a regression test in src/ownership/miner_test.py for skipping bot commits and merges.",
     hoursAgo: 14,
     latencyMs: 94,
     outcome: "local_success",
@@ -54,7 +54,7 @@ const SPECS: SeedSpec[] = [
   {
     id: "tsk_seed_05",
     prompt:
-      "Tighten the CSS on the payout receipt so the amount does not wrap on mobile.",
+      "Tighten the CSS in receipts/ReceiptCard.tsx so the amount does not wrap on mobile.",
     hoursAgo: 40,
     latencyMs: 102,
     outcome: "local_success",

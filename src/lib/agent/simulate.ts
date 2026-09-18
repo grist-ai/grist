@@ -42,8 +42,8 @@ export function simulateAgent(input: {
 }
 
 export function counterfactualFrontierCost(prompt: string): number {
-  const inputTokens = 1800 + Math.round(prompt.length / 3);
-  const outputTokens = 900 + Math.min(2400, Math.round(prompt.length / 2));
+  const inputTokens = 4200 + 4 * 220 + Math.round(prompt.length / 3);
+  const outputTokens = 1400 + Math.round(prompt.length / 2);
   return round4(inputTokens * FRONTIER_IN_USD + outputTokens * FRONTIER_OUT_USD);
 }
 

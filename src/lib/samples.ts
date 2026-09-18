@@ -16,6 +16,6 @@ export const SAMPLE_PROMPTS = [
   {
     label: "Test",
     prompt:
-      "Add a regression test for the ownership miner skipping bot commits and merges.",
+      "Add a regression test in src/ownership/miner_test.py for skipping bot commits and merges.",
   },
 ] as const;

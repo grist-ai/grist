@@ -22,4 +22,11 @@ describe("shadowAnswers", () => {
     const decision = composeRoute(shadowAnswers("Fix it."), DEFAULT_GATE_SETTINGS);
     assert.equal(decision.route, "ask_human");
   });
+
+  it("keeps a scoped regression test on the local model", () => {
+    const prompt =
+      "Add a regression test in src/ownership/miner_test.py for skipping bot commits and merges.";
+    const decision = composeRoute(shadowAnswers(prompt), DEFAULT_GATE_SETTINGS);
+    assert.equal(decision.route, "local_model");
+  });
 });
