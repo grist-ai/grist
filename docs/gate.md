@@ -22,7 +22,7 @@ Rung → model defaults (override with env):
 
 | Rung | Env | Default (OpenRouter) |
 | --- | --- | --- |
-| cheapest | `GRIST_CHEAPEST_*` | `openrouter` / `deepseek/deepseek-v4-flash` |
+| cheapest | `GRIST_CHEAPEST_*` | `openrouter` / `deepseek/deepseek-v4.1-flash` |
 | medium | `GRIST_MEDIUM_*` | `openrouter` / `deepseek/deepseek-v4-pro` |
 | frontier | `GRIST_FRONTIER_*` | `openrouter` / `anthropic/claude-opus-4.6` |
 

@@ -38,7 +38,7 @@ CONFIDENCE GATE — Jev (TypeSafe System One)
   Score(sensitivity) → caps max rung
   route ∈ { cheapest, medium, frontier }
   Context minimized on escalation (subgraph, not repo)
-   ├──► CHEAPEST: DeepSeek V4 Flash        (default)
+   ├──► CHEAPEST: DeepSeek V4.1 Flash     (default)
    ├──► MEDIUM:   DeepSeek V4 Pro          (pre-frontier step)
    └──► FRONTIER: Claude Opus 5            (exception only; GPT-5.6 Sol backup)
    │ tools + retrieval (all tiers)
@@ -51,18 +51,19 @@ SANDBOX — Docker (v1)
 OBSERVABILITY — Langfuse (traces, $/task) · inspect_ai (gate precision, evals)
 ```
 
-## 3. Model ladder (locked Sept 2026, benchmark-backed)
+## 3. Model ladder (locked Sept 2026, benchmark-backed; prices rechecked 2026-09-19)
 
-| Tier | Model | Coding evidence | Price/1M tok (in/out) | Role |
-|------|-------|-----------------|----------------------|------|
-| Cheapest | **DeepSeek V4 Flash** (`deepseek-flash`, 1M ctx) | 88.8% SWE-bench Verified (independent, vals.ai) | ~$0.15 / $0.60 off-peak | Default for everything |
-| Medium | **DeepSeek V4 Pro** (0813) | 96.4% SWE-bench Verified (independent) — frontier-class | promo ~$0.44 / $0.87 | Pre-frontier step: beats cheap, doesn't need frontier |
+| Tier | Model | Coding evidence | Price/1M tok (in/out, off-peak) | Role |
+|------|-------|-----------------|------------------------------|------|
+| Cheapest | **DeepSeek V4.1 Flash** (`deepseek-flash` / OpenRouter `deepseek/deepseek-v4.1-flash`, 1M ctx) | 88.8% SWE-bench Verified (independent, vals.ai) — treat as Flash-class | ~$0.15 / $0.60 (peak 2×) | Default for everything |
+| Medium | **DeepSeek V4 Pro** (0813) | 96.4% SWE-bench Verified (independent) — frontier-class | ~$0.66 / $1.98 (peak 2×); promo ~$0.44/$0.87 is stale | Pre-frontier step |
 | Frontier | **Claude Opus 5** (1M ctx; backup: GPT-5.6 Sol) | 97.0% / 96.2% SWE-bench Verified (independent) | $5 / $25 flat (Sol: $4/$20 promo) | Exception only |
 
 - Router seam stays **provider-agnostic**. DeepSeek carries two tiers =
   concentration risk: a backup cheap tier (Kimi K2.6-class / GPT mini-class)
-  must be one config change away. Recheck DeepSeek pricing at build time
-  (api-docs.deepseek.com) — it moves.
+  must be one config change away. Recheck DeepSeek pricing at
+  [api-docs.deepseek.com](https://api-docs.deepseek.com/quick_start/pricing) —
+  it moves; see [`providers.md`](providers.md).
 - Benchmark caveat: SWE-bench Verified is saturated at the top; treat sub-2pt
   gaps as noise. SWE-bench Pro discriminates better.
 - Explicitly rejected: Meta Muse Spark (proprietary, beta; contributor tier
@@ -218,13 +219,17 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 
 - [x] OpenRouter ladder — one `OPENROUTER_API_KEY` covers cheapest/medium/frontier
 - [x] Operating modes — `GRIST_MODE=normal|capped|cheapest` (§10) in-tree
+- [x] SoL-Pi mechanism Choice — `GRIST_MECH=auto|efficiency|performance|off` (§5)
+- [x] DeepSeek pricing recheck (2026-09-19) — Flash $0.15/$0.60 off-peak; Pro $0.66/$1.98;
+  OpenRouter default cheap → `deepseek/deepseek-v4.1-flash`
 - [ ] Jev API key capture (`custom.typesafe` link sent — pending his submission)
 - [ ] Map bake-off: Graphify vs CRG — harness + method in-tree; not yet run on Prosh
+  (`Desktop/Prosh/prosh-voice` is the pilot git root; `git log` hung on this machine
+  2026-09-19 — check repo health / locks before bootstrap)
 - [ ] Memory: harness in-tree (`memory` tool + file/Supermemory); Prosh bootstrap
-  (`scripts/grist-bootstrap.sh`) not yet run
+  (`scripts/grist-bootstrap.sh`, now `--max-count` bounded) not yet run end-to-end
+  with Graphify
 - [ ] Shadow burn-in: harness in-tree (JSONL + thresholds + report); not yet run on Prosh
-- [ ] DeepSeek pricing recheck at build time (volatile); backup cheap tier =
-  `GRIST_CHEAPEST_MODEL` swap (Kimi / GPT-mini class on OpenRouter)
 - [ ] pydriller license confirmation (`scripts/ownership-mine.py` uses git log until then)
 - [ ] Local-model watch only: Qwen3.8-27B leads the ≤32B class; Ternary Bonsai 2
   (its 2-day-old ternary quant) has no agentic numbers yet — revisit only if a

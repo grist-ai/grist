@@ -17,7 +17,8 @@ export type ModelRef = {
 export const RUNG_MODELS: Record<Rung, ModelRef> = {
   cheapest: {
     providerID: process.env.GRIST_CHEAPEST_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_CHEAPEST_MODEL ?? "deepseek/deepseek-v4-flash",
+    // OpenRouter id for DeepSeek-V4.1-Flash (legacy deepseek-v4-flash still aliases).
+    modelID: process.env.GRIST_CHEAPEST_MODEL ?? "deepseek/deepseek-v4.1-flash",
   },
   medium: {
     providerID: process.env.GRIST_MEDIUM_PROVIDER ?? "openrouter",

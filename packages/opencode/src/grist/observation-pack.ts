@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { sessionAllowsObservationPack } from "./mechanisms"
 
 /** SoL-Pi ObservationPack (pre-POC §5): >10KB full twice, then handle + 1KB excerpt. */
 export const PACK_BYTES = 10 * 1024
@@ -35,10 +36,11 @@ export type PackDecision =
 
 /**
  * Decide whether to keep full output or pack it.
- * Disabled when GRIST_OBS_PACK=off.
+ * Disabled when GRIST_OBS_PACK=off or session mechanism Choice turns packing off.
  */
 export function consider(input: { sessionID: string; toolID: string; text: string }): PackDecision {
   if (process.env.GRIST_OBS_PACK === "off") return { action: "passthrough", count: 0 }
+  if (!sessionAllowsObservationPack(input.sessionID)) return { action: "passthrough", count: 0 }
   if (Buffer.byteLength(input.text, "utf-8") <= PACK_BYTES) return { action: "passthrough", count: 0 }
 
   const handle = identity(input.toolID, input.text)
