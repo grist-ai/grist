@@ -9,6 +9,10 @@ Every user prompt hits `routeTask` in `SessionPrompt.createUserMessage`
 - **Compose:** difficulty picks cheapest/medium/frontier; sensitivity caps the
   max rung; underspecified forces **cheapest** (no ask-human rung).
 - **Passthrough:** `GRIST_GATE=off`, or explicit user/agent model pin.
+- **Operating mode** (`GRIST_MODE`, pre-POC §10) — degrades, never hard-stops:
+  - `normal` (default) — full ladder
+  - `capped` — frontier off; medium is the ceiling
+  - `cheapest` — cheapest-only
 - **Doctrine:** `SURGICAL_ENGINEER` appended in `LLMRequestPrep.prepare`.
 - **Burn-in:** every decision appends to `.grist/burn-in.jsonl` for calibration
   ([`docs/shadow-burn-in.md`](shadow-burn-in.md)). Thresholds overridable via

@@ -29,11 +29,21 @@ Self-host quickstart: `bunx supermemory local` then `supermemory-server`
 - Tool: `memory` — `action=recall|remember`
 - Log: `[grist:memory] …`
 
-## Ownership mining (next)
+## Ownership mining
 
-`scripts/ownership-mine.py` — stub for pydriller → memory remember.
-Run against Prosh history once the map layer is locked; feed verified
-ownership facts into the same store.
+```bash
+python3 scripts/ownership-mine.py --repo /path/to/Prosh --since 18months \
+  --out .grist/bootstrap/ownership.jsonl
+```
+
+Uses `git log` today (pydriller path reserved until license confirmation).
+Review rows before `memory remember` — never auto-persist unreviewed ownership.
+
+Cold-start wrapper (pin SHA → optional Graphify → ownership mine):
+
+```bash
+./scripts/grist-bootstrap.sh /path/to/Prosh
+```
 
 ## Tests
 

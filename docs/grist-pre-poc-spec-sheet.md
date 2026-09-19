@@ -216,12 +216,16 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 
 ## 12. Blockers & open items
 
+- [x] OpenRouter ladder — one `OPENROUTER_API_KEY` covers cheapest/medium/frontier
+- [x] Operating modes — `GRIST_MODE=normal|capped|cheapest` (§10) in-tree
 - [ ] Jev API key capture (`custom.typesafe` link sent — pending his submission)
 - [ ] Map bake-off: Graphify vs CRG — harness + method in-tree; not yet run on Prosh
-- [ ] Memory: harness in-tree (`memory` tool + file/Supermemory); Prosh bootstrap not run
+- [ ] Memory: harness in-tree (`memory` tool + file/Supermemory); Prosh bootstrap
+  (`scripts/grist-bootstrap.sh`) not yet run
 - [ ] Shadow burn-in: harness in-tree (JSONL + thresholds + report); not yet run on Prosh
-- [ ] DeepSeek pricing recheck at build time (volatile); backup cheap tier ready
-- [ ] pydriller license confirmation
+- [ ] DeepSeek pricing recheck at build time (volatile); backup cheap tier =
+  `GRIST_CHEAPEST_MODEL` swap (Kimi / GPT-mini class on OpenRouter)
+- [ ] pydriller license confirmation (`scripts/ownership-mine.py` uses git log until then)
 - [ ] Local-model watch only: Qwen3.8-27B leads the ≤32B class; Ternary Bonsai 2
   (its 2-day-old ternary quant) has no agentic numbers yet — revisit only if a
   zero-marginal-cost tier ever becomes strategically worth it

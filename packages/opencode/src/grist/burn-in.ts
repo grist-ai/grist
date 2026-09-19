@@ -1,4 +1,5 @@
 import path from "path"
+import type { OperatingMode } from "./mode"
 import type { Rung } from "./rung"
 
 export type BurnInOutcome = "success" | "fail" | "escalated" | "unknown"
@@ -6,6 +7,7 @@ export type BurnInOutcome = "success" | "fail" | "escalated" | "unknown"
 export type BurnInDecision = {
   rung: Rung
   provider: string
+  mode?: OperatingMode
   difficulty: number
   sensitivity: number
   underspecified: number
