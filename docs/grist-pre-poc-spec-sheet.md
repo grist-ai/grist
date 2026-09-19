@@ -117,9 +117,10 @@ Two integrations:
 
 ## 6. Knowledge & memory
 
-- **Code map — bake-off OPEN:** Graphify (deterministic AST-only, zero API cost)
+- **Code map — bake-off OPEN (harness in-tree):** Graphify (deterministic AST-only, zero API cost)
   vs code-review-graph/CRG (MCP-native, blast-radius analysis, semantic search).
   Method: head-to-head on Prosh; lock on measured token spend + retrieval quality.
+  See `docs/code-map.md`; tool `code_map`.
 - **Agent memory:** Supermemory (MIT, self-hosted). **Verified outcomes only** —
   persist from sessions where tests passed, the user approved, or explicitly
   corrected. Never persist unreviewed generations. Stale memories decay by
@@ -215,7 +216,7 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 ## 12. Blockers & open items
 
 - [ ] Jev API key capture (`custom.typesafe` link sent — pending his submission)
-- [ ] Map bake-off: Graphify vs CRG — method set, not yet run
+- [ ] Map bake-off: Graphify vs CRG — harness + method in-tree; not yet run on Prosh
 - [ ] DeepSeek pricing recheck at build time (volatile); backup cheap tier ready
 - [ ] pydriller license confirmation
 - [ ] Local-model watch only: Qwen3.8-27B leads the ≤32B class; Ternary Bonsai 2
