@@ -2,6 +2,12 @@ import { RUNG_MODELS, type ModelRef, type Rung } from "./rung"
 import { loadThresholds, type GateThresholds } from "./thresholds"
 import { createBurnInLog } from "./burn-in"
 import { applyModeCap, loadOperatingMode, type OperatingMode } from "./mode"
+import {
+  composeMechanisms,
+  loadMechanismProfile,
+  rememberSessionMechanisms,
+  type MechanismSet,
+} from "./mechanisms"
 
 const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 const JEV_MODEL = "jev-latest"
@@ -11,6 +17,7 @@ export type GateDecision = {
   model: ModelRef
   provider: "jev" | "shadow"
   mode: OperatingMode
+  mechanisms: MechanismSet
   difficulty: number
   sensitivity: number
   underspecified: number
@@ -214,12 +221,16 @@ function modelForRung(rung: Rung, _current: ModelRef): ModelRef {
 export async function routeTask(input: GateInput): Promise<GateDecision> {
   const started = Date.now()
   const mode = loadOperatingMode()
+  const mechanisms = composeMechanisms(input.text, loadMechanismProfile())
+  if (input.sessionID) rememberSessionMechanisms(input.sessionID, mechanisms)
+
   if (input.pinned || process.env.GRIST_GATE === "off") {
     return {
       rung: "cheapest",
       model: input.current,
       provider: "shadow",
       mode,
+      mechanisms,
       difficulty: 0,
       sensitivity: 0,
       underspecified: 0,
@@ -250,12 +261,16 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
     model,
     provider,
     mode,
+    mechanisms,
     ...scores,
     reasons,
     latencyMs: Date.now() - started,
   }
   console.log(
     `[grist:gate] ${rung} via ${provider} mode=${mode} · diff=${scores.difficulty.toFixed(2)} sens=${scores.sensitivity.toFixed(2)} under=${scores.underspecified.toFixed(2)} · ${reasons.join(",")} · ${decision.latencyMs}ms → ${model.providerID}/${model.modelID}`,
+  )
+  console.log(
+    `[grist:mech] ${mechanisms.resolved} pack=${mechanisms.observationPack} fusion=${mechanisms.actionFusion} · ${mechanisms.reasons.join(",")}`,
   )
   // Shadow burn-in: durable JSONL for calibration (§8.6). Never blocks the turn.
   void createBurnInLog()

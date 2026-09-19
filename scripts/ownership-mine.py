@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -37,17 +38,21 @@ def mine_with_git(repo: Path, since: datetime) -> list[dict]:
 
     since_arg = since.strftime("%Y-%m-%d")
     # Prefix author lines so paths never collide with names.
+    # Bound history so cold-start stays resumable on large repos.
+    max_count = os.environ.get("GRIST_OWNERSHIP_MAX_COMMITS", "5000")
+    cmd = [
+        "git",
+        "-C",
+        str(repo),
+        "log",
+        f"--since={since_arg}",
+        f"--max-count={max_count}",
+        "--format=AUTHOR:%aN",
+        "--name-only",
+        "--no-merges",
+    ]
     result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo),
-            "log",
-            f"--since={since_arg}",
-            "--format=AUTHOR:%aN",
-            "--name-only",
-            "--no-merges",
-        ],
+        cmd,
         check=True,
         capture_output=True,
         text=True,

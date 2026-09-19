@@ -32,12 +32,13 @@ bun dev
 
 Gate logs: `[grist:gate] cheapest|medium|frontier …`. Disable with `GRIST_GATE=off`.
 Mode: `GRIST_MODE=normal|capped|cheapest` (frontier off under `capped`).
+Mechanisms: `GRIST_MECH=auto|efficiency|performance|off` (`[grist:mech]`).
 Usage logs: `[grist:usage] …`. Disable with `GRIST_USAGE_LOG=off`.
 ObservationPack: `[grist:observation-pack] …`. Disable with `GRIST_OBS_PACK=off`.
 Code map: `[grist:code-map] …`. Disable with `GRIST_CODE_MAP=off`.
 Memory: `[grist:memory] …`. Disable with `GRIST_MEMORY=off`.
 Burn-in log: `.grist/burn-in.jsonl`. Disable with `GRIST_BURNIN=off`.
-Bootstrap: `./scripts/grist-bootstrap.sh /path/to/Prosh`.
+Bootstrap: `./scripts/grist-bootstrap.sh /path/to/Prosh/prosh-voice`.
 Explicit `--model` / agent-pinned models are not rewritten.
 
 ## Build order (pre-POC)
