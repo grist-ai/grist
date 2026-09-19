@@ -180,7 +180,7 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 
 - **Gate quality (primary):** rung-choice precision/recall via shadow
   counterfactuals — *would a cheaper rung have succeeded?* Escalation precision
-  (% of escalations that truly needed it); ask-human rate.
+  (% of escalations that truly needed it).
 - **Tier mix:** ≥80% cheapest / ≤5% frontier sustained; $/task; $/user/month.
 - **Task success:** per-tier success rate on a **pinned Prosh task battery**
   (real tasks, fixed). Re-run the battery on every router/gate change —
