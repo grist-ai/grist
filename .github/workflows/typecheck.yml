@@ -17,5 +17,10 @@ jobs:
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
 
+      # Full-monorepo turbo typecheck OOMs (exit 137) on github-hosted runners
+      # when many packages compile in parallel. Cap concurrency for this fork.
       - name: Run typecheck
         run: bun typecheck
+        env:
+          TURBO_CONCURRENCY: "2"
+          NODE_OPTIONS: "--max-old-space-size=4096"
