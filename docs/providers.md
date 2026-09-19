@@ -44,6 +44,25 @@ export GRIST_FRONTIER_MODEL=openai/gpt-5.6-sol
 
 Browse live ids: [openrouter.ai/models](https://openrouter.ai/models).
 
+## Backup cheap tier
+
+DeepSeek concentration risk: keep a second cheap model one env change away, e.g.
+
+```bash
+export GRIST_CHEAPEST_MODEL=moonshotai/kimi-k2.5   # or openai/gpt-4o-mini-class id
+```
+
+Still one `OPENROUTER_API_KEY` — no new provider key.
+
+## Operating mode
+
+```bash
+export GRIST_MODE=capped      # frontier off; medium is top
+# export GRIST_MODE=cheapest  # cheapest-only
+```
+
+See [`gate.md`](gate.md).
+
 ## Native providers (optional)
 
 You can still use first-party keys if you prefer (DeepSeek / Anthropic /
