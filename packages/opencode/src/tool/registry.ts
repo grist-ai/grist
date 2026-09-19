@@ -6,6 +6,7 @@ import { Session } from "@/session/session"
 import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
 import { EditTool } from "./edit"
+import { EditVerifyTool } from "./edit-verify"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
@@ -111,6 +112,7 @@ const layer = Layer.effect(
     const globtool = yield* GlobTool
     const writetool = yield* WriteTool
     const edit = yield* EditTool
+    const editVerify = yield* EditVerifyTool
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
@@ -213,6 +215,7 @@ const layer = Layer.effect(
           glob: Tool.init(globtool),
           grep: Tool.init(greptool),
           edit: Tool.init(edit),
+          edit_verify: Tool.init(editVerify),
           write: Tool.init(writetool),
           task: Tool.init(task),
           fetch: Tool.init(webfetch),
@@ -236,6 +239,7 @@ const layer = Layer.effect(
             tool.glob,
             tool.grep,
             tool.edit,
+            tool.edit_verify,
             tool.write,
             tool.task,
             tool.fetch,
@@ -297,7 +301,7 @@ const layer = Layer.effect(
         const usePatch =
           input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4")
         if (tool.id === ApplyPatchTool.id) return usePatch
-        if (tool.id === EditTool.id || tool.id === WriteTool.id) return !usePatch
+        if (tool.id === EditTool.id || tool.id === WriteTool.id || tool.id === EditVerifyTool.id) return !usePatch
 
         return true
       })
