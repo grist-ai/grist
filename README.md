@@ -1,57 +1,49 @@
 # Grist
 
-Self-hosted, confidence-gated coding-agent harness for engineering teams.
+Confidence-gated coding agent — a rebranded fork of [OpenCode](https://github.com/anomalyco/opencode).
+The agent loop *is* this codebase (chat / IDE / CLI). There is no separate mill wrapper.
 
-**Grist is a fork of [OpenCode](https://github.com/anomalyco/opencode)** (anomalyco). The agent loop *is* this codebase — not a wrapper that shells out to OpenCode.
+A Jev confidence gate routes each task to the **cheapest capable model rung**
+(DeepSeek Flash → DeepSeek Pro → frontier), with institutional memory mined from
+the user’s history. Local models are watch-only for now.
 
-A small local model (Ternary Bonsai 2 27B via llama.cpp) does the bulk of agentic coding on the team’s own hardware. A confidence gate (Jev / TypeSafe System One) will route only low-confidence or high-stakes work to frontier APIs. Institutional knowledge is mined from the team’s history and fed as retrieval.
+**Value prop:** frontier-tier output at a flat price, with memory that survives turnover.
 
-One-line: **frontier-tier output on a local budget, with institutional memory that survives turnover.**
+Living plan: [`docs/grist-pre-poc-spec-sheet.md`](docs/grist-pre-poc-spec-sheet.md).
 
 ## Current phase
 
-**Phase 3 — Agent loop** is in place (this OpenCode fork). **Phase 2 — local model** uses PrismML llama.cpp + Ternary Bonsai 2 27B; see below.
-
-Full product plan: [`docs/grist-build-spec.md`](docs/grist-build-spec.md).
-
-## Develop
-
-Requirements: [Bun](https://bun.sh) 1.3+.
+**Phase 1 — Harness.** Run this OpenCode fork on the cheap tier (DeepSeek Flash)
+with Grist-held keys. Exit: real tasks on Prosh.
 
 ```bash
 bun install --ignore-scripts   # if tree-sitter-powershell gyp fails
 bun run --cwd packages/core fix-node-pty
+cp opencode.jsonc.example opencode.jsonc
+# set DEEPSEEK_API_KEY (see docs/providers.md)
 bun dev
 ```
 
-```bash
-bun dev --help
-bun run --cwd packages/opencode src/index.ts --help
-```
+## Build order (pre-POC)
 
-## Local model (Phase 2)
+| # | Phase | Exit |
+| --- | --- | --- |
+| 1 | Harness on cheap tier | Real tasks on Prosh |
+| 2 | Jev router + Action Fusion / ObservationPack | Routing logged per task |
+| 3 | Langfuse | $/task visible |
+| 4 | Map bake-off (Graphify vs CRG) | Layer locked on data |
+| 5 | Supermemory + bootstrap | Retrieval answers ownership/convention Qs |
+| 6 | Shadow burn-in | Calibrated thresholds + measured tier mix |
 
-Stock Homebrew `llama-server` will **not** run ternary Bonsai. Use the PrismML fork:
+TypeSafe / Jev skill: [`.agents/skills/typesafe-ai`](.agents/skills/typesafe-ai).
 
-```bash
-./scripts/grist-phase2-setup.sh    # binaries + ~6GB PTQ1_0 GGUF
-./scripts/grist-llama-server.sh    # :8080 OpenAI-compatible
-cp opencode.jsonc.example opencode.jsonc
-bun dev                            # model llama.cpp/bonsai-2-27b
-```
+## Local models (watch only)
 
-Details: [`docs/local-model.md`](docs/local-model.md).
-
-## What’s next (not in this reset)
-
-| Phase | Work |
-| --- | --- |
-| 4 | Langfuse + token-spend logging |
-| 5 | Jev confidence gate (`local_model` / `frontier_escalation` / `ask_human`) |
-| 6–8 | Code-map bake-off, Supermemory + ownership mining, shadow burn-in |
-
-TypeSafe skill for gate work: [`.agents/skills/typesafe-ai`](.agents/skills/typesafe-ai).
+Ternary Bonsai 2 / llama.cpp scripts remain under `scripts/` and
+[`docs/local-model.md`](docs/local-model.md) for later revisit — **not** the
+active Phase 1 path.
 
 ## Upstream
 
-Based on [anomalyco/opencode](https://github.com/anomalyco/opencode) (`dev`). MIT. Product name **Grist**; package names remain OpenCode until a deliberate rename pass.
+Based on [anomalyco/opencode](https://github.com/anomalyco/opencode) (`dev`). MIT.
+Product name **Grist**; package names stay OpenCode until a deliberate rename.

@@ -1,8 +1,9 @@
 # Grist
 
-This repository is **Grist**: a fork of OpenCode used as the local agent loop.
-Product plan: `docs/grist-build-spec.md`. TypeSafe / Jev skill: `.agents/skills/typesafe-ai`.
+This repository is **Grist**: a fork of OpenCode used as the coding-agent harness.
+Living plan: `docs/grist-pre-poc-spec-sheet.md`. TypeSafe / Jev skill: `.agents/skills/typesafe-ai`.
 Do not introduce a separate “mill” CLI that shells out to OpenCode — Grist *is* the agent loop.
+Default model rung is cheapest API (DeepSeek Flash), not a local llama.cpp path.
 Default GitHub branch for this fork is `main`; upstream OpenCode’s default is `dev`.
 
 # OpenCode (upstream agent notes)
