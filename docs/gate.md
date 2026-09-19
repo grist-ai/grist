@@ -10,6 +10,9 @@ Every user prompt hits `routeTask` in `SessionPrompt.createUserMessage`
   max rung; underspecified forces **cheapest** (no ask-human rung).
 - **Passthrough:** `GRIST_GATE=off`, or explicit user/agent model pin.
 - **Doctrine:** `SURGICAL_ENGINEER` appended in `LLMRequestPrep.prepare`.
+- **Burn-in:** every decision appends to `.grist/burn-in.jsonl` for calibration
+  ([`docs/shadow-burn-in.md`](shadow-burn-in.md)). Thresholds overridable via
+  `GRIST_TH_*` env.
 
 Rung → model defaults (override with env):
 

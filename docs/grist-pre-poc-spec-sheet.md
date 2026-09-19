@@ -219,6 +219,7 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 - [ ] Jev API key capture (`custom.typesafe` link sent — pending his submission)
 - [ ] Map bake-off: Graphify vs CRG — harness + method in-tree; not yet run on Prosh
 - [ ] Memory: harness in-tree (`memory` tool + file/Supermemory); Prosh bootstrap not run
+- [ ] Shadow burn-in: harness in-tree (JSONL + thresholds + report); not yet run on Prosh
 - [ ] DeepSeek pricing recheck at build time (volatile); backup cheap tier ready
 - [ ] pydriller license confirmation
 - [ ] Local-model watch only: Qwen3.8-27B leads the ≤32B class; Ternary Bonsai 2

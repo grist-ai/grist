@@ -654,6 +654,7 @@ const layer = Layer.effect(
             modelID: String(resolved.modelID),
           },
           pinned,
+          sessionID: input.sessionID,
         }),
       )
       const model = pinned
