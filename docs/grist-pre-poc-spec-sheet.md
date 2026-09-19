@@ -100,8 +100,8 @@ They cut tokens *within* every tier, multiplying the router's savings.
 
 | Mechanism | What it does | Port plan |
 |-----------|--------------|-----------|
-| **Action Fusion** | Bundle file edit + follow-up test/build into one tool call | Phase 2 (cheap port) |
-| **ObservationPack** | Tool outputs >10KB: full twice, then handle + 1KB excerpt, retrievable on demand | Phase 2 (cheap port) |
+| **Action Fusion** | Bundle file edit + follow-up test/build into one tool call | **Ported** — `edit_verify` tool |
+| **ObservationPack** | Tool outputs >10KB: full twice, then handle + 1KB excerpt, retrievable on demand | **Ported** — `Tool.wrap` + shell |
 | **Evidence-Preserving Reducer** | Cheap-tier model distills build/test logs into a *verified* evidence receipt; falls back to original on failure | Post-POC |
 | **Online Context Compact** | Compact at plan-step boundaries only when projected savings beat cache-rewrite cost (cost gate) | Post-POC |
 

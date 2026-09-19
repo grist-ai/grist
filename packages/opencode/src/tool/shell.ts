@@ -16,6 +16,7 @@ import { Shell } from "@opencode-ai/core/shell"
 import { ShellID } from "./shell/id"
 
 import * as Truncate from "./truncate"
+import { consider as considerPack, formatPacked } from "@/grist/observation-pack"
 import { Plugin } from "@/plugin"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
@@ -566,6 +567,41 @@ export const ShellTool = Tool.define(
       }
       if (aborted) meta.push("User aborted the command")
       const raw = list.map((item) => item.text).join("")
+
+      // SoL-Pi ObservationPack on raw shell output (before line/byte tail trim).
+      const pack = considerPack({
+        sessionID: ctx.sessionID,
+        toolID: ShellID.ToolID,
+        text: raw,
+      })
+      if (pack.action === "pack") {
+        file = yield* trunc.write(raw)
+        let packed = formatPacked({
+          handle: pack.handle,
+          excerpt: pack.excerpt,
+          outputPath: file,
+          toolID: ShellID.ToolID,
+          count: pack.count,
+          totalBytes: Buffer.byteLength(raw, "utf-8"),
+        })
+        if (meta.length > 0) {
+          packed += "\n\n<shell_metadata>\n" + meta.join("\n") + "\n</shell_metadata>"
+        }
+        return {
+          title: input.command,
+          metadata: {
+            output: last || preview(packed),
+            exit: code,
+            truncated: true,
+            outputPath: file,
+            observationPack: true,
+            observationPackHandle: pack.handle,
+            observationPackHit: pack.count,
+          },
+          output: packed,
+        }
+      }
+
       const end = tail(raw, limits.maxLines, limits.maxBytes)
       if (end.cut) cut = true
       if (!file && end.cut) {
