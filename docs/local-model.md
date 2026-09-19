@@ -31,7 +31,9 @@ With the server up:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/models | head
-# optional: PrismML llama-bench / timed completion — target ~20–28 tok/s on M-series
+# timed chat completion (or native /completion timings)
 ```
+
+**Measured on this Mac (32GB, Metal, `-c 32768`, PTQ1_0):** ~**22.3 tok/s** decode (prompt ~50 tok/s) — within the build-spec ~20–28 tok/s band.
 
 See [`grist-build-spec.md`](grist-build-spec.md) §6–7 for context/slot guidance.
