@@ -7,18 +7,24 @@ export type ModelRef = {
   variant?: string
 }
 
-/** Default provider/model ids per rung — override via env when keys land. */
+/**
+ * Default ladder goes through OpenRouter so one `OPENROUTER_API_KEY` covers
+ * every rung. Override any slot with `GRIST_<RUNG>_PROVIDER` / `GRIST_<RUNG>_MODEL`
+ * (e.g. pin frontier to native Anthropic while keeping cheap/medium on OpenRouter).
+ *
+ * OpenRouter model ids keep their org/model slash (provider is still `openrouter`).
+ */
 export const RUNG_MODELS: Record<Rung, ModelRef> = {
   cheapest: {
-    providerID: process.env.GRIST_CHEAPEST_PROVIDER ?? "deepseek",
-    modelID: process.env.GRIST_CHEAPEST_MODEL ?? "deepseek-flash",
+    providerID: process.env.GRIST_CHEAPEST_PROVIDER ?? "openrouter",
+    modelID: process.env.GRIST_CHEAPEST_MODEL ?? "deepseek/deepseek-v4-flash",
   },
   medium: {
-    providerID: process.env.GRIST_MEDIUM_PROVIDER ?? "deepseek",
-    modelID: process.env.GRIST_MEDIUM_MODEL ?? "deepseek-v4-pro",
+    providerID: process.env.GRIST_MEDIUM_PROVIDER ?? "openrouter",
+    modelID: process.env.GRIST_MEDIUM_MODEL ?? "deepseek/deepseek-v4-pro",
   },
   frontier: {
-    providerID: process.env.GRIST_FRONTIER_PROVIDER ?? "anthropic",
-    modelID: process.env.GRIST_FRONTIER_MODEL ?? "claude-opus-4-20250514",
+    providerID: process.env.GRIST_FRONTIER_PROVIDER ?? "openrouter",
+    modelID: process.env.GRIST_FRONTIER_MODEL ?? "anthropic/claude-opus-4.6",
   },
 }
