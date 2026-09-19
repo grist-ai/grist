@@ -14,6 +14,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
+import { recordTouch } from "@/grist/diff-audit"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
@@ -88,6 +89,8 @@ export const WriteTool = Tool.define(
             projectDiagnosticsCount++
             output += `\n\nLSP errors detected in other files:\n${block}`
           }
+
+          recordTouch({ sessionID: ctx.sessionID, filePath: filepath, tool: "write" })
 
           return {
             title: path.relative(instance.worktree, filepath),
