@@ -60,6 +60,12 @@ export const EditVerifyTool = Tool.define(
           const exit =
             typeof verifyResult.metadata?.exit === "number" ? verifyResult.metadata.exit : undefined
 
+          const verifyMeta = verifyResult.metadata as {
+            truncated?: boolean
+            outputPath?: string
+            exit?: number | null
+          }
+
           return {
             title: `edit_verify ${params.filePath}`,
             metadata: {
@@ -69,12 +75,8 @@ export const EditVerifyTool = Tool.define(
               exit,
               edit: editResult.metadata,
               verifyMeta: verifyResult.metadata,
-              truncated: Boolean(editResult.metadata?.truncated || verifyResult.metadata?.truncated),
-              ...(verifyResult.metadata?.outputPath
-                ? { outputPath: verifyResult.metadata.outputPath }
-                : editResult.metadata?.outputPath
-                  ? { outputPath: editResult.metadata.outputPath }
-                  : {}),
+              truncated: Boolean(verifyMeta.truncated),
+              ...(verifyMeta.outputPath ? { outputPath: verifyMeta.outputPath } : {}),
             },
             output: formatFusion({
               filePath: params.filePath,

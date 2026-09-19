@@ -568,6 +568,16 @@ export const ShellTool = Tool.define(
       if (aborted) meta.push("User aborted the command")
       const raw = list.map((item) => item.text).join("")
 
+      type ShellMeta = {
+        output: string
+        exit: number | null
+        truncated: boolean
+        outputPath?: string
+        observationPack?: boolean
+        observationPackHandle?: string
+        observationPackHit?: number
+      }
+
       // SoL-Pi ObservationPack on raw shell output (before line/byte tail trim).
       const pack = considerPack({
         sessionID: ctx.sessionID,
@@ -587,17 +597,18 @@ export const ShellTool = Tool.define(
         if (meta.length > 0) {
           packed += "\n\n<shell_metadata>\n" + meta.join("\n") + "\n</shell_metadata>"
         }
+        const metadata: ShellMeta = {
+          output: last || preview(packed),
+          exit: code,
+          truncated: true,
+          outputPath: file,
+          observationPack: true,
+          observationPackHandle: pack.handle,
+          observationPackHit: pack.count,
+        }
         return {
           title: input.command,
-          metadata: {
-            output: last || preview(packed),
-            exit: code,
-            truncated: true,
-            outputPath: file,
-            observationPack: true,
-            observationPackHandle: pack.handle,
-            observationPackHit: pack.count,
-          },
+          metadata,
           output: packed,
         }
       }
@@ -618,14 +629,15 @@ export const ShellTool = Tool.define(
       if (meta.length > 0) {
         output += "\n\n<shell_metadata>\n" + meta.join("\n") + "\n</shell_metadata>"
       }
+      const metadata: ShellMeta = {
+        output: last || preview(output),
+        exit: code,
+        truncated: cut,
+        ...(cut && file ? { outputPath: file } : {}),
+      }
       return {
         title: input.command,
-        metadata: {
-          output: last || preview(output),
-          exit: code,
-          truncated: cut,
-          ...(cut && file ? { outputPath: file } : {}),
-        },
+        metadata,
         output,
       }
     })
