@@ -56,6 +56,7 @@ import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
+import { routeTask, textFromParts } from "@/grist/jev-gate"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -643,7 +644,25 @@ const layer = Layer.effect(
         throw error
       }
 
-      const model = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
+      const resolved = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
+      const pinned = Boolean(input.model || ag.model)
+      const gate = yield* Effect.promise(() =>
+        routeTask({
+          text: textFromParts(input.parts),
+          current: {
+            providerID: String(resolved.providerID),
+            modelID: String(resolved.modelID),
+          },
+          pinned,
+        }),
+      )
+      const model =
+        pinned || gate.rung === "ask_human"
+          ? resolved
+          : {
+              providerID: ProviderV2.ID.make(gate.model.providerID),
+              modelID: ModelV2.ID.make(gate.model.modelID),
+            }
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same

@@ -14,6 +14,7 @@ import { Effect, Record } from "effect"
 import { jsonSchema, tool as aiTool, type ModelMessage, type Tool } from "ai"
 import type { Plugin } from "@/plugin"
 import { mergeDeep } from "remeda"
+import { SURGICAL_ENGINEER } from "@/grist/doctrine"
 
 const USER_AGENT = `opencode/${InstallationVersion}`
 
@@ -58,6 +59,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
   const system = [
     [
       ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
+      SURGICAL_ENGINEER,
       ...input.system,
       ...(input.user.system ? [input.user.system] : []),
     ]

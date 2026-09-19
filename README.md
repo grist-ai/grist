@@ -13,16 +13,22 @@ Living plan: [`docs/grist-pre-poc-spec-sheet.md`](docs/grist-pre-poc-spec-sheet.
 
 ## Current phase
 
-**Phase 1 — Harness.** Run this OpenCode fork on the cheap tier (DeepSeek Flash)
-with Grist-held keys. Exit: real tasks on Prosh.
+**Phase 1 — Harness** awaits `DEEPSEEK_API_KEY` (you’ll add later).
+**Phase 2 scaffold — Router** is in-tree: Jev/shadow gate stamps the model rung
+per task; surgical-engineer doctrine is injected into the system prompt.
 
 ```bash
-bun install --ignore-scripts   # if tree-sitter-powershell gyp fails
+bun install --ignore-scripts
 bun run --cwd packages/core fix-node-pty
 cp opencode.jsonc.example opencode.jsonc
-# set DEEPSEEK_API_KEY (see docs/providers.md)
+# optional: export TYPESAFE_API_KEY=...  (else shadow gate)
+# later: export DEEPSEEK_API_KEY=...
+bun run --cwd packages/opencode test src/grist/jev-gate.test.ts
 bun dev
 ```
+
+Gate logs: `[grist:gate] cheapest|medium|frontier|ask_human …`. Disable with `GRIST_GATE=off`.
+Explicit `--model` / agent-pinned models are not rewritten.
 
 ## Build order (pre-POC)
 
