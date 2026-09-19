@@ -13,10 +13,9 @@ Living plan: [`docs/grist-pre-poc-spec-sheet.md`](docs/grist-pre-poc-spec-sheet.
 
 ## Current phase
 
-**Phase 1 — Harness** via **OpenRouter** (`OPENROUTER_API_KEY`) — one key for
-the whole ladder; swap models with `GRIST_*_MODEL`.
-**Phase 2–6 scaffolds** are in-tree (gate, SoL-Pi, usage, code map, memory,
-shadow burn-in).
+**Grist in-tree build complete** for pre-POC phases 1–6 (gate, SoL-Pi, usage,
+code map, memory, burn-in, eval). Pilot-repo exits are deferred — see
+[`docs/grist-status.md`](docs/grist-status.md).
 
 ```bash
 bun install --ignore-scripts
@@ -26,6 +25,7 @@ export OPENROUTER_API_KEY=sk-or-v1-...
 # optional: export TYPESAFE_API_KEY=...
 # optional: export GRIST_FRONTIER_MODEL=openai/gpt-5.6-sol
 bun run --cwd packages/opencode test src/grist/
+bun scripts/grist-eval.ts
 bun scripts/burn-in-report.ts
 bun dev
 ```
@@ -33,12 +33,13 @@ bun dev
 Gate logs: `[grist:gate] cheapest|medium|frontier …`. Disable with `GRIST_GATE=off`.
 Mode: `GRIST_MODE=normal|capped|cheapest` (frontier off under `capped`).
 Mechanisms: `GRIST_MECH=auto|efficiency|performance|off` (`[grist:mech]`).
-Usage logs: `[grist:usage] …`. Disable with `GRIST_USAGE_LOG=off`.
+Escalation context: code-map subgraph on medium/frontier (`GRIST_CTX_MIN=off` to disable).
+Diff audit: `[grist:diff-audit]` on edit/write (`GRIST_DIFF_AUDIT=off` to disable).
+Usage logs: `[grist:usage]` / `[grist:event]`. Disable with `GRIST_USAGE_LOG=off`.
 ObservationPack: `[grist:observation-pack] …`. Disable with `GRIST_OBS_PACK=off`.
 Code map: `[grist:code-map] …`. Disable with `GRIST_CODE_MAP=off`.
 Memory: `[grist:memory] …`. Disable with `GRIST_MEMORY=off`.
 Burn-in log: `.grist/burn-in.jsonl`. Disable with `GRIST_BURNIN=off`.
-Bootstrap: `./scripts/grist-bootstrap.sh /path/to/Prosh/prosh-voice`.
 Explicit `--model` / agent-pinned models are not rewritten.
 
 ## Build order (pre-POC)

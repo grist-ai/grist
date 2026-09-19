@@ -217,20 +217,25 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 
 ## 12. Blockers & open items
 
+### Grist in-tree (build complete when checked)
+
 - [x] OpenRouter ladder — one `OPENROUTER_API_KEY` covers cheapest/medium/frontier
-- [x] Operating modes — `GRIST_MODE=normal|capped|cheapest` (§10) in-tree
+- [x] Operating modes — `GRIST_MODE=normal|capped|cheapest` (§10)
 - [x] SoL-Pi mechanism Choice — `GRIST_MECH=auto|efficiency|performance|off` (§5)
 - [x] DeepSeek pricing recheck (2026-09-19) — Flash $0.15/$0.60 off-peak; Pro $0.66/$1.98;
   OpenRouter default cheap → `deepseek/deepseek-v4.1-flash`
-- [ ] Jev API key capture (`custom.typesafe` link sent — pending his submission)
-- [ ] Map bake-off: Graphify vs CRG — harness + method in-tree; not yet run on Prosh
-  (`Desktop/Prosh/prosh-voice` is the pilot git root; `git log` hung on this machine
-  2026-09-19 — check repo health / locks before bootstrap)
-- [ ] Memory: harness in-tree (`memory` tool + file/Supermemory); Prosh bootstrap
-  (`scripts/grist-bootstrap.sh`, now `--max-count` bounded) not yet run end-to-end
-  with Graphify
-- [ ] Shadow burn-in: harness in-tree (JSONL + thresholds + report); not yet run on Prosh
+- [x] Escalation context minimization — code-map subgraph on medium/frontier
+- [x] Doctrine enforcement — multi-file plan text + diff audit on edit/write
+- [x] Langfuse events for mode-cap / diff-audit (`recordGristEvent`)
+- [x] In-repo eval battery — `bun scripts/grist-eval.ts` (no pilot repo)
+- [ ] Jev API key (optional) — shadow gate is the default without `TYPESAFE_API_KEY`
 - [ ] pydriller license confirmation (`scripts/ownership-mine.py` uses git log until then)
-- [ ] Local-model watch only: Qwen3.8-27B leads the ≤32B class; Ternary Bonsai 2
-  (its 2-day-old ternary quant) has no agentic numbers yet — revisit only if a
-  zero-marginal-cost tier ever becomes strategically worth it
+- [ ] Local-model watch only: Qwen3.8-27B / Ternary Bonsai 2 — revisit only if needed
+
+### Pilot exits (after Grist runs — do not block harness)
+
+- [ ] Map bake-off on a real codebase
+- [ ] Memory bootstrap / ownership mine on that codebase
+- [ ] Shadow burn-in week(s) → calibrated `GRIST_TH_*`
+
+See [`grist-status.md`](grist-status.md).
