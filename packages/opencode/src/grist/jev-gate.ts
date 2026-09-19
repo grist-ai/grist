@@ -1,4 +1,6 @@
 import { RUNG_MODELS, type ModelRef, type Rung } from "./rung"
+import { loadThresholds, type GateThresholds } from "./thresholds"
+import { createBurnInLog } from "./burn-in"
 
 const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 const JEV_MODEL = "jev-latest"
@@ -19,6 +21,7 @@ export type GateInput = {
   current: ModelRef
   /** When true, never rewrite model (explicit user/agent pin). */
   pinned?: boolean
+  sessionID?: string
 }
 
 type ScoreAnswer = {
@@ -52,33 +55,36 @@ function score01(answer: ScoreAnswer | undefined, levels: number): number {
 /**
  * Compose rung from difficulty + sensitivity + underspecified (pre-POC §4).
  * Underspecified tasks stay on cheapest (no ask-human rung).
- * Thresholds are placeholders until shadow burn-in calibrates them.
+ * Thresholds default until shadow burn-in calibrates them (§8.6).
  */
-export function composeRung(input: {
-  difficulty: number
-  sensitivity: number
-  underspecified: number
-}): { rung: Rung; reasons: string[] } {
+export function composeRung(
+  input: {
+    difficulty: number
+    sensitivity: number
+    underspecified: number
+  },
+  thresholds: GateThresholds = loadThresholds(),
+): { rung: Rung; reasons: string[] } {
   const reasons: string[] = []
 
   // Sensitivity caps how high we may escalate.
   let max: Rung = "frontier"
-  if (input.sensitivity >= 0.75) {
+  if (input.sensitivity >= thresholds.sensitivityCapCheapest) {
     max = "cheapest"
     reasons.push("sensitivity_cap_cheapest")
-  } else if (input.sensitivity >= 0.45) {
+  } else if (input.sensitivity >= thresholds.sensitivityCapMedium) {
     max = "medium"
     reasons.push("sensitivity_cap_medium")
   }
 
   let want: Rung = "cheapest"
-  if (input.underspecified >= 0.7) {
+  if (input.underspecified >= thresholds.underspecifiedCheapest) {
     want = "cheapest"
     reasons.push("underspecified_cheapest")
-  } else if (input.difficulty >= 0.75) {
+  } else if (input.difficulty >= thresholds.difficultyFrontier) {
     want = "frontier"
     reasons.push("difficulty_frontier")
-  } else if (input.difficulty >= 0.4) {
+  } else if (input.difficulty >= thresholds.difficultyMedium) {
     want = "medium"
     reasons.push("difficulty_medium")
   } else {
@@ -241,6 +247,14 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
   console.log(
     `[grist:gate] ${rung} via ${provider} · diff=${scores.difficulty.toFixed(2)} sens=${scores.sensitivity.toFixed(2)} under=${scores.underspecified.toFixed(2)} · ${reasons.join(",")} · ${decision.latencyMs}ms → ${model.providerID}/${model.modelID}`,
   )
+  // Shadow burn-in: durable JSONL for calibration (§8.6). Never blocks the turn.
+  void createBurnInLog()
+    .recordDecision({
+      decision,
+      sessionID: input.sessionID,
+      text: input.text,
+    })
+    .catch((error) => console.warn("[grist:burn-in] record failed", error))
   return decision
 }
 
