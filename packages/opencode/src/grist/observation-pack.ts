@@ -41,6 +41,15 @@ export type PackDecision =
 export function consider(input: { sessionID: string; toolID: string; text: string }): PackDecision {
   if (process.env.GRIST_OBS_PACK === "off") return { action: "passthrough", count: 0 }
   if (!sessionAllowsObservationPack(input.sessionID)) return { action: "passthrough", count: 0 }
+  // Optional cost gate (§5): packing only when output clears a higher bar.
+  // Enable with GRIST_MECH_COST_GATE=on (default off — SoL-Pi FULL_HITS already
+  // amortizes the first two full deliveries).
+  if (process.env.GRIST_MECH_COST_GATE === "on") {
+    const minBytes = Number(process.env.GRIST_OBS_PACK_MIN_BYTES ?? String(PACK_BYTES * 2))
+    if (Buffer.byteLength(input.text, "utf-8") < minBytes) {
+      return { action: "passthrough", count: 0 }
+    }
+  }
   if (Buffer.byteLength(input.text, "utf-8") <= PACK_BYTES) return { action: "passthrough", count: 0 }
 
   const handle = identity(input.toolID, input.text)

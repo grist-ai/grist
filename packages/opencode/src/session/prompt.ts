@@ -57,6 +57,7 @@ import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
 import { routeTask, textFromParts } from "@/grist/jev-gate"
+import { escalationContext } from "@/grist/escalation-context"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -672,6 +673,18 @@ const layer = Layer.effect(
           : undefined
       const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
 
+      // Escalation context minimization: subgraph only, never the whole repo.
+      const ctxMin =
+        pinned || gate.rung === "cheapest"
+          ? undefined
+          : yield* Effect.promise(() =>
+              escalationContext({
+                text: textFromParts(input.parts),
+                rung: gate.rung,
+              }),
+            )
+      const system = [input.system, ctxMin].filter(Boolean).join("\n\n") || undefined
+
       const info: SessionV1.User = {
         id: input.messageID ?? MessageID.ascending(),
         role: "user",
@@ -684,7 +697,7 @@ const layer = Layer.effect(
           modelID: model.modelID,
           variant,
         },
-        system: input.system,
+        system,
         format: input.format,
       }
 
