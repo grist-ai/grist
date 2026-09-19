@@ -17,8 +17,8 @@ Living plan: [`docs/grist-pre-poc-spec-sheet.md`](docs/grist-pre-poc-spec-sheet.
 **Phase 2 — Router + SoL-Pi:** Jev/shadow gate; `edit_verify`; ObservationPack.
 **Phase 3 scaffold — Instrument:** `[grist:usage]` + optional Langfuse.
 **Phase 4 scaffold — Code map:** `code_map` + Graphify bake-off harness.
-**Phase 5 scaffold — Memory:** verified-outcomes `memory` tool; file store or
-Supermemory; pydriller ownership-mine stub.
+**Phase 6 scaffold — Shadow burn-in:** JSONL decision log + calibratable
+thresholds + `bun scripts/burn-in-report.ts`.
 
 ```bash
 bun install --ignore-scripts
@@ -28,8 +28,10 @@ cp opencode.jsonc.example opencode.jsonc
 # optional: export LANGFUSE_PUBLIC_KEY=... LANGFUSE_SECRET_KEY=...
 # optional: export GRIST_GRAPHIFY_PATH=.../graph.json
 # optional: export SUPERMEMORY_API_KEY=... SUPERMEMORY_BASE_URL=http://localhost:6767
+# optional: export GRIST_TH_DIFF_MEDIUM=0.4  # after burn-in calibration
 # later: export DEEPSEEK_API_KEY=...
 bun run --cwd packages/opencode test src/grist/
+bun scripts/burn-in-report.ts
 bun dev
 ```
 
@@ -38,6 +40,7 @@ Usage logs: `[grist:usage] …`. Disable with `GRIST_USAGE_LOG=off`.
 ObservationPack: `[grist:observation-pack] …`. Disable with `GRIST_OBS_PACK=off`.
 Code map: `[grist:code-map] …`. Disable with `GRIST_CODE_MAP=off`.
 Memory: `[grist:memory] …`. Disable with `GRIST_MEMORY=off`.
+Burn-in log: `.grist/burn-in.jsonl`. Disable with `GRIST_BURNIN=off`.
 Explicit `--model` / agent-pinned models are not rewritten.
 
 ## Build order (pre-POC)
@@ -56,6 +59,7 @@ SoL-Pi ports: [`docs/solpi.md`](docs/solpi.md).
 Gate: [`docs/gate.md`](docs/gate.md).
 Code map: [`docs/code-map.md`](docs/code-map.md).
 Memory: [`docs/memory.md`](docs/memory.md).
+Shadow burn-in: [`docs/shadow-burn-in.md`](docs/shadow-burn-in.md).
 
 ## Local models (watch only)
 
