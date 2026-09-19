@@ -14,8 +14,8 @@ Living plan: [`docs/grist-pre-poc-spec-sheet.md`](docs/grist-pre-poc-spec-sheet.
 ## Current phase
 
 **Phase 1 — Harness** awaits `DEEPSEEK_API_KEY` (you’ll add later).
-**Phase 2 scaffold — Router** is in-tree: Jev/shadow gate stamps the model rung
-per task; surgical-engineer doctrine is injected into the system prompt.
+**Phase 2 — Router + SoL-Pi:** Jev/shadow gate; `edit_verify` Action Fusion;
+ObservationPack on large tool outputs; surgical-engineer doctrine.
 **Phase 3 scaffold — Instrument:** `[grist:usage]` token/$ logs per step; optional Langfuse.
 
 ```bash
@@ -25,12 +25,13 @@ cp opencode.jsonc.example opencode.jsonc
 # optional: export TYPESAFE_API_KEY=...  (else shadow gate)
 # optional: export LANGFUSE_PUBLIC_KEY=... LANGFUSE_SECRET_KEY=...
 # later: export DEEPSEEK_API_KEY=...
-bun run --cwd packages/opencode test src/grist/jev-gate.test.ts
+bun run --cwd packages/opencode test src/grist/
 bun dev
 ```
 
 Gate logs: `[grist:gate] cheapest|medium|frontier …`. Disable with `GRIST_GATE=off`.
 Usage logs: `[grist:usage] …`. Disable with `GRIST_USAGE_LOG=off`.
+ObservationPack: `[grist:observation-pack] …`. Disable with `GRIST_OBS_PACK=off`.
 Explicit `--model` / agent-pinned models are not rewritten.
 
 ## Build order (pre-POC)
@@ -38,13 +39,15 @@ Explicit `--model` / agent-pinned models are not rewritten.
 | # | Phase | Exit |
 | --- | --- | --- |
 | 1 | Harness on cheap tier | Real tasks on Prosh |
-| 2 | Jev router (+ Action Fusion / ObservationPack next) | Routing logged per task |
+| 2 | Jev router + Action Fusion / ObservationPack | Routing + mechanism logs |
 | 3 | Langfuse / usage log | $/task visible |
 | 4 | Map bake-off (Graphify vs CRG) | Layer locked on data |
 | 5 | Supermemory + bootstrap | Retrieval answers ownership/convention Qs |
 | 6 | Shadow burn-in | Calibrated thresholds + measured tier mix |
 
 TypeSafe / Jev skill: [`.agents/skills/typesafe-ai`](.agents/skills/typesafe-ai).
+SoL-Pi ports: [`docs/solpi.md`](docs/solpi.md).
+Gate: [`docs/gate.md`](docs/gate.md).
 
 ## Local models (watch only)
 
