@@ -8,6 +8,7 @@ import {
   rememberSessionMechanisms,
   type MechanismSet,
 } from "./mechanisms"
+import { recordGristEvent } from "./usage-log"
 
 const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 const JEV_MODEL = "jev-latest"
@@ -272,6 +273,14 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
   console.log(
     `[grist:mech] ${mechanisms.resolved} pack=${mechanisms.observationPack} fusion=${mechanisms.actionFusion} · ${mechanisms.reasons.join(",")}`,
   )
+  if (reasons.some((r) => r.startsWith("mode_"))) {
+    recordGristEvent("grist-mode-cap", {
+      sessionID: input.sessionID,
+      mode,
+      rung,
+      reasons: reasons.filter((r) => r.startsWith("mode_")),
+    })
+  }
   // Shadow burn-in: durable JSONL for calibration (§8.6). Never blocks the turn.
   void createBurnInLog()
     .recordDecision({

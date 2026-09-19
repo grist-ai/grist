@@ -17,6 +17,10 @@ Every user prompt hits `routeTask` in `SessionPrompt.createUserMessage`
 - **Burn-in:** every decision appends to `.grist/burn-in.jsonl` for calibration
   ([`docs/shadow-burn-in.md`](shadow-burn-in.md)). Thresholds overridable via
   `GRIST_TH_*` env.
+- **Escalation context:** on medium/frontier, inject a code-map subgraph into the
+  user message system (`GRIST_CTX_MIN=off` to disable).
+- **Diff audit:** edit/write touches logged; off-plan files flagged when a plan
+  was declared (`GRIST_DIFF_AUDIT=off` to disable).
 
 Rung → model defaults (override with env):
 

@@ -26,6 +26,7 @@ text is written under the truncation dir; Grep/Read that path for more.
 - Hooked in `Tool.wrap` (all tools) and shell raw output (`packages/opencode/src/tool/shell.ts`).
 - Disable globally: `GRIST_OBS_PACK=off`
 - Per-task: turned off under `performance` / `off` profiles
+- Optional cost gate: `GRIST_MECH_COST_GATE=on` (+ `GRIST_OBS_PACK_MIN_BYTES`)
 - Log marker: `[grist:observation-pack]`
 
 ## Action Fusion
