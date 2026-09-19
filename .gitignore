@@ -47,3 +47,4 @@ opencode.jsonc
 /models/*.gguf
 /models/.cache/
 /tools/llama-prism/
+.grist/

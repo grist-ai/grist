@@ -121,10 +121,11 @@ Two integrations:
   vs code-review-graph/CRG (MCP-native, blast-radius analysis, semantic search).
   Method: head-to-head on Prosh; lock on measured token spend + retrieval quality.
   See `docs/code-map.md`; tool `code_map`.
-- **Agent memory:** Supermemory (MIT, self-hosted). **Verified outcomes only** —
-  persist from sessions where tests passed, the user approved, or explicitly
-  corrected. Never persist unreviewed generations. Stale memories decay by
-  recency × outcome weight; store needs compaction.
+- **Agent memory:** Supermemory (MIT, self-hosted) + local file fallback.
+  **Verified outcomes only** — persist from sessions where tests passed, the user
+  approved, or explicitly corrected. Never persist unreviewed generations.
+  Stale memories decay by recency × outcome weight. Harness: `docs/memory.md`,
+  tool `memory`.
 - **Ownership mining:** pydriller → Supermemory (license: verify).
 - **Cold-start bootstrap** (one overnight job, resumable): pin SHA → code-map
   build → bounded git history (12–18 mo, sharded) → ranked PR/review ingestion →
@@ -217,6 +218,7 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 
 - [ ] Jev API key capture (`custom.typesafe` link sent — pending his submission)
 - [ ] Map bake-off: Graphify vs CRG — harness + method in-tree; not yet run on Prosh
+- [ ] Memory: harness in-tree (`memory` tool + file/Supermemory); Prosh bootstrap not run
 - [ ] DeepSeek pricing recheck at build time (volatile); backup cheap tier ready
 - [ ] pydriller license confirmation
 - [ ] Local-model watch only: Qwen3.8-27B leads the ≤32B class; Ternary Bonsai 2
