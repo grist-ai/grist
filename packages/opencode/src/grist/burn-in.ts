@@ -1,4 +1,5 @@
 import path from "path"
+import type { MechanismSet } from "./mechanisms"
 import type { OperatingMode } from "./mode"
 import type { Rung } from "./rung"
 
@@ -8,6 +9,7 @@ export type BurnInDecision = {
   rung: Rung
   provider: string
   mode?: OperatingMode
+  mechanisms?: Pick<MechanismSet, "resolved" | "observationPack" | "actionFusion">
   difficulty: number
   sensitivity: number
   underspecified: number
@@ -150,19 +152,37 @@ export function createBurnInLog(input?: {
   return {
     path: filePath,
     async recordDecision(input: {
-      decision: BurnInDecision
+      decision: BurnInDecision & { mechanisms?: MechanismSet }
       sessionID?: string
       text?: string
     }) {
       const id = crypto.randomUUID()
       const preview = input.text?.trim().slice(0, 240)
+      const mech = input.decision.mechanisms
       await write({
         id,
         at: Date.now(),
         kind: "decision",
         sessionID: input.sessionID,
         decision: {
-          ...input.decision,
+          rung: input.decision.rung,
+          provider: input.decision.provider,
+          mode: input.decision.mode,
+          difficulty: input.decision.difficulty,
+          sensitivity: input.decision.sensitivity,
+          underspecified: input.decision.underspecified,
+          reasons: input.decision.reasons,
+          latencyMs: input.decision.latencyMs,
+          model: input.decision.model,
+          ...(mech
+            ? {
+                mechanisms: {
+                  resolved: mech.resolved,
+                  observationPack: mech.observationPack,
+                  actionFusion: mech.actionFusion,
+                },
+              }
+            : {}),
           ...(preview ? { textPreview: preview } : {}),
         },
       })

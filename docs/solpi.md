@@ -3,6 +3,20 @@
 Harness-layer token cuts from *SoL-Pi* (arXiv:2609.20519). Both sit behind env
 kill switches and multiply savings on every model rung.
 
+## Mechanism Choice (`GRIST_MECH`)
+
+Per-task Choice (pre-POC §5) picks a profile; logged as `[grist:mech]`:
+
+| Profile | Env | ObservationPack | Action Fusion |
+| --- | --- | --- | --- |
+| **auto** (default) | `GRIST_MECH=auto` | heuristic | on |
+| **efficiency** | `GRIST_MECH=efficiency` | on | on |
+| **performance** | `GRIST_MECH=performance` | off (full fidelity) | on |
+| **off** | `GRIST_MECH=off` | off | off |
+
+Auto heuristic: exploration/diagnosis → performance; build/test/edit → efficiency.
+Choice is remembered per session so `Tool.wrap` / shell honor ObservationPack.
+
 ## ObservationPack
 
 Tool outputs **>10KB**: deliver full text twice for the same
@@ -10,7 +24,8 @@ Tool outputs **>10KB**: deliver full text twice for the same
 text is written under the truncation dir; Grep/Read that path for more.
 
 - Hooked in `Tool.wrap` (all tools) and shell raw output (`packages/opencode/src/tool/shell.ts`).
-- Disable: `GRIST_OBS_PACK=off`
+- Disable globally: `GRIST_OBS_PACK=off`
+- Per-task: turned off under `performance` / `off` profiles
 - Log marker: `[grist:observation-pack]`
 
 ## Action Fusion
@@ -27,4 +42,5 @@ text is written under the truncation dir; Grep/Read that path for more.
 ```bash
 bun run --cwd packages/opencode test src/grist/observation-pack.test.ts
 bun run --cwd packages/opencode test src/grist/action-fusion.test.ts
+bun run --cwd packages/opencode test src/grist/mechanisms.test.ts
 ```

@@ -29,10 +29,11 @@ else
   echo "[grist:bootstrap] graphify not on PATH — skip map build (install later for bake-off)"
 fi
 
-echo "[grist:bootstrap] mining ownership…"
+echo "[grist:bootstrap] mining ownership (bounded)…"
 python3 "$ROOT/scripts/ownership-mine.py" \
   --repo "$REPO" \
   --since "$SINCE" \
+  --limit "${GRIST_BOOTSTRAP_OWNERSHIP_LIMIT:-5000}" \
   --out "$OUT/ownership.jsonl"
 
 cat >"$OUT/NEXT.md" <<EOF
