@@ -7,6 +7,7 @@ import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
 import { EditTool } from "./edit"
 import { EditVerifyTool } from "./edit-verify"
+import { CodeMapTool } from "./code-map"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
@@ -113,6 +114,7 @@ const layer = Layer.effect(
     const writetool = yield* WriteTool
     const edit = yield* EditTool
     const editVerify = yield* EditVerifyTool
+    const codeMap = yield* CodeMapTool
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
@@ -216,6 +218,7 @@ const layer = Layer.effect(
           grep: Tool.init(greptool),
           edit: Tool.init(edit),
           edit_verify: Tool.init(editVerify),
+          code_map: Tool.init(codeMap),
           write: Tool.init(writetool),
           task: Tool.init(task),
           fetch: Tool.init(webfetch),
@@ -240,6 +243,7 @@ const layer = Layer.effect(
             tool.grep,
             tool.edit,
             tool.edit_verify,
+            tool.code_map,
             tool.write,
             tool.task,
             tool.fetch,
