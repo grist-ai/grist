@@ -18,7 +18,7 @@ export OPENROUTER_API_KEY=sk-or-v1-...
 cp opencode.jsonc.example opencode.jsonc
 ```
 
-Default model: `openrouter/deepseek/deepseek-v4-flash`.
+Default model: `openrouter/deepseek/deepseek-v4.1-flash`.
 
 4. Verify:
 
@@ -31,9 +31,23 @@ bun run --cwd packages/opencode src/index.ts models openrouter
 
 | Rung | OpenRouter model id | Env override |
 | --- | --- | --- |
-| Cheapest | `deepseek/deepseek-v4-flash` | `GRIST_CHEAPEST_MODEL` |
+| Cheapest | `deepseek/deepseek-v4.1-flash` | `GRIST_CHEAPEST_MODEL` |
 | Medium | `deepseek/deepseek-v4-pro` | `GRIST_MEDIUM_MODEL` |
 | Frontier | `anthropic/claude-opus-4.6` | `GRIST_FRONTIER_MODEL` |
+
+### DeepSeek pricing recheck (2026-09-19)
+
+First-party [api-docs.deepseek.com](https://api-docs.deepseek.com/quick_start/pricing)
+(off-peak / peak per 1M tok). OpenRouter markups may differ — verify on
+[openrouter.ai/models](https://openrouter.ai/models).
+
+| Model | Off-peak in/out | Peak in/out | Notes |
+| --- | --- | --- | --- |
+| `deepseek-flash` (V4.1-Flash) | $0.15 / $0.60 | $0.30 / $1.20 | Preferred cheap; legacy `deepseek-v4-flash` aliases here |
+| `deepseek-v4-pro` (0813) | $0.66 / $1.98 | $1.32 / $3.96 | Still served after 2026-09-14; was nearly withdrawn |
+
+Peak windows (UTC weekdays): 01:00–04:00 and 06:00–10:00. US daytime ≈ off-peak.
+Spec sheet table (~$0.44/$0.87 promo for Pro) is **stale** — use this row for economics.
 
 Provider defaults to `openrouter` for every rung (`GRIST_*_PROVIDER` to pin
 elsewhere). Example — swap frontier to GPT-5.6 Sol still on OpenRouter:
