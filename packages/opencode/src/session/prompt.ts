@@ -656,13 +656,12 @@ const layer = Layer.effect(
           pinned,
         }),
       )
-      const model =
-        pinned || gate.rung === "ask_human"
-          ? resolved
-          : {
-              providerID: ProviderV2.ID.make(gate.model.providerID),
-              modelID: ModelV2.ID.make(gate.model.modelID),
-            }
+      const model = pinned
+        ? resolved
+        : {
+            providerID: ProviderV2.ID.make(gate.model.providerID),
+            modelID: ModelV2.ID.make(gate.model.modelID),
+          }
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same

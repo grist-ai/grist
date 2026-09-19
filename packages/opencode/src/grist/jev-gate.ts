@@ -50,7 +50,8 @@ function score01(answer: ScoreAnswer | undefined, levels: number): number {
 }
 
 /**
- * Compose rung from difficulty + sensitivity + underspecified (spec §4).
+ * Compose rung from difficulty + sensitivity + underspecified (pre-POC §4).
+ * Underspecified tasks stay on cheapest (no ask-human rung).
  * Thresholds are placeholders until shadow burn-in calibrates them.
  */
 export function composeRung(input: {
@@ -59,13 +60,9 @@ export function composeRung(input: {
   underspecified: number
 }): { rung: Rung; reasons: string[] } {
   const reasons: string[] = []
-  if (input.underspecified >= 0.7) {
-    reasons.push("underspecified")
-    return { rung: "ask_human", reasons }
-  }
 
   // Sensitivity caps how high we may escalate.
-  let max: Exclude<Rung, "ask_human"> = "frontier"
+  let max: Rung = "frontier"
   if (input.sensitivity >= 0.75) {
     max = "cheapest"
     reasons.push("sensitivity_cap_cheapest")
@@ -74,8 +71,11 @@ export function composeRung(input: {
     reasons.push("sensitivity_cap_medium")
   }
 
-  let want: Exclude<Rung, "ask_human"> = "cheapest"
-  if (input.difficulty >= 0.75) {
+  let want: Rung = "cheapest"
+  if (input.underspecified >= 0.7) {
+    want = "cheapest"
+    reasons.push("underspecified_cheapest")
+  } else if (input.difficulty >= 0.75) {
     want = "frontier"
     reasons.push("difficulty_frontier")
   } else if (input.difficulty >= 0.4) {
@@ -130,7 +130,7 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
     state: {
       task: text,
       product: "Grist",
-      ladder: "cheapest=DeepSeek Flash, medium=DeepSeek Pro, frontier=Claude Opus, ask_human",
+      ladder: "cheapest=DeepSeek Flash, medium=DeepSeek Pro, frontier=Claude Opus",
     },
     questions: {
       difficulty: {
@@ -159,7 +159,8 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
       },
       underspecified: {
         type: "noul",
-        instructions: "Is the task too vague to act without inventing goals or files?",
+        instructions:
+          "Is the task vague (missing goal/files)? High yes should prefer the cheapest rung, not invent scope.",
         criteria: {
           true: "Missing goal, files, or success criteria",
           false: "Clear enough to attempt",
@@ -189,8 +190,7 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
   return { difficulty, sensitivity, underspecified }
 }
 
-function modelForRung(rung: Rung, current: ModelRef): ModelRef {
-  if (rung === "ask_human") return current
+function modelForRung(rung: Rung, _current: ModelRef): ModelRef {
   return { ...RUNG_MODELS[rung] }
 }
 

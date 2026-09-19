@@ -1,5 +1,5 @@
-/** Grist model ladder rungs (pre-POC spec §3–4). */
-export type Rung = "cheapest" | "medium" | "frontier" | "ask_human"
+/** Grist model ladder rungs (pre-POC: cheapest → medium → frontier). */
+export type Rung = "cheapest" | "medium" | "frontier"
 
 export type ModelRef = {
   providerID: string
@@ -8,7 +8,7 @@ export type ModelRef = {
 }
 
 /** Default provider/model ids per rung — override via env when keys land. */
-export const RUNG_MODELS: Record<Exclude<Rung, "ask_human">, ModelRef> = {
+export const RUNG_MODELS: Record<Rung, ModelRef> = {
   cheapest: {
     providerID: process.env.GRIST_CHEAPEST_PROVIDER ?? "deepseek",
     modelID: process.env.GRIST_CHEAPEST_MODEL ?? "deepseek-flash",

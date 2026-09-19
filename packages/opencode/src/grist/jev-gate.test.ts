@@ -7,9 +7,10 @@ describe("composeRung", () => {
     expect(rung).toBe("cheapest")
   })
 
-  test("asks human when underspecified", () => {
-    const { rung } = composeRung({ difficulty: 0.9, sensitivity: 0.1, underspecified: 0.9 })
-    expect(rung).toBe("ask_human")
+  test("underspecified stays on cheapest (no ask_human)", () => {
+    const { rung, reasons } = composeRung({ difficulty: 0.9, sensitivity: 0.1, underspecified: 0.9 })
+    expect(rung).toBe("cheapest")
+    expect(reasons).toContain("underspecified_cheapest")
   })
 
   test("sensitivity caps frontier down to cheapest", () => {

@@ -36,12 +36,11 @@ ENGINEER (chat / IDE / CLI)
 CONFIDENCE GATE — Jev (TypeSafe System One)
   Score(difficulty) → picks cheapest capable rung
   Score(sensitivity) → caps max rung
-  route ∈ { cheapest, medium, frontier, ask_human }
+  route ∈ { cheapest, medium, frontier }
   Context minimized on escalation (subgraph, not repo)
    ├──► CHEAPEST: DeepSeek V4 Flash        (default)
    ├──► MEDIUM:   DeepSeek V4 Pro          (pre-frontier step)
-   ├──► FRONTIER: Claude Opus 5            (exception only; GPT-5.6 Sol backup)
-   └──► ASK HUMAN (Jev Noul / explicit unknown)
+   └──► FRONTIER: Claude Opus 5            (exception only; GPT-5.6 Sol backup)
    │ tools + retrieval (all tiers)
    ▼
 KNOWLEDGE LAYER — code map (bake-off open) · Supermemory (self-hosted)
@@ -75,12 +74,13 @@ OBSERVABILITY — Langfuse (traces, $/task) · inspect_ai (gate precision, evals
   via `typesafe-sdk`. Not a text generator — evaluates a state, returns typed
   answers + calibrated probabilities. $0.042/MTok in, output free; 70–500 ms.
 - **Primitives:** `Score` (0–1), `Choice` (route/mechanism decision), `Noul`
-  (explicit unknown → ask human).
+  (underspecification signal — forces cheapest rung; no ask-human path).
 - **Two scores per task:**
   - `Score(difficulty)` → cheapest rung that can handle it.
   - `Score(sensitivity)` → caps how high it may escalate. Auth/secrets/
     proprietary logic stay on cheaper tiers even at quality cost; per-project
     policy can forbid escalation past a chosen rung.
+  - `Noul(underspecified)` → stay on cheapest rather than inventing scope.
 - **Context minimization on escalation:** send the relevant code-map subgraph,
   never the repo.
 - **Targets:** ≥80% cheapest-tier, ≤5% frontier. (One point of frontier ≈ 30×

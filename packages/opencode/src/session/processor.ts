@@ -25,6 +25,7 @@ import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
 import { Usage, type LLMEvent } from "@opencode-ai/llm"
+import { recordTaskUsage } from "@/grist/usage-log"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -453,6 +454,22 @@ const layer = Layer.effect(
               model: ctx.model,
               usage: value.usage ?? new Usage({}),
               metadata: value.providerMetadata,
+            })
+            recordTaskUsage({
+              sessionID: ctx.sessionID,
+              messageID: ctx.assistantMessage.id,
+              providerID: String(ctx.model.providerID),
+              modelID: String(ctx.model.id),
+              tokens: {
+                input: usage.tokens.input,
+                output: usage.tokens.output,
+                reasoning: usage.tokens.reasoning,
+                cache: {
+                  read: usage.tokens.cache.read,
+                  write: usage.tokens.cache.write,
+                },
+              },
+              costUsd: usage.cost,
             })
             ctx.assistantMessage.finish = value.reason
             ctx.assistantMessage.cost += usage.cost
