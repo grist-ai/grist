@@ -4,8 +4,8 @@ Confidence-gated coding agent — a rebranded fork of [OpenCode](https://github.
 The agent loop *is* this codebase (chat / IDE / CLI). There is no separate mill wrapper.
 
 A Jev confidence gate routes each task to the **cheapest capable model rung**
-(DeepSeek Flash → DeepSeek Pro → frontier), with institutional memory mined from
-the user’s history. Local models are watch-only for now.
+(via OpenRouter: DeepSeek Flash → DeepSeek Pro → frontier), with institutional
+memory mined from the user’s history. Local models are watch-only for now.
 
 **Value prop:** frontier-tier output at a flat price, with memory that survives turnover.
 
@@ -13,23 +13,18 @@ Living plan: [`docs/grist-pre-poc-spec-sheet.md`](docs/grist-pre-poc-spec-sheet.
 
 ## Current phase
 
-**Phase 1 — Harness** awaits `DEEPSEEK_API_KEY` (you’ll add later).
-**Phase 2 — Router + SoL-Pi:** Jev/shadow gate; `edit_verify`; ObservationPack.
-**Phase 3 scaffold — Instrument:** `[grist:usage]` + optional Langfuse.
-**Phase 4 scaffold — Code map:** `code_map` + Graphify bake-off harness.
-**Phase 6 scaffold — Shadow burn-in:** JSONL decision log + calibratable
-thresholds + `bun scripts/burn-in-report.ts`.
+**Phase 1 — Harness** via **OpenRouter** (`OPENROUTER_API_KEY`) — one key for
+the whole ladder; swap models with `GRIST_*_MODEL`.
+**Phase 2–6 scaffolds** are in-tree (gate, SoL-Pi, usage, code map, memory,
+shadow burn-in).
 
 ```bash
 bun install --ignore-scripts
 bun run --cwd packages/core fix-node-pty
 cp opencode.jsonc.example opencode.jsonc
-# optional: export TYPESAFE_API_KEY=...  (else shadow gate)
-# optional: export LANGFUSE_PUBLIC_KEY=... LANGFUSE_SECRET_KEY=...
-# optional: export GRIST_GRAPHIFY_PATH=.../graph.json
-# optional: export SUPERMEMORY_API_KEY=... SUPERMEMORY_BASE_URL=http://localhost:6767
-# optional: export GRIST_TH_DIFF_MEDIUM=0.4  # after burn-in calibration
-# later: export DEEPSEEK_API_KEY=...
+export OPENROUTER_API_KEY=sk-or-v1-...
+# optional: export TYPESAFE_API_KEY=...
+# optional: export GRIST_FRONTIER_MODEL=openai/gpt-5.6-sol
 bun run --cwd packages/opencode test src/grist/
 bun scripts/burn-in-report.ts
 bun dev
@@ -55,6 +50,7 @@ Explicit `--model` / agent-pinned models are not rewritten.
 | 6 | Shadow burn-in | Calibrated thresholds + measured tier mix |
 
 TypeSafe / Jev skill: [`.agents/skills/typesafe-ai`](.agents/skills/typesafe-ai).
+Providers: [`docs/providers.md`](docs/providers.md).
 SoL-Pi ports: [`docs/solpi.md`](docs/solpi.md).
 Gate: [`docs/gate.md`](docs/gate.md).
 Code map: [`docs/code-map.md`](docs/code-map.md).

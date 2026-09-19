@@ -16,10 +16,12 @@ Every user prompt hits `routeTask` in `SessionPrompt.createUserMessage`
 
 Rung → model defaults (override with env):
 
-| Rung | Env | Default |
+| Rung | Env | Default (OpenRouter) |
 | --- | --- | --- |
-| cheapest | `GRIST_CHEAPEST_*` | `deepseek/deepseek-flash` |
-| medium | `GRIST_MEDIUM_*` | `deepseek/deepseek-v4-pro` |
-| frontier | `GRIST_FRONTIER_*` | `anthropic/claude-opus-4-20250514` |
+| cheapest | `GRIST_CHEAPEST_*` | `openrouter` / `deepseek/deepseek-v4-flash` |
+| medium | `GRIST_MEDIUM_*` | `openrouter` / `deepseek/deepseek-v4-pro` |
+| frontier | `GRIST_FRONTIER_*` | `openrouter` / `anthropic/claude-opus-4.6` |
+
+One key: `OPENROUTER_API_KEY`. See [`providers.md`](providers.md).
 
 Tests: `bun run --cwd packages/opencode test src/grist/jev-gate.test.ts`
