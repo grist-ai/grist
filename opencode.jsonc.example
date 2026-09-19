@@ -1,19 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // Phase 1 default: cheapest rung (DeepSeek Flash).
-  // Copy to opencode.jsonc (gitignored) and set DEEPSEEK_API_KEY.
-  "model": "deepseek/deepseek-flash",
+  // One key for the whole ladder: export OPENROUTER_API_KEY=sk-or-v1-...
+  // Change rungs via GRIST_*_MODEL without new provider keys.
+  "model": "openrouter/deepseek/deepseek-v4-flash",
   "provider": {
-    "deepseek": {
+    "openrouter": {
       "options": {
-        "baseURL": "https://api.deepseek.com"
-      },
-      "models": {
-        "deepseek-flash": {
-          "name": "DeepSeek Flash (cheapest)"
-        },
-        "deepseek-v4-pro": {
-          "name": "DeepSeek V4 Pro (medium)"
+        "headers": {
+          "HTTP-Referer": "https://github.com/pranav6226/grist",
+          "X-Title": "Grist"
         }
       }
     }

@@ -1,43 +1,54 @@
 # Providers (Phase 1 harness)
 
-Grist holds API keys and points the OpenCode fork at the model ladder.
-Default rung: **DeepSeek Flash** (`deepseek-flash`).
+Grist holds **one** API key via [OpenRouter](https://openrouter.ai) and routes
+the model ladder (cheapest → medium → frontier) by changing model ids only.
 
-## DeepSeek (required for Phase 1)
+## OpenRouter (recommended)
 
-1. Create a key at [platform.deepseek.com](https://platform.deepseek.com).
+1. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys).
 2. Export it (or put it in a local `.env` that is **not** committed):
 
 ```bash
-export DEEPSEEK_API_KEY=sk-...
+export OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-3. Project config (gitignored `opencode.jsonc` — copy from example):
+3. Project config:
 
 ```bash
 cp opencode.jsonc.example opencode.jsonc
 ```
 
-4. Connect / verify:
+Default model: `openrouter/deepseek/deepseek-v4-flash`.
+
+4. Verify:
 
 ```bash
-bun run --cwd packages/opencode src/index.ts models deepseek
-# or interactive: bun dev  then /connect deepseek
+bun run --cwd packages/opencode src/index.ts models openrouter
+# or: bun dev  then /connect openrouter
 ```
 
-OpenAI-compatible base URL: `https://api.deepseek.com`. Recheck pricing at
-[api-docs.deepseek.com](https://api-docs.deepseek.com) before locking economics.
+### Ladder (defaults — all via OpenRouter)
 
-### Medium / frontier (later phases)
-
-| Rung | Model (spec) | Notes |
+| Rung | OpenRouter model id | Env override |
 | --- | --- | --- |
-| Cheapest | `deepseek-flash` | Phase 1 default |
-| Medium | DeepSeek V4 Pro | Confirm live API id at build time (may route/retire) |
-| Frontier | Claude Opus 5 (backup GPT-5.6 Sol) | Anthropic / OpenAI keys; Phase 2+ with Jev |
+| Cheapest | `deepseek/deepseek-v4-flash` | `GRIST_CHEAPEST_MODEL` |
+| Medium | `deepseek/deepseek-v4-pro` | `GRIST_MEDIUM_MODEL` |
+| Frontier | `anthropic/claude-opus-4.6` | `GRIST_FRONTIER_MODEL` |
 
-Router stays provider-agnostic — backup cheap tier (Kimi / GPT-mini class) must
-be one config change away.
+Provider defaults to `openrouter` for every rung (`GRIST_*_PROVIDER` to pin
+elsewhere). Example — swap frontier to GPT-5.6 Sol still on OpenRouter:
+
+```bash
+export GRIST_FRONTIER_MODEL=openai/gpt-5.6-sol
+```
+
+Browse live ids: [openrouter.ai/models](https://openrouter.ai/models).
+
+## Native providers (optional)
+
+You can still use first-party keys if you prefer (DeepSeek / Anthropic /
+OpenAI). Set `GRIST_*_PROVIDER` + `GRIST_*_MODEL` accordingly and export that
+provider’s key. OpenRouter remains the zero-friction default.
 
 ## TypeSafe / Jev (Phase 2)
 
@@ -46,3 +57,4 @@ export TYPESAFE_API_KEY=...
 ```
 
 See [`grist-pre-poc-spec-sheet.md`](grist-pre-poc-spec-sheet.md) §4.
+Gate: [`gate.md`](gate.md).
