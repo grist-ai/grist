@@ -7,6 +7,7 @@ import type { Permission } from "../permission"
 import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
+import { consider as considerPack, formatPacked } from "@/grist/observation-pack"
 
 interface Metadata {
   [key: string]: any
@@ -128,6 +129,35 @@ function wrap<Parameters extends Schema.Decoder<unknown>, Result extends Metadat
             ),
           )
           const result = yield* execute(decoded as Schema.Schema.Type<Parameters>, ctx)
+          // SoL-Pi ObservationPack: after 2 full deliveries of the same >10KB
+          // output, replace with handle + ~1KB excerpt (full text on disk).
+          const pack = considerPack({
+            sessionID: ctx.sessionID,
+            toolID: id,
+            text: result.output,
+          })
+          if (pack.action === "pack") {
+            const outputPath = yield* truncate.write(result.output)
+            return {
+              ...result,
+              output: formatPacked({
+                handle: pack.handle,
+                excerpt: pack.excerpt,
+                outputPath,
+                toolID: id,
+                count: pack.count,
+                totalBytes: Buffer.byteLength(result.output, "utf-8"),
+              }),
+              metadata: {
+                ...result.metadata,
+                truncated: true,
+                outputPath,
+                observationPack: true,
+                observationPackHandle: pack.handle,
+                observationPackHit: pack.count,
+              },
+            }
+          }
           if (result.metadata.truncated !== undefined) {
             return result
           }
