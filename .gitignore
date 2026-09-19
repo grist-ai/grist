@@ -32,3 +32,18 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Phase 2 local model + PrismML llama.cpp binaries (download locally)
+/models/
+/tools/llama-prism/
+opencode.jsonc
+
+# Phase 2 local inference (large binaries / weights — not committed)
+/models/*.gguf
+/models/.cache/
+/tools/llama-prism/
+
+# Phase 2 local inference (large binaries / weights — not committed)
+/models/*.gguf
+/models/.cache/
+/tools/llama-prism/

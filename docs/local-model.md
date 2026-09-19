@@ -1,29 +1,37 @@
-# Local model (llama.cpp → Grist)
+# Local model (Phase 2 → 3)
 
-Phase 2 runs Ternary Bonsai 2 27B behind llama.cpp. Phase 3 points this OpenCode fork at that server.
+Ternary Bonsai 2 27B runs behind **PrismML’s llama.cpp fork**, not stock Homebrew `llama-server`. Stock builds reject `PTQ1_0` / `PQ2_0` (or load `Q2_0` and emit garbage).
 
-llama.cpp’s `llama-server` exposes an OpenAI-compatible API. Example project config (`opencode.json` / `opencode.jsonc`):
+## Setup (this machine)
 
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "llama.cpp": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "llama-server (local)",
-      "options": {
-        "baseURL": "http://127.0.0.1:8080/v1"
-      },
-      "models": {
-        "bonsai-2-27b": {
-          "name": "Ternary Bonsai 2 27B (local)"
-        }
-      }
-    }
-  }
-}
+```bash
+./scripts/grist-phase2-setup.sh   # PrismML binaries + PTQ1_0 GGUF (~6 GB)
+./scripts/grist-llama-server.sh   # OpenAI-compatible API on :8080
 ```
 
-Adjust `baseURL`, provider ID, and model IDs to match your `llama-server` bind address and loaded GGUF. On 16GB machines cap context per slot (~16K); 24GB+ can use ~32K — see [`grist-build-spec.md`](grist-build-spec.md) §6–7.
+Defaults: 32K context (`GRIST_CTX`), Metal offload (`GRIST_NGL=99`), port `8080`. On ≤16GB RAM use `GRIST_CTX=16384`.
 
-This reset does **not** require the model to be installed; config is documentation only until Phase 2 is live.
+Weights: [`prism-ml/Ternary-Bonsai-2-27B-gguf`](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) (`Ternary-Bonsai-2-27B-PTQ1_0.gguf`). Binaries: [PrismML-Eng/llama.cpp releases](https://github.com/PrismML-Eng/llama.cpp/releases) (`*-bin-macos-arm64`).
+
+`models/` and `tools/llama-prism/` are gitignored — download locally.
+
+## Point Grist (OpenCode fork) at the server
+
+```bash
+cp opencode.jsonc.example opencode.jsonc
+bun dev
+# or: bun run --cwd packages/opencode src/index.ts --model llama.cpp/bonsai-2-27b
+```
+
+`opencode.jsonc.example` registers an OpenAI-compatible provider at `http://127.0.0.1:8080/v1`.
+
+## Verify tok/s (Phase 2 gate)
+
+With the server up:
+
+```bash
+curl -s http://127.0.0.1:8080/v1/models | head
+# optional: PrismML llama-bench / timed completion — target ~20–28 tok/s on M-series
+```
+
+See [`grist-build-spec.md`](grist-build-spec.md) §6–7 for context/slot guidance.

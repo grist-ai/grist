@@ -10,38 +10,37 @@ One-line: **frontier-tier output on a local budget, with institutional memory th
 
 ## Current phase
 
-**Phase 3 — Agent loop.** Baseline is this OpenCode-derived tree, runnable locally. Point it at llama.cpp when Phase 2 is up.
+**Phase 3 — Agent loop** is in place (this OpenCode fork). **Phase 2 — local model** uses PrismML llama.cpp + Ternary Bonsai 2 27B; see below.
 
-Full product plan, locked components, and later phases (gate, map, memory, shadow burn-in): [`docs/grist-build-spec.md`](docs/grist-build-spec.md).
-
-Upstream OpenCode install / contributing docs still apply for day-to-day development of the agent loop.
+Full product plan: [`docs/grist-build-spec.md`](docs/grist-build-spec.md).
 
 ## Develop
 
 Requirements: [Bun](https://bun.sh) 1.3+.
 
 ```bash
-bun install
+bun install --ignore-scripts   # if tree-sitter-powershell gyp fails
+bun run --cwd packages/core fix-node-pty
 bun dev
 ```
 
-CLI help / headless serve:
-
 ```bash
 bun dev --help
-bun dev serve
+bun run --cwd packages/opencode src/index.ts --help
 ```
 
-Build a standalone binary:
+## Local model (Phase 2)
+
+Stock Homebrew `llama-server` will **not** run ternary Bonsai. Use the PrismML fork:
 
 ```bash
-./packages/opencode/script/build.ts --single
-./packages/opencode/dist/opencode-<platform>/bin/opencode --help
+./scripts/grist-phase2-setup.sh    # binaries + ~6GB PTQ1_0 GGUF
+./scripts/grist-llama-server.sh    # :8080 OpenAI-compatible
+cp opencode.jsonc.example opencode.jsonc
+bun dev                            # model llama.cpp/bonsai-2-27b
 ```
 
-## Local model (Phase 2 → 3)
-
-When llama.cpp `llama-server` is running (OpenAI-compatible, typically `http://127.0.0.1:8080/v1`), configure a provider in `opencode.json` / `opencode.jsonc`. See [`docs/local-model.md`](docs/local-model.md).
+Details: [`docs/local-model.md`](docs/local-model.md).
 
 ## What’s next (not in this reset)
 
