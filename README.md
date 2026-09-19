@@ -16,8 +16,9 @@ Living plan: [`docs/grist-pre-poc-spec-sheet.md`](docs/grist-pre-poc-spec-sheet.
 **Phase 1 — Harness** awaits `DEEPSEEK_API_KEY` (you’ll add later).
 **Phase 2 — Router + SoL-Pi:** Jev/shadow gate; `edit_verify`; ObservationPack.
 **Phase 3 scaffold — Instrument:** `[grist:usage]` + optional Langfuse.
-**Phase 4 scaffold — Code map:** `code_map` tool + Graphify loader + bake-off
-scoring; CRG MCP stub. Run head-to-head on Prosh to lock the layer.
+**Phase 4 scaffold — Code map:** `code_map` + Graphify bake-off harness.
+**Phase 5 scaffold — Memory:** verified-outcomes `memory` tool; file store or
+Supermemory; pydriller ownership-mine stub.
 
 ```bash
 bun install --ignore-scripts
@@ -26,6 +27,7 @@ cp opencode.jsonc.example opencode.jsonc
 # optional: export TYPESAFE_API_KEY=...  (else shadow gate)
 # optional: export LANGFUSE_PUBLIC_KEY=... LANGFUSE_SECRET_KEY=...
 # optional: export GRIST_GRAPHIFY_PATH=.../graph.json
+# optional: export SUPERMEMORY_API_KEY=... SUPERMEMORY_BASE_URL=http://localhost:6767
 # later: export DEEPSEEK_API_KEY=...
 bun run --cwd packages/opencode test src/grist/
 bun dev
@@ -35,6 +37,7 @@ Gate logs: `[grist:gate] cheapest|medium|frontier …`. Disable with `GRIST_GATE
 Usage logs: `[grist:usage] …`. Disable with `GRIST_USAGE_LOG=off`.
 ObservationPack: `[grist:observation-pack] …`. Disable with `GRIST_OBS_PACK=off`.
 Code map: `[grist:code-map] …`. Disable with `GRIST_CODE_MAP=off`.
+Memory: `[grist:memory] …`. Disable with `GRIST_MEMORY=off`.
 Explicit `--model` / agent-pinned models are not rewritten.
 
 ## Build order (pre-POC)
@@ -52,6 +55,7 @@ TypeSafe / Jev skill: [`.agents/skills/typesafe-ai`](.agents/skills/typesafe-ai)
 SoL-Pi ports: [`docs/solpi.md`](docs/solpi.md).
 Gate: [`docs/gate.md`](docs/gate.md).
 Code map: [`docs/code-map.md`](docs/code-map.md).
+Memory: [`docs/memory.md`](docs/memory.md).
 
 ## Local models (watch only)
 
