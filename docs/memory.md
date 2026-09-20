@@ -57,19 +57,16 @@ Grist remembers via `POST /v3/documents` and recalls via `POST /v4/search`.
 
 ## Ownership mining
 
-```bash
-python3 scripts/ownership-mine.py --repo /path/to/Prosh --since 18months \
-  --out .grist/bootstrap/ownership.jsonl
-```
-
-Uses `git log` today (pydriller path reserved until license confirmation).
-Review rows before `memory remember` — never auto-persist unreviewed ownership.
-
-Cold-start wrapper (pin SHA → optional Graphify → ownership mine):
+Cold-start:
 
 ```bash
-./scripts/grist-bootstrap.sh /path/to/Prosh
+grist init /path/to/repo
+grist bootstrap /path/to/repo --since 18months
+# or: ./scripts/grist-bootstrap.sh /path/to/repo
 ```
+
+Review `.grist/bootstrap/ownership.jsonl` before `memory remember` — never auto-persist
+unreviewed ownership.
 
 ## Tests
 

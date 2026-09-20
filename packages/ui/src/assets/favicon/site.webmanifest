@@ -1,6 +1,6 @@
 {
-  "name": "OpenCode",
-  "short_name": "OpenCode",
+  "name": "Grist",
+  "short_name": "Grist",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -18,7 +18,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#080808",
+  "theme_color": "#EC5B2B",
   "background_color": "#080808",
   "display": "standalone"
 }

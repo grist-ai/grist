@@ -19,11 +19,11 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
   const colors = isLight
     ? {
         bg: "#ffffff",
-        element: "#f5f5f5",
+        element: "#f5f0eb",
         borderSubtle: "#d4d4d4",
         text: "#1a1a1a",
         muted: "#8a8a8a",
-        primary: "#3b7dd8",
+        primary: "#EC5B2B",
         onPrimary: "#ffffff",
         error: "#d1383d",
         success: "#3d9a57",
@@ -34,7 +34,7 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
         borderSubtle: "#3c3c3c",
         text: "#eeeeee",
         muted: "#808080",
-        primary: "#fab283",
+        primary: "#EC5B2B",
         onPrimary: "#0a0a0a",
         error: "#e06c75",
         success: "#7fd88f",

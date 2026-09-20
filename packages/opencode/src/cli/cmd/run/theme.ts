@@ -404,8 +404,8 @@ export function generateSystem(colors: TerminalColors, pick: "dark" | "light"): 
 
   const diff_alpha = isDark ? 0.22 : 0.14
   const diff_context_bg = grays[2]
-  const primary = ansi.cyan
-  const secondary = ansi.magenta
+  const primary = RGBA.fromHex("#EC5B2B")
+  const secondary = RGBA.fromHex("#EE7948")
 
   return {
     theme: {

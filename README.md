@@ -20,7 +20,10 @@ code map, memory, burn-in, eval). Pilot-repo exits are deferred — see
 ```bash
 bun install --ignore-scripts
 bun run --cwd packages/core fix-node-pty
-cp opencode.jsonc.example opencode.jsonc
+# In a codebase you want Grist to work on:
+bun run --cwd packages/opencode src/index.ts init
+# optional cold-start (ownership mine + optional Graphify):
+bun run --cwd packages/opencode src/index.ts bootstrap
 export OPENROUTER_API_KEY=sk-or-v1-...
 # optional: export TYPESAFE_API_KEY=...
 # optional: export GRIST_FRONTIER_MODEL=openai/gpt-5.6-sol
@@ -28,8 +31,24 @@ bun run --cwd packages/opencode test src/grist/
 bun scripts/grist-eval.ts
 bun scripts/burn-in-report.ts
 bun dev
+
+# Desktop GUI (Electron, Mac/Win/Linux):
+bun run --cwd packages/desktop dev
+# package a Mac .app:
+# bun run --cwd packages/desktop build && bun run --cwd packages/desktop package:mac
 ```
 
+### New codebase
+
+```bash
+cd /path/to/your-repo
+grist init                 # .grist/, opencode.jsonc, .gitignore
+grist bootstrap            # pin SHA + ownership mine (+ Graphify if installed)
+grist                      # start agent
+```
+
+`grist init --bootstrap` runs both. Review `.grist/bootstrap/ownership.jsonl` before
+persisting any rows to memory.
 ### Install from npm (when published)
 
 ```bash
