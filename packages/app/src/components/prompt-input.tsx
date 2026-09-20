@@ -44,6 +44,7 @@ import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
+import { HIDE_MODEL_UI } from "@/product"
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import { useCommand } from "@/context/command"
@@ -1674,7 +1675,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </TooltipKeybind>
                   </div>
                 </Show>
-                <Show when={!providersLoading()}>
+                <Show when={!HIDE_MODEL_UI && !providersLoading()}>
                   <Show when={store.mode !== "shell"}>
                     <div
                       data-component="prompt-model-control"

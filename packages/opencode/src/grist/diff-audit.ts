@@ -5,6 +5,7 @@
  */
 
 import { recordGristEvent } from "./usage-log"
+import { gristLog } from "./debug"
 
 export type DiffTouch = {
   filePath: string
@@ -67,7 +68,7 @@ export function auditSession(sessionID: string): DiffAudit {
   }
 
   if (state.touches.length > 0) {
-    console.log(
+    gristLog(
       `[grist:diff-audit] session=${sessionID} files=${touched.length} planned=${planned.length} offPlan=${offPlan.length}${
         offPlan.length ? ` · ${offPlan.slice(0, 5).join(",")}` : ""
       }`,

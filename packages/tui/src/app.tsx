@@ -40,6 +40,7 @@ import { LocationProvider } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
 import { PermissionProvider } from "./context/permission"
 import { DialogModel } from "./component/dialog-model"
+import { HIDE_MODEL_UI, PRODUCT_NAME } from "./product"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogStatus } from "./component/dialog-status"
@@ -456,24 +457,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
 
     if (route.data.type === "home") {
-      renderer.setTerminalTitle("OpenCode")
+      renderer.setTerminalTitle(PRODUCT_NAME)
       return
     }
 
     if (route.data.type === "session") {
       const session = sync.session.get(route.data.sessionID)
       if (!session || isDefaultTitle(session.title)) {
-        renderer.setTerminalTitle("OpenCode")
+        renderer.setTerminalTitle(PRODUCT_NAME)
         return
       }
 
       const title = session.title.length > 40 ? session.title.slice(0, 37) + "…" : session.title
-      renderer.setTerminalTitle(`OC | ${title}`)
+      renderer.setTerminalTitle(`${PRODUCT_NAME} | ${title}`)
       return
     }
 
     if (route.data.type === "plugin") {
-      renderer.setTerminalTitle(`OC | ${route.data.id}`)
+      renderer.setTerminalTitle(`${PRODUCT_NAME} | ${route.data.id}`)
     }
   })
 
@@ -631,12 +632,13 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.list",
         title: "Switch model",
-        suggested: true,
+        suggested: false,
         category: "Agent",
         slashName: "models",
-        // Bias /mo toward /models over /move without changing global fuzzy scoring.
         slashAliases: ["mo"],
+        hidden: HIDE_MODEL_UI,
         run: () => {
+          if (HIDE_MODEL_UI) return
           dialog.replace(() => <DialogModel />)
         },
       },
@@ -646,6 +648,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "Agent",
         hidden: true,
         run: () => {
+          if (HIDE_MODEL_UI) return
           local.model.cycle(1)
         },
       },
@@ -655,6 +658,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "Agent",
         hidden: true,
         run: () => {
+          if (HIDE_MODEL_UI) return
           local.model.cycle(-1)
         },
       },
@@ -664,6 +668,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "Agent",
         hidden: true,
         run: () => {
+          if (HIDE_MODEL_UI) return
           local.model.cycleFavorite(1)
         },
       },
@@ -673,6 +678,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "Agent",
         hidden: true,
         run: () => {
+          if (HIDE_MODEL_UI) return
           local.model.cycleFavorite(-1)
         },
       },
@@ -707,7 +713,9 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "variant.cycle",
         title: "Variant cycle",
         category: "Agent",
+        hidden: HIDE_MODEL_UI,
         run: () => {
+          if (HIDE_MODEL_UI) return
           local.model.variant.cycle()
         },
       },
@@ -715,9 +723,10 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "variant.list",
         title: "Switch model variant",
         category: "Agent",
-        hidden: local.model.variant.list().length === 0,
+        hidden: HIDE_MODEL_UI || local.model.variant.list().length === 0,
         slashName: "variants",
         run: () => {
+          if (HIDE_MODEL_UI) return
           if (local.model.variant.list().length === 0) {
             return toast.show({
               title: "No variants available",
@@ -740,9 +749,11 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "provider.connect",
         title: "Connect provider",
-        suggested: !connected(),
+        suggested: false,
+        hidden: HIDE_MODEL_UI,
         slashName: "connect",
         run: () => {
+          if (HIDE_MODEL_UI) return
           dialog.replace(() => <DialogProviderList />)
         },
         category: "Provider",
@@ -1072,7 +1083,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     await DialogAlert.show(
       dialog,
       "Update Complete",
-      `Successfully updated to OpenCode v${result.data.version}. Please restart the application.`,
+      `Successfully updated to ${PRODUCT_NAME} v${result.data.version}. Please restart the application.`,
     )
 
     void exit()

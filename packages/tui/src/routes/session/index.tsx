@@ -67,6 +67,7 @@ import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import * as Model from "../../util/model"
+import { HIDE_MODEL_UI } from "../../product"
 import { formatTranscript } from "../../util/transcript"
 import { sessionEpilogue } from "../../util/presentation"
 import { setPreLayoutSiblingMargin } from "../../util/layout"
@@ -1560,7 +1561,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                 ▣{" "}
               </span>{" "}
               <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
-              <span style={{ fg: theme.textMuted }}> · {model()}</span>
+              <Show when={!HIDE_MODEL_UI}>
+                <span style={{ fg: theme.textMuted }}> · {model()}</span>
+              </Show>
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
               </Show>

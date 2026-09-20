@@ -19,6 +19,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import * as Bom from "@/util/bom"
 import { recordTouch } from "@/grist/diff-audit"
+import { decideVerify } from "@/grist/control-plane"
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -202,12 +203,17 @@ export const EditTool = Tool.define(
           if (block) output += `\n\nLSP errors detected in this file, please fix:\n${block}`
 
           recordTouch({ sessionID: ctx.sessionID, filePath, tool: "edit" })
+          const verify = yield* Effect.promise(() =>
+            decideVerify({ sessionID: ctx.sessionID, filePath }),
+          )
+          if (verify.message) output += `\n\n${verify.message}`
 
           return {
             metadata: {
               diagnostics,
               diff,
               filediff,
+              gristVerify: verify.action,
             },
             title: `${path.relative(instance.worktree, filePath)}`,
             output,

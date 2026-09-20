@@ -34,12 +34,13 @@ const IS_PREVIEW = CHANNEL !== "latest"
 const VERSION = await (async () => {
   if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
-  const version = await fetch("https://registry.npmjs.org/opencode-ai/latest")
+  const version = await fetch("https://registry.npmjs.org/grist-ai/latest")
     .then((res) => {
+      if (res.status === 404) return { version: "0.0.0" }
       if (!res.ok) throw new Error(res.statusText)
       return res.json()
     })
-    .then((data: any) => data.version)
+    .then((data: any) => data.version ?? "0.0.0")
   const [major, minor, patch] = version.split(".").map((x: string) => Number(x) || 0)
   const t = env.OPENCODE_BUMP?.toLowerCase()
   if (t === "major") return `${major + 1}.0.0`
@@ -47,13 +48,14 @@ const VERSION = await (async () => {
   return `${major}.${minor}.${patch + 1}`
 })()
 
-const bot = ["actions-user", "opencode", "opencode-agent[bot]"]
+const bot = ["actions-user", "opencode", "opencode-agent[bot]", "grist"]
 const teamPath = path.resolve(import.meta.dir, "../../../.github/TEAM_MEMBERS")
 const team = [
   ...(await Bun.file(teamPath)
     .text()
     .then((x) => x.split(/\r?\n/).map((x) => x.trim()))
-    .then((x) => x.filter((x) => x && !x.startsWith("#")))),
+    .then((x) => x.filter((x) => x && !x.startsWith("#")))
+    .catch(() => [])),
   ...bot,
 ]
 
@@ -74,4 +76,4 @@ export const Script = {
     return team
   },
 }
-console.log(`opencode script`, JSON.stringify(Script, null, 2))
+console.log(`grist script`, JSON.stringify(Script, null, 2))

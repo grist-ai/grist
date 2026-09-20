@@ -58,6 +58,7 @@ import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
 import { routeTask, textFromParts } from "@/grist/jev-gate"
 import { escalationContext } from "@/grist/escalation-context"
+import { decideContinue } from "@/grist/control-plane"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -1139,6 +1140,15 @@ const layer = Layer.effect(
             lastAssistantMsg?.parts.some(
               (part) => part.type === "tool" && !part.metadata?.providerExecuted && !isOrphanedInterruptedTool(part),
             ) ?? false
+          const hasIncompleteTools =
+            lastAssistantMsg?.parts.some(
+              (part) =>
+                part.type === "tool" &&
+                part.state?.status !== "completed" &&
+                part.state?.status !== "error" &&
+                !part.metadata?.providerExecuted &&
+                !isOrphanedInterruptedTool(part),
+            ) ?? false
 
           if (
             lastAssistant?.finish &&
@@ -1169,6 +1179,39 @@ const layer = Layer.effect(
               providerID: lastUser.model.providerID,
               history: msgs,
             }).pipe(Effect.ignore, Effect.forkIn(scope))
+
+          // Jev control plane: stop early or escalate rung before another paid turn.
+          if (step > 1 && lastAssistantMsg) {
+            const ctrl = yield* Effect.promise(() =>
+              decideContinue({
+                sessionID,
+                step,
+                parts: lastAssistantMsg.parts,
+              }),
+            )
+            if (ctrl.action === "stop" && !hasIncompleteTools) {
+              yield* Effect.logInfo("grist control stop", {
+                "session.id": sessionID,
+                step,
+                reasons: ctrl.reasons,
+              })
+              break
+            }
+            if (ctrl.action === "escalate" && ctrl.model && !hasIncompleteTools) {
+              lastUser.model = {
+                providerID: ProviderV2.ID.make(ctrl.model.providerID),
+                modelID: ModelV2.ID.make(ctrl.model.modelID),
+                variant: lastUser.model.variant,
+              }
+              yield* sessions.updateMessage(lastUser)
+              yield* Effect.logInfo("grist control escalate", {
+                "session.id": sessionID,
+                step,
+                model: `${ctrl.model.providerID}/${ctrl.model.modelID}`,
+                reasons: ctrl.reasons,
+              })
+            }
+          }
 
           const model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
           const task = tasks.pop()

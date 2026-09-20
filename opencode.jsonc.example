@@ -3,6 +3,7 @@
   // One key for the whole ladder: export OPENROUTER_API_KEY=sk-or-v1-...
   // Change rungs via GRIST_*_MODEL without new provider keys.
   "model": "openrouter/deepseek/deepseek-v4.1-flash",
+  "lsp": true,
   "provider": {
     "openrouter": {
       "options": {

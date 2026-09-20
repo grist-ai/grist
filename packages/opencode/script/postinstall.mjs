@@ -11,6 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"))
 
+const PRODUCT_BIN = "grist"
+const PRODUCT_PREFIX = "grist"
+
 const platformMap = {
   darwin: "darwin",
   linux: "linux",
@@ -24,9 +27,9 @@ const archMap = {
 
 const platform = platformMap[os.platform()] ?? os.platform()
 const arch = archMap[os.arch()] ?? os.arch()
-const base = `opencode-${platform}-${arch}`
-const sourceBinary = platform === "windows" ? "opencode.exe" : "opencode"
-const targetBinary = path.join(__dirname, "bin", "opencode.exe")
+const base = `${PRODUCT_PREFIX}-${platform}-${arch}`
+const sourceBinary = platform === "windows" ? `${PRODUCT_BIN}.exe` : PRODUCT_BIN
+const targetBinary = path.join(__dirname, "bin", `${PRODUCT_BIN}.exe`)
 
 function supportsAvx2() {
   if (arch !== "x64") return false
@@ -127,7 +130,7 @@ function installPackage(name) {
   const version = packageJson.optionalDependencies?.[name]
   if (!version) return
 
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-install-"))
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "grist-install-"))
   try {
     const result = childProcess.spawnSync(
       "npm",
@@ -175,7 +178,7 @@ function main() {
   }
 
   throw new Error(
-    `It seems your package manager failed to install the right opencode CLI package. Try manually installing ${packageNames()
+    `It seems your package manager failed to install the right Grist CLI package. Try manually installing ${packageNames()
       .map((name) => JSON.stringify(name))
       .join(" or ")}.`,
   )

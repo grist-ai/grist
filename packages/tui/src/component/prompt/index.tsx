@@ -14,6 +14,7 @@ import { registerOpencodeSpinner } from "../register-spinner"
 import path from "path"
 import { fileURLToPath } from "url"
 import { useLocal } from "../../context/local"
+import { HIDE_MODEL_UI } from "../../product"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { tint, useTheme } from "../../context/theme"
 import { EmptyBorder, SplitBorder } from "../../ui/border"
@@ -216,10 +217,12 @@ export function Prompt(props: PromptProps) {
   function promptModelWarning() {
     toast.show({
       variant: "warning",
-      message: "Connect a provider to send prompts",
+      message: HIDE_MODEL_UI
+        ? "Grist is not ready yet — check OPENROUTER_API_KEY in your environment"
+        : "Connect a provider to send prompts",
       duration: 3000,
     })
-    if (sync.data.provider.length === 0) {
+    if (!HIDE_MODEL_UI && sync.data.provider.length === 0) {
       dialog.replace(() => <DialogProviderConnect />)
     }
   }
@@ -1452,7 +1455,7 @@ export function Prompt(props: PromptProps) {
                       <Show when={store.mode === "normal" && local.permission.mode === "auto"}>
                         <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>auto</text>
                       </Show>
-                      <Show when={store.mode === "normal"}>
+                      <Show when={store.mode === "normal" && !HIDE_MODEL_UI}>
                         <box flexDirection="row" gap={1}>
                           <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>·</text>
                           <text

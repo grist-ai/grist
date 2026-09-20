@@ -21,7 +21,8 @@ export function footerWidthPolicy(width: number) {
       showCommandHint: width >= FOOTER_WIDTH_BREAKPOINTS.commandHint,
       showContextHints: compact,
       contextHintLimit: !compact ? 0 : spacious ? undefined : model ? 2 : 1,
-      showModel: model,
+      // Grist routes models internally — never show model/provider in the statusline.
+      showModel: false,
     },
   }
 }

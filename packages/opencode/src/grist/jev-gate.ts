@@ -9,9 +9,16 @@ import {
   type MechanismSet,
 } from "./mechanisms"
 import { recordGristEvent } from "./usage-log"
-
-const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
-const JEV_MODEL = "jev-latest"
+import { rememberSessionControl } from "./control-plane"
+import { gristLog, gristWarn } from "./debug"
+import {
+  askSystemOne,
+  noul01,
+  score01,
+  typesafeKey,
+  type NoulAnswer,
+  type ScoreAnswer,
+} from "./jev-client"
 
 export type GateDecision = {
   rung: Rung
@@ -32,34 +39,6 @@ export type GateInput = {
   /** When true, never rewrite model (explicit user/agent pin). */
   pinned?: boolean
   sessionID?: string
-}
-
-type ScoreAnswer = {
-  type: "score"
-  score: number
-  confidence?: number
-}
-
-type NoulAnswer = {
-  type: "noul"
-  noul: number
-}
-
-type SystemOneResult = {
-  model: string
-  answers: Record<string, ScoreAnswer | NoulAnswer | { type: string }>
-}
-
-function clamp01(n: number) {
-  if (Number.isNaN(n)) return 0
-  return Math.min(1, Math.max(0, n))
-}
-
-/** Normalize Score answers that may be 0–N levels into 0–1. */
-function score01(answer: ScoreAnswer | undefined, levels: number): number {
-  if (!answer || answer.type !== "score") return 0.5
-  const max = Math.max(1, levels - 1)
-  return clamp01(answer.score / max)
 }
 
 /**
@@ -146,8 +125,8 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
   sensitivity: number
   underspecified: number
 }> {
-  const body = {
-    model: JEV_MODEL,
+  const result = await askSystemOne({
+    apiKey,
     state: {
       task: text,
       product: "Grist",
@@ -156,8 +135,7 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
     questions: {
       difficulty: {
         type: "score",
-        instructions:
-          "How hard is this coding task for a capable agent with repo tools?",
+        instructions: "How hard is this coding task for a capable agent with repo tools?",
         criteria: [
           "Trivial scoped edit or question",
           "Routine change with clear files",
@@ -188,27 +166,12 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
         },
       },
     },
-  }
-
-  const response = await fetch(JEV_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
   })
-  if (!response.ok) {
-    throw new Error(`Jev HTTP ${response.status}`)
+  return {
+    difficulty: score01(result.answers.difficulty as ScoreAnswer, 5),
+    sensitivity: score01(result.answers.sensitivity as ScoreAnswer, 5),
+    underspecified: noul01(result.answers.underspecified as NoulAnswer | undefined),
   }
-  const result = (await response.json()) as SystemOneResult
-  const difficulty = score01(result.answers.difficulty as ScoreAnswer, 5)
-  const sensitivity = score01(result.answers.sensitivity as ScoreAnswer, 5)
-  const underspecified =
-    (result.answers.underspecified as NoulAnswer | undefined)?.type === "noul"
-      ? clamp01((result.answers.underspecified as NoulAnswer).noul)
-      : 0.1
-  return { difficulty, sensitivity, underspecified }
 }
 
 function modelForRung(rung: Rung, _current: ModelRef): ModelRef {
@@ -226,6 +189,16 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
   if (input.sessionID) rememberSessionMechanisms(input.sessionID, mechanisms)
 
   if (input.pinned || process.env.GRIST_GATE === "off") {
+    if (input.sessionID) {
+      const scores = shadowScores(input.text)
+      rememberSessionControl(input.sessionID, {
+        rung: "cheapest",
+        difficulty: scores.difficulty,
+        sensitivity: scores.sensitivity,
+        underspecified: scores.underspecified,
+        task: input.text,
+      })
+    }
     return {
       rung: "cheapest",
       model: input.current,
@@ -240,7 +213,7 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
     }
   }
 
-  const key = process.env.TYPESAFE_API_KEY?.trim()
+  const key = typesafeKey()
   let scores: { difficulty: number; sensitivity: number; underspecified: number }
   let provider: "jev" | "shadow" = "shadow"
   if (key) {
@@ -248,7 +221,7 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
       scores = await evaluateWithJev(input.text, key)
       provider = "jev"
     } catch (error) {
-      console.warn("[grist] Jev call failed; using shadow gate", error)
+      gristWarn("[grist] Jev call failed; using shadow gate", error)
       scores = shadowScores(input.text)
     }
   } else {
@@ -267,10 +240,19 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
     reasons,
     latencyMs: Date.now() - started,
   }
-  console.log(
+  if (input.sessionID) {
+    rememberSessionControl(input.sessionID, {
+      rung,
+      difficulty: scores.difficulty,
+      sensitivity: scores.sensitivity,
+      underspecified: scores.underspecified,
+      task: input.text,
+    })
+  }
+  gristLog(
     `[grist:gate] ${rung} via ${provider} mode=${mode} · diff=${scores.difficulty.toFixed(2)} sens=${scores.sensitivity.toFixed(2)} under=${scores.underspecified.toFixed(2)} · ${reasons.join(",")} · ${decision.latencyMs}ms → ${model.providerID}/${model.modelID}`,
   )
-  console.log(
+  gristLog(
     `[grist:mech] ${mechanisms.resolved} pack=${mechanisms.observationPack} fusion=${mechanisms.actionFusion} · ${mechanisms.reasons.join(",")}`,
   )
   if (reasons.some((r) => r.startsWith("mode_"))) {
@@ -288,7 +270,7 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
       sessionID: input.sessionID,
       text: input.text,
     })
-    .catch((error) => console.warn("[grist:burn-in] record failed", error))
+    .catch((error) => gristWarn("[grist:burn-in] record failed", error))
   return decision
 }
 

@@ -403,11 +403,7 @@ export function RunCommandMenuBody(props: {
           ]
         : []
     const agent: CommandEntry[] = [
-      {
-        action: "model",
-        category: "Agent",
-        display: "Switch model",
-      },
+      // model switching hidden — Grist routes automatically
       ...(props.queued().length > 0
         ? [
             {
@@ -419,23 +415,6 @@ export function RunCommandMenuBody(props: {
                 .queued()
                 .map((item) => item.prompt.text)
                 .join(" "),
-            },
-          ]
-        : []),
-      {
-        action: "variant.cycle",
-        category: "Agent",
-        display: "Variant cycle",
-        footer: props.variantCycle,
-        keywords: "variant cycle",
-      },
-      ...(props.variants().length > 0
-        ? [
-            {
-              action: "variant.list" as const,
-              category: "Agent",
-              display: "Switch model variant",
-              keywords: `variant variants ${props.variants().join(" ")}`,
             },
           ]
         : []),

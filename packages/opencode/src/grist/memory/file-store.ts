@@ -1,6 +1,7 @@
 import path from "path"
 import type { MemoryHit, MemoryRecord, MemoryStore, RecallInput, RememberInput } from "./types"
 import { decayScore, requireVerified } from "./verified"
+import { gristLog } from "../debug"
 
 type FileShape = { records: MemoryRecord[] }
 
@@ -76,7 +77,7 @@ export function createFileStore(input?: {
       }
       shape.records.push(record)
       await save(shape)
-      console.log(
+      gristLog(
         `[grist:memory] remember backend=file outcome=${record.outcome} container=${record.container} id=${record.id}`,
       )
       return record
