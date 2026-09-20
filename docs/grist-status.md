@@ -10,6 +10,7 @@ do not block harness work on an external codebase.
 | --- | --- |
 | Harness / ladder | OpenRouter + `GRIST_*_MODEL` ([providers.md](providers.md)) |
 | Gate | Jev + shadow ([gate.md](gate.md)) |
+| Control plane | continue/stop/escalate, permission, tool budget, verify, ctx rank (`GRIST_CTRL`) |
 | Operating modes | `GRIST_MODE` |
 | SoL-Pi | ObservationPack, Action Fusion, mechanism Choice ([solpi.md](solpi.md)) |
 | Escalation context | code-map subgraph on medium/frontier (`GRIST_CTX_MIN`) |

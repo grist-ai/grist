@@ -23,6 +23,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { decidePermission, decideToolBudget } from "@/grist/control-plane"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -79,14 +80,25 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         }
       }),
     ask: (req) =>
-      permission
-        .ask({
-          ...req,
-          sessionID: input.session.id,
-          tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-          ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
-        })
-        .pipe(Effect.orDie),
+      Effect.gen(function* () {
+        const perm = yield* Effect.promise(() =>
+          decidePermission({
+            sessionID: input.session.id,
+            permission: req.permission,
+            patterns: [...req.patterns],
+            metadata: req.metadata as Record<string, unknown> | undefined,
+          }),
+        )
+        if (perm.action === "allow") return
+        yield* permission
+          .ask({
+            ...req,
+            sessionID: input.session.id,
+            tool: { messageID: input.processor.message.id, callID: options.toolCallId },
+            ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+          })
+          .pipe(Effect.orDie)
+      }),
   })
 
   for (const item of yield* registry.tools({
@@ -103,6 +115,16 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         return run.promise(
           Effect.gen(function* () {
             const ctx = context(args, options)
+            const budget = yield* Effect.promise(() =>
+              decideToolBudget({ sessionID: ctx.sessionID, toolID: item.id }),
+            )
+            if (budget.action === "block") {
+              return {
+                title: item.id,
+                output: budget.message ?? "[grist:ctrl] Exploratory tool budget reached.",
+                metadata: { gristToolBudget: true },
+              }
+            }
             yield* plugin.trigger(
               "tool.execute.before",
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },

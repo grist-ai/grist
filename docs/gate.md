@@ -18,9 +18,34 @@ Every user prompt hits `routeTask` in `SessionPrompt.createUserMessage`
   ([`docs/shadow-burn-in.md`](shadow-burn-in.md)). Thresholds overridable via
   `GRIST_TH_*` env.
 - **Escalation context:** on medium/frontier, inject a code-map subgraph into the
-  user message system (`GRIST_CTX_MIN=off` to disable).
+  user message system; nodes are ranked by Jev/shadow (`GRIST_CTX_MIN=off` to disable).
 - **Diff audit:** edit/write touches logged; off-plan files flagged when a plan
   was declared (`GRIST_DIFF_AUDIT=off` to disable).
+
+## Control plane (`GRIST_CTRL`)
+
+Between coding-model turns, Jev (or shadow) owns harness decisions — not generation.
+Kill switch: `GRIST_CTRL=off`. Soft exploratory cap: `GRIST_CTRL_EXPLORE_CAP` (default 8).
+
+| Decision | When | Actions |
+| --- | --- | --- |
+| **Continue** | Before provider turn N>1 | `continue` / `stop` / `escalate` rung |
+| **Permission** | Before `Permission.ask` | auto-`allow` low-risk vs `ask` |
+| **Tool budget** | Before exploratory tools (grep/glob/…) | `allow` / `block` with nudge to edit |
+| **Verify** | After edit/write | `skip` / `nudge` / `require` message |
+| **Context rank** | Escalation subgraph | keep top relevant nodes |
+
+Logs: `[grist:ctrl:continue]`, `[grist:ctrl:perm]`, `[grist:ctrl:budget]`,
+`[grist:ctrl:verify]`, `[grist:ctrl:ctx]`.
+
+Implementation: `packages/opencode/src/grist/control-plane.ts` (+ `jev-client.ts`).
+
+Tests:
+
+```bash
+bun run --cwd packages/opencode test src/grist/control-plane.test.ts
+bun run --cwd packages/opencode test src/grist/jev-gate.test.ts
+```
 
 Rung → model defaults (override with env):
 
@@ -31,5 +56,3 @@ Rung → model defaults (override with env):
 | frontier | `GRIST_FRONTIER_*` | `openrouter` / `anthropic/claude-opus-4.6` |
 
 One key: `OPENROUTER_API_KEY`. See [`providers.md`](providers.md).
-
-Tests: `bun run --cwd packages/opencode test src/grist/jev-gate.test.ts`

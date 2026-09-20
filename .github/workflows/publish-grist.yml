@@ -1,0 +1,67 @@
+name: publish-grist
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 0.1.0). Leave empty to auto-bump patch from npm."
+        required: false
+        type: string
+      channel:
+        description: "npm dist-tag"
+        required: false
+        type: choice
+        default: latest
+        options:
+          - latest
+          - beta
+          - next
+      single:
+        description: "Build current platform only (faster smoke publish)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install
+        run: bun install --ignore-scripts
+
+      - name: Fix node-pty
+        run: bun run --cwd packages/core fix-node-pty
+
+      - name: Build
+        run: |
+          flags=""
+          if [ "${{ inputs.single }}" = "true" ]; then
+            flags="--single --skip-embed-web-ui"
+          fi
+          bun run --cwd packages/opencode script/build.ts $flags
+        env:
+          OPENCODE_VERSION: ${{ inputs.version }}
+          OPENCODE_CHANNEL: ${{ inputs.channel }}
+          OPENCODE_RELEASE: "1"
+
+      - name: Publish to npm
+        run: bun run --cwd packages/opencode script/publish.ts
+        env:
+          OPENCODE_VERSION: ${{ inputs.version }}
+          OPENCODE_CHANNEL: ${{ inputs.channel }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

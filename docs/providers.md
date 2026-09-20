@@ -12,6 +12,13 @@ the model ladder (cheapest → medium → frontier) by changing model ids only.
 export OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
+Or put it in a local **`.env`** (gitignored; Bun loads it automatically):
+
+```bash
+cp .env.example .env
+# edit .env → OPENROUTER_API_KEY=sk-or-v1-...
+```
+
 3. Project config:
 
 ```bash

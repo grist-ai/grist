@@ -30,7 +30,17 @@ bun scripts/burn-in-report.ts
 bun dev
 ```
 
+### Install from npm (when published)
+
+```bash
+npm install -g grist-ai
+grist
+```
+
+See [`docs/npm.md`](docs/npm.md) for publishing.
+
 Gate logs: `[grist:gate] cheapest|medium|frontier …`. Disable with `GRIST_GATE=off`.
+Control plane: `[grist:ctrl:…]` continue/perm/budget/verify/ctx. Disable with `GRIST_CTRL=off`.
 Mode: `GRIST_MODE=normal|capped|cheapest` (frontier off under `capped`).
 Mechanisms: `GRIST_MECH=auto|efficiency|performance|off` (`[grist:mech]`).
 Escalation context: code-map subgraph on medium/frontier (`GRIST_CTX_MIN=off` to disable).
@@ -38,7 +48,9 @@ Diff audit: `[grist:diff-audit]` on edit/write (`GRIST_DIFF_AUDIT=off` to disabl
 Usage logs: `[grist:usage]` / `[grist:event]`. Disable with `GRIST_USAGE_LOG=off`.
 ObservationPack: `[grist:observation-pack] …`. Disable with `GRIST_OBS_PACK=off`.
 Code map: `[grist:code-map] …`. Disable with `GRIST_CODE_MAP=off`.
-Memory: `[grist:memory] …`. Disable with `GRIST_MEMORY=off`.
+Memory: `[grist:memory] …` → managed Supermemory local sidecar (MIT;
+`bunx supermemory local install` once; Grist auto-starts it) or
+`.grist/memory.json`. Off: `GRIST_MEMORY=off`.
 Burn-in log: `.grist/burn-in.jsonl`. Disable with `GRIST_BURNIN=off`.
 Explicit `--model` / agent-pinned models are not rewritten.
 
@@ -71,3 +83,5 @@ active Phase 1 path.
 
 Based on [anomalyco/opencode](https://github.com/anomalyco/opencode) (`dev`). MIT.
 Product name **Grist**; package names stay OpenCode until a deliberate rename.
+Model selection is internal (OpenRouter ladder + gate) — the TUI/CLI do not expose
+model pickers or model names to users.

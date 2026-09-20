@@ -8,6 +8,7 @@ import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
 import { createEffect, createMemo, on, Show } from "solid-js"
 import { ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
+import { HIDE_MODEL_UI } from "@/product"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import type { PromptInputProps } from "@/components/prompt-input/contracts"
 import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } from "@/components/prompt-input/history"
@@ -55,10 +56,11 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         controller={props.controller}
         borderUnderlay={props.borderUnderlay}
         class={props.class}
-        variantControlVisible={!props.controller.model.loading}
+        variantControlVisible={!HIDE_MODEL_UI && !props.controller.model.loading}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
         modelControl={
+          HIDE_MODEL_UI ? undefined : (
           <PromptInputV2ModelControl
             loading={props.controller.model.loading}
             paid={props.controller.model.paid}
@@ -72,6 +74,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
               dialog.show(() => <DialogSelectModelUnpaidV2 model={props.controller.model.selection} />)
             }
           />
+          )
         }
       />
     </div>

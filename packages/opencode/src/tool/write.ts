@@ -15,6 +15,7 @@ import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 import { recordTouch } from "@/grist/diff-audit"
+import { decideVerify } from "@/grist/control-plane"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
@@ -91,6 +92,10 @@ export const WriteTool = Tool.define(
           }
 
           recordTouch({ sessionID: ctx.sessionID, filePath: filepath, tool: "write" })
+          const verify = yield* Effect.promise(() =>
+            decideVerify({ sessionID: ctx.sessionID, filePath: filepath }),
+          )
+          if (verify.message) output += `\n\n${verify.message}`
 
           return {
             title: path.relative(instance.worktree, filepath),
@@ -98,6 +103,7 @@ export const WriteTool = Tool.define(
               diagnostics,
               filepath,
               exists: exists,
+              gristVerify: verify.action,
             },
             output,
           }

@@ -1,9 +1,11 @@
 /**
  * Phase 3 instrument scaffold: log $/task tokens every provider step.
- * Always prints structured `[grist:usage]` lines.
- * When LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY are set, also POSTs to Langfuse
- * ingestion (no SDK dependency). Failures never throw.
+ * Structured lines go through `gristLog` (silent unless `GRIST_DEBUG` is set)
+ * so they never paint over the TUI. When LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY
+ * are set, also POSTs to Langfuse ingestion (no SDK dependency). Failures never throw.
  */
+
+import { gristLog, gristWarn } from "./debug"
 
 export type TaskUsage = {
   sessionID: string
@@ -50,7 +52,7 @@ async function postLangfuseBatch(events: Array<{ type: string; body: Record<stri
     body: JSON.stringify({ batch }),
   })
   if (!response.ok) {
-    console.warn(`[grist:usage] Langfuse HTTP ${response.status}`)
+    gristWarn(`[grist:usage] Langfuse HTTP ${response.status}`)
   }
 }
 
@@ -85,7 +87,7 @@ async function postLangfuse(usage: TaskUsage) {
 
 /** Fire-and-forget named event (mode/cap/diff-audit). Never throws. */
 export function recordGristEvent(name: string, metadata: Record<string, unknown>): void {
-  console.log(`[grist:event] ${name} ${JSON.stringify(metadata)}`)
+  gristLog(`[grist:event] ${name} ${JSON.stringify(metadata)}`)
   const id = crypto.randomUUID()
   void postLangfuseBatch([
     {
@@ -97,7 +99,7 @@ export function recordGristEvent(name: string, metadata: Record<string, unknown>
       },
     },
   ]).catch((error) => {
-    console.warn("[grist:usage] Langfuse event failed", error)
+    gristWarn("[grist:usage] Langfuse event failed", error)
   })
 }
 
@@ -112,8 +114,8 @@ export function recordTaskUsage(usage: TaskUsage): void {
     tokens: usage.tokens,
     costUsd: Number(usage.costUsd.toFixed(6)),
   }
-  console.log(`[grist:usage] ${JSON.stringify(line)}`)
+  gristLog(`[grist:usage] ${JSON.stringify(line)}`)
   void postLangfuse(usage).catch((error) => {
-    console.warn("[grist:usage] Langfuse post failed", error)
+    gristWarn("[grist:usage] Langfuse post failed", error)
   })
 }

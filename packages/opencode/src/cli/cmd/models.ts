@@ -7,7 +7,8 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 
 export const ModelsCommand = effectCmd({
   command: "models [provider]",
-  describe: "list all available models",
+  describe: false, // internal — Grist picks models automatically
+
   builder: (yargs) =>
     yargs
       .positional("provider", {

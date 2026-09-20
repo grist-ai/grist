@@ -5,6 +5,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { getCursorPosition, setCursorPosition } from "@/components/prompt-input/editor-dom"
 import { useSessionLayout } from "./session-layout"
 import { createSessionOwnership } from "./session-ownership"
+import { HIDE_MODEL_UI } from "@/product"
 
 const withCategory = (category: string) => {
   return (option: Omit<CommandOption, "category">): CommandOption => ({
@@ -47,21 +48,25 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
   }
 
   command.register("composer", () => [
-    modelCommand({
-      id: "model.choose",
-      title: language.t("command.model.choose"),
-      description: language.t("command.model.choose.description"),
-      keybind: "mod+'",
-      slash: "model",
-      onSelect: chooseModel,
-    }),
-    modelCommand({
-      id: "model.variant.cycle",
-      title: language.t("command.model.variant.cycle"),
-      description: language.t("command.model.variant.cycle.description"),
-      keybind: "shift+mod+d",
-      onSelect: () => model.variant.cycle(),
-    }),
+    ...(HIDE_MODEL_UI
+      ? []
+      : [
+          modelCommand({
+            id: "model.choose",
+            title: language.t("command.model.choose"),
+            description: language.t("command.model.choose.description"),
+            keybind: "mod+'",
+            slash: "model",
+            onSelect: chooseModel,
+          }),
+          modelCommand({
+            id: "model.variant.cycle",
+            title: language.t("command.model.variant.cycle"),
+            description: language.t("command.model.variant.cycle.description"),
+            keybind: "shift+mod+d",
+            onSelect: () => model.variant.cycle(),
+          }),
+        ]),
     agentCommand({
       id: "agent.cycle",
       title: language.t("command.agent.cycle"),
