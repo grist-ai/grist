@@ -1,6 +1,6 @@
 // Entry and exit splash banners for direct interactive mode scrollback.
 //
-// Renders the full opencode entry logo and a compact [O] exit badge, plus
+// Renders the Grist entry logo and a compact G exit badge, plus
 // session metadata and the resume command. These are scrollback snapshots, so
 // they become immutable terminal history once committed.
 //
@@ -234,7 +234,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
       lines,
       body_left + label.length,
       top + 1,
-      `grist --mini -s ${meta.session_id}`,
+      `grist -s ${meta.session_id}`,
       right,
       undefined,
       TextAttributes.BOLD,

@@ -1,12 +1,14 @@
-/** Grist product logo (replaces upstream OpenCode open+code split). */
+/** Grist product logo (glyph dialect: _ ^ ~ ,). Spells GRIST. */
 export const logo = {
-  left: ["    ", "█▀▀▀", "█_^█", "▀▀▀▀"],
-  right: ["             ", "█▀▀█ █ █▀▀▀ ▀█▀", "█^^█ █ ▀▀▀█ _█_", "▀__▀ ▀ ▀▀▀▀ _▀_"],
+  // G + R (R stem touches bowl, no gap) | I S T — G/R solid primary like I/S/T
+  left: ["      ", "█▀▀▀ █▀▀█", "█ ▀█ █▀▀ ", "▀▀▀▀ █ ▀█"],
+  right: ["              ", " █  █▀▀▀ ▀▀█▀▀", "_█_ ▀▀▀█  _█_ ", "_█_ ▀▀▀▀  _▀_ "],
 }
 
+/** Compact G mark for splash / exit badge. */
 export const go = {
-  left: ["    ", "█▀▀▀", "█_^█", "▀▀▀▀"],
-  right: ["    ", "█▀▀█", "█^^█", "▀__▀"],
+  left: ["    ", "█▀▀▀", "█ ▀█", "▀▀▀▀"],
+  right: ["    ", "█▀▀▀", "█ ▀█", "▀▀▀▀"],
 }
 
 export const marks = "_^~,"

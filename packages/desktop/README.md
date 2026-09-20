@@ -1,19 +1,19 @@
-# OpenCode Desktop
+# Grist Desktop
 
-The OpenCode Desktop app, built with Electron.
+Mac / Windows / Linux GUI for Grist, forked from OpenCode Desktop (Electron + `packages/app`).
 
 ## Development
 
 ```bash
 bun install
-bun dev
+bun run --cwd packages/desktop dev
 ```
 
-## Build
-
-Run the `build` script to build the app's JS assets, then `package` to
-bundle the assets as an application. The resulting app will be in `dist/`.
+## Build (Mac)
 
 ```bash
-bun run build && bun run package
+bun run --cwd packages/desktop build
+bun run --cwd packages/desktop package:mac
 ```
+
+The app appears as **Grist** / **Grist Dev**. Deep links use `grist://`. App ids are `ai.grist.desktop*`.

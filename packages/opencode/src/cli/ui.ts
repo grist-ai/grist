@@ -1,19 +1,18 @@
 import { EOL } from "os"
 import { Schema } from "effect"
 import { logo as glyphs } from "./logo"
+import { WORDMARK } from "@/grist/brand"
 
-const wordmark = [
-  `                  `,
-  `█▀▀▀ █▀▀█ █ █▀▀▀ ▀█▀`,
-  `█_^█ █^^█ █ ▀▀▀█ _█_`,
-  `▀▀▀▀ ▀__▀ ▀ ▀▀▀▀ _▀_`,
-]
+const wordmark = [...WORDMARK]
 
 export class CancelledError extends Schema.TaggedErrorClass<CancelledError>()("UICancelledError", {}) {}
 
+/** Grist brand orange (#EC5B2B) for CLI highlights. */
+const ORANGE = "\x1b[38;2;236;91;43m"
+
 export const Style = {
-  TEXT_HIGHLIGHT: "\x1b[96m",
-  TEXT_HIGHLIGHT_BOLD: "\x1b[96m\x1b[1m",
+  TEXT_HIGHLIGHT: ORANGE,
+  TEXT_HIGHLIGHT_BOLD: ORANGE + "\x1b[1m",
   TEXT_DIM: "\x1b[90m",
   TEXT_DIM_BOLD: "\x1b[90m\x1b[1m",
   TEXT_NORMAL: "\x1b[0m",
@@ -58,15 +57,10 @@ export function logo(pad?: string) {
 
   const result: string[] = []
   const reset = "\x1b[0m"
-  const left = {
-    fg: "\x1b[90m",
-    shadow: "\x1b[38;5;235m",
-    bg: "\x1b[48;5;235m",
-  }
-  const right = {
-    fg: reset,
-    shadow: "\x1b[38;5;238m",
-    bg: "\x1b[48;5;238m",
+  const ink = {
+    fg: "\x1b[38;2;236;91;43m",
+    shadow: "\x1b[38;2;80;36;22m",
+    bg: "\x1b[48;2;80;36;22m",
   }
   const gap = " "
   const draw = (line: string, fg: string, shadow: string, bg: string) => {
@@ -94,10 +88,10 @@ export function logo(pad?: string) {
   }
   glyphs.left.forEach((row, index) => {
     if (pad) result.push(pad)
-    result.push(draw(row, left.fg, left.shadow, left.bg))
+    result.push(draw(row, ink.fg, ink.shadow, ink.bg))
     result.push(gap)
     const other = glyphs.right[index] ?? ""
-    result.push(draw(other, right.fg, right.shadow, right.bg))
+    result.push(draw(other, ink.fg, ink.shadow, ink.bg))
     result.push(EOL)
   })
   return result.join("").trimEnd()

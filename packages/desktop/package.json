@@ -4,9 +4,9 @@
   "version": "1.18.31",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://opencode.ai",
+  "homepage": "https://github.com/pranav6226/grist",
   "author": {
-    "name": "OpenCode",
+    "name": "Grist",
     "email": "hello@opencode.ai"
   },
   "scripts": {

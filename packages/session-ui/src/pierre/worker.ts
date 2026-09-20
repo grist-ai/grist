@@ -22,7 +22,7 @@ function createPool(lineDiffType: "none" | "word-alt") {
       poolSize: 2,
     },
     {
-      theme: "OpenCode",
+      theme: "Grist",
       lineDiffType,
       preferredHighlighter: "shiki-wasm",
     },
