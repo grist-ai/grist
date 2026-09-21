@@ -135,7 +135,8 @@ describe("gateway HTTP", () => {
     expect(html).toContain("Sign in with Google")
     expect(html).toContain("npm install -g grist-ai")
     expect(html).toContain("Download for macOS")
-    expect(html).toContain("tally.so/embed/QKGWYG")
+    expect(html).not.toContain("tally.so")
+    expect(html).toContain('id="request-form"')
     expect(html).toContain("Request access")
     expect(html).toContain('href="/privacy"')
     expect(html).toContain("Privacy Policy")
@@ -197,7 +198,9 @@ describe("gateway HTTP", () => {
 
     const privacy = await gateway.fetch(new Request("http://gateway.test/privacy"))
     expect(privacy.status).toBe(200)
-    expect(await privacy.text()).toContain("What we do not take")
+    const privacyHtml = await privacy.text()
+    expect(privacyHtml).toContain("What we do not take")
+    expect(privacyHtml).not.toContain("Tally")
 
     const terms = await gateway.fetch(new Request("http://gateway.test/terms"))
     expect(await terms.text()).toContain("Invite-only beta")
@@ -206,13 +209,24 @@ describe("gateway HTTP", () => {
     expect(await aup.text()).toContain("Local execution")
 
     const cookies = await gateway.fetch(new Request("http://gateway.test/cookies"))
-    expect(await cookies.text()).toContain("grist_invite")
+    const cookiesHtml = await cookies.text()
+    expect(cookiesHtml).toContain("grist_invite")
+    expect(cookiesHtml).not.toContain("Tally")
 
     const login = await gateway.fetch(new Request("http://gateway.test/login"))
     expect(await login.text()).toContain("Sign in")
 
     const adminPage = await gateway.fetch(new Request("http://gateway.test/admin"))
-    expect(await adminPage.text()).toContain("Generate codes")
+    const adminHtml = await adminPage.text()
+    expect(adminHtml).toContain("Generate codes")
+    expect(adminHtml).toContain('href="/admin/requests"')
+    expect(adminHtml).toContain("Copy email")
+    expect(adminHtml).toContain('path === "/admin"')
+    expect(adminHtml).toContain("main.hidden = true")
+    const appJs = await gateway.fetch(new Request("http://gateway.test/app.js"))
+    const source = await appJs.text()
+    expect(source).toContain("authStateReady")
+    expect(source).toContain("if (ticket !== sessionTicket) return")
 
     const favicon = await gateway.fetch(new Request("http://gateway.test/favicon.svg"))
     expect(favicon.headers.get("Content-Type")).toContain("image/svg+xml")
@@ -455,6 +469,66 @@ describe("gateway HTTP", () => {
       body: { text: "hi" },
     })
     expect(after.status).toBe(401)
+  })
+
+  test("keeps access requests for the admin to mint and send", async () => {
+    const gateway = createGateway({ adminToken: "secret" })
+    const bad = await call(gateway.fetch, "POST", "/v1/access/requests", { body: { email: "nope" } })
+    expect(bad.status).toBe(400)
+
+    const created = await call(gateway.fetch, "POST", "/v1/access/requests", {
+      body: { email: "Ada@Example.com", name: "Ada", note: "a compiler" },
+    })
+    expect(created.status).toBe(200)
+
+    const again = await call(gateway.fetch, "POST", "/v1/access/requests", {
+      body: { email: "ada@example.com", name: "Ada again" },
+    })
+    expect(again.status).toBe(200)
+
+    const denied = await call(gateway.fetch, "GET", "/v1/admin/requests")
+    expect(denied.status).toBe(401)
+
+    const listed = await call(gateway.fetch, "GET", "/v1/admin/requests", {
+      headers: { "X-Grist-Admin": "secret" },
+    })
+    expect(listed.status).toBe(200)
+    const requests = (listed.json as { requests: { id: string; email: string; name: string; status: string }[] }).requests
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.email).toBe("ada@example.com")
+    expect(requests[0]?.name).toBe("Ada")
+    expect(requests[0]?.status).toBe("open")
+
+    const minted = await call(gateway.fetch, "POST", `/v1/admin/requests/${requests[0]?.id}/code`, {
+      headers: { "X-Grist-Admin": "secret" },
+    })
+    expect(minted.status).toBe(200)
+    const mintedBody = minted.json as { code: string; cap_usd: number; days: number; email: string }
+    const code = mintedBody.code
+    expect(code).toMatch(/^grist-/)
+    expect(mintedBody.email).toBe("ada@example.com")
+    expect(mintedBody.cap_usd).toBe(5)
+    expect(mintedBody.days).toBe(30)
+
+    const second = await call(gateway.fetch, "POST", `/v1/admin/requests/${requests[0]?.id}/code`, {
+      headers: { "X-Grist-Admin": "secret" },
+    })
+    expect((second.json as { code: string }).code).toBe(code)
+
+    const usable = await call(gateway.fetch, "POST", "/v1/invite/validate", { body: { code } })
+    expect((usable.json as { valid: boolean }).valid).toBe(true)
+
+    const sent = await call(gateway.fetch, "POST", `/v1/admin/requests/${requests[0]?.id}/sent`, {
+      headers: { "X-Grist-Admin": "secret" },
+    })
+    expect(sent.status).toBe(200)
+
+    const after = await call(gateway.fetch, "GET", "/v1/admin/requests", {
+      headers: { "X-Grist-Admin": "secret" },
+    })
+    const row = (after.json as { requests: { status: string; code: string }[] }).requests[0]
+    expect(row?.status).toBe("sent")
+    expect(row?.code).toBe(code)
   })
 })
 
