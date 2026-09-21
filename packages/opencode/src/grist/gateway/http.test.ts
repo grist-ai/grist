@@ -158,6 +158,11 @@ describe("gateway HTTP", () => {
     expect(html).not.toContain("deepseek")
     expect(html).not.toContain("kimi")
     expect(html).not.toContain("gpt-5")
+    expect(html).not.toContain("Necora")
+    expect(html).not.toContain("Pranav")
+    expect(html).not.toContain("pranavmm25")
+    expect(html).not.toContain("pranav6226")
+    expect(html).toContain("privacy@grist.lol")
 
     const docs = await gateway.fetch(new Request("http://gateway.test/docs"))
     expect(docs.headers.get("Content-Type")).toContain("text/html")
@@ -172,7 +177,8 @@ describe("gateway HTTP", () => {
     const skillFile = await gateway.fetch(new Request("http://gateway.test/grist-skill.md"))
     expect(skillFile.headers.get("Content-Type")).toContain("text/markdown")
     const skillText = await skillFile.text()
-    expect(skillText).toContain("Never run Grist on Necora")
+    expect(skillText).toContain("Only run Grist on repos and machines you are allowed to modify.")
+    expect(skillText).not.toContain("Necora")
 
     const wellKnown = await gateway.fetch(
       new Request("http://gateway.test/.well-known/agent-skills/grist/SKILL.md"),

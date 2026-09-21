@@ -58,7 +58,7 @@ Do not use the interactive TUI. Do not run `grist auth login` on a headless VM �
 
 ## Hard rules
 
-- Never run Grist on Necora code, repos, or infrastructure.
+- Only run Grist on repos and machines you are allowed to modify.
 - Never expose the API key. If it leaks, revoke it on the Grist dashboard and stop.
 - Keep tasks scoped. Spend bills to the human’s Grist account. One feature or fix per run — not “clean up the repo.”
 - Branches only. Never push to `main` or the default branch.
