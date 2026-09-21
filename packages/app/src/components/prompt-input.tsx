@@ -81,6 +81,8 @@ import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
 import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
+import { joinPromptText } from "@/utils/voice-input"
+import { useVoiceInput } from "@/components/voice-input-button"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
 
@@ -129,6 +131,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
   const tabs = () => props.controls.session.tabs
+  const spoken = {
+    insert(text: string) {
+      void text
+    },
+  }
+  const voice = useVoiceInput({ onTranscript: (text) => spoken.insert(text) })
   let editorRef!: HTMLDivElement
   let fileInputRef: HTMLInputElement | undefined
   let scrollRef!: HTMLDivElement
@@ -467,6 +475,15 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       keybind: normalModeKey,
       disabled: store.mode === "normal",
       onSelect: () => setMode("normal"),
+    },
+    {
+      id: "prompt.voice",
+      title: language.t("command.prompt.voice"),
+      description: language.t("command.prompt.voice.description"),
+      category: language.t("command.category.session"),
+      keybind: "mod+shift+v",
+      disabled: store.mode !== "normal",
+      onSelect: () => void voice.toggle(),
     },
   ])
 
@@ -1102,6 +1119,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return true
   }
 
+  spoken.insert = (text: string) => {
+    const existing = prompt
+      .current()
+      .map((part) => ("content" in part ? part.content : ""))
+      .join("")
+    const cursor = prompt.cursor() ?? existing.length
+    const before = existing.slice(0, cursor)
+    const content = joinPromptText(before, text).slice(before.length)
+    if (!content.trim()) return
+    addPart({ type: "text", content, start: 0, end: 0 })
+  }
+
   const addToHistory = (prompt: Prompt, mode: "normal" | "shell") => {
     history.add(prompt, mode, mode === "shell" ? [] : historyComments())
   }
@@ -1616,6 +1645,36 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   aria-label={language.t("prompt.action.attachFile")}
                 >
                   <Icon name="plus" class="size-4.5" />
+                </Button>
+              </TooltipKeybind>
+              <TooltipKeybind
+                placement="top"
+                title={
+                  voice.state() === "recording"
+                    ? language.t("prompt.action.voice.stop")
+                    : voice.state() === "busy"
+                      ? language.t("prompt.action.voice.transcribing")
+                      : language.t("prompt.action.voice")
+                }
+                keybind={command.keybind("prompt.voice")}
+              >
+                <Button
+                  data-action="prompt-voice"
+                  type="button"
+                  variant="ghost"
+                  class="size-8 p-0"
+                  style={buttons()}
+                  onClick={() => void voice.toggle()}
+                  disabled={store.mode !== "normal" || voice.state() === "busy"}
+                  tabIndex={store.mode === "normal" ? undefined : -1}
+                  aria-label={
+                    voice.state() === "recording"
+                      ? language.t("prompt.action.voice.stop")
+                      : language.t("prompt.action.voice")
+                  }
+                  aria-pressed={voice.state() === "recording"}
+                >
+                  <Icon name="microphone" class="size-4.5" classList={{ "text-icon-critical-base": voice.state() === "recording" }} />
                 </Button>
               </TooltipKeybind>
             </div>

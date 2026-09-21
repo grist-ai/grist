@@ -11,6 +11,7 @@ afterEach(() => {
   for (const file of files.splice(0)) fs.rmSync(file, { force: true })
   delete process.env.GRIST_CONFIG_PATH
   delete process.env.GRIST_INVITE
+  delete process.env.GRIST_API_KEY
   delete process.env.GRIST_GATEWAY_URL
 })
 
@@ -20,6 +21,13 @@ describe("ensureSignedIn", () => {
     files.push(file)
     process.env.GRIST_CONFIG_PATH = file
     saveInviteConfig({ code: "grist-ABCD-2345", gatewayUrl: "http://127.0.0.1:8787" })
+    expect(await ensureSignedIn()).toBe(true)
+  })
+
+  test("returns true when GRIST_API_KEY is set", async () => {
+    delete process.env.GRIST_CONFIG_PATH
+    delete process.env.GRIST_INVITE
+    process.env.GRIST_API_KEY = "grist_sk_" + "ab".repeat(32)
     expect(await ensureSignedIn()).toBe(true)
   })
 

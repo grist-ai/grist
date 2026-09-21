@@ -108,9 +108,12 @@ They cut tokens *within* every tier, multiplying the router's savings.
 
 Two integrations:
 1. **Routable via the gate.** Jev `Choice` picks model rung *and* mechanism set
-   per task (build/test → Fusion+Reducer; exploration → ObservationPack).
-   SoL-Pi's own [Performance] vs [Efficiency] modes. Every mechanism sits behind
-   a cost gate: projected savings must beat its cost, or it stays off.
+   per task (build/test → Fusion+ObservationPack; exploration → full fidelity,
+   pack off, fusion still on). SoL-Pi's own [Performance] vs [Efficiency] modes.
+   Every mechanism sits behind a cost gate: projected savings must beat its cost,
+   or it stays off. **Deviation:** ObservationPack's extra byte-bar
+   (`GRIST_MECH_COST_GATE`) is opt-in and defaults off — the first two full
+   deliveries already amortize packing; flip the env on for ablation.
 2. **Discovery loop (post-POC).** Shadow burn-in doesn't just calibrate
    thresholds — under the verified-outcomes-only rule it can discover
    per-codebase efficiency mechanisms. The flywheel leveled up: from tuning the

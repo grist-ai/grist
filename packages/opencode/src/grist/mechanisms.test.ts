@@ -4,6 +4,7 @@ import {
   composeMechanisms,
   loadMechanismProfile,
   rememberSessionMechanisms,
+  sessionAllowsActionFusion,
   sessionAllowsObservationPack,
   shadowMechanismChoice,
 } from "./mechanisms"
@@ -40,5 +41,15 @@ describe("mechanisms", () => {
     expect(sessionAllowsObservationPack(id)).toBe(true)
     clearSessionMechanisms(id)
     expect(sessionAllowsObservationPack(id)).toBe(true)
+  })
+
+  test("session store gates Action Fusion", () => {
+    const id = "sess-fusion-test"
+    rememberSessionMechanisms(id, composeMechanisms("anything", "off"))
+    expect(sessionAllowsActionFusion(id)).toBe(false)
+    rememberSessionMechanisms(id, composeMechanisms("run the tests", "efficiency"))
+    expect(sessionAllowsActionFusion(id)).toBe(true)
+    clearSessionMechanisms(id)
+    expect(sessionAllowsActionFusion(id)).toBe(true)
   })
 })

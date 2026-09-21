@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css?v=stitch9" />
+    <link rel="stylesheet" href="/styles.css?v=stitch10" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -61,7 +61,7 @@
             </div>
             <pre>npm install -g grist-ai
 grist</pre>
-            <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Invite required. No API key.</p>
+            <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Invite required. We hold the inference key.</p>
           </div>
           <div class="actions">
             <a
@@ -379,6 +379,10 @@ grist</pre>
           Beta is invite-only. Inference is included. The CLI is the product —
           this page is how you get from an invite to a running agent.
         </p>
+        <nav class="docs-tabs" aria-label="Docs">
+          <a href="/docs" class="is-on">Using Grist</a>
+          <a href="/docs/skills">Agent skills</a>
+        </nav>
         <nav class="docs-toc" aria-label="On this page">
           <a href="/docs#install">Install</a>
           <a href="/docs#sign-in">Sign in</a>
@@ -415,6 +419,9 @@ grist</pre>
         <p>
           Usage, remaining spend, and the current plan live on the
           <a href="/dashboard">dashboard</a>. Same account, same origin.
+          Agents that run Grist on a VM use an
+          <a href="/dashboard/api">API key</a> from that dashboard — not this
+          login. See <a href="/docs/skills">agent skills</a>.
         </p>
 
         <h2 id="repo">Start in a repo</h2>
@@ -466,9 +473,101 @@ GRIST_OBS_PACK=off       # pack only</pre>
         <p>
           Completions are metered against your invite cap. At the cap the CLI
           stops. The dashboard shows remaining USD, rung mix, and expiry.
-          We hold the inference key. You never paste one. We do not train on
-          tester repos.
+          Agent API keys spend against the same cap. We hold the inference key.
+          You never paste an OpenRouter key. We do not train on tester repos.
         </p>
+      </article>
+    </main>
+
+    <main id="view-docs-skills" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ docs ]</p>
+        <h1>Agent skills</h1>
+        <p class="lede">
+          Give this to an agent (Muse, Cursor, and the like) so it can install
+          Grist on its own VM and bill your account. The key stays in a vault —
+          never in the skill, never in chat.
+        </p>
+        <nav class="docs-tabs" aria-label="Docs">
+          <a href="/docs">Using Grist</a>
+          <a href="/docs/skills" class="is-on">Agent skills</a>
+        </nav>
+        <p>
+          <button type="button" class="btn btn-ghost" id="copy-skill">Copy skill</button>
+          <a href="/grist-skill.md">Download SKILL.md</a>
+        </p>
+
+        <h2 id="trigger">When to reach for Grist</h2>
+        <p>
+          Delegate multi-step coding tasks in a git repo to Grist: features, bug
+          fixes, refactors spanning multiple files. Not for single-file edits or
+          non-coding questions.
+        </p>
+
+        <h2 id="prerequisites">Prerequisites</h2>
+        <p>
+          Grist installed on the agent’s VM (<code>npm install -g grist-ai</code>),
+          the gateway URL (<code>https://grist.lol</code> unless you were given
+          another), and the API key living in a secure vault. Never in chat.
+          Never in the skill file.
+        </p>
+        <pre>export GRIST_GATEWAY_URL=https://grist.lol
+export GRIST_API_KEY   # injected from the vault — do not echo it
+grist usage            # confirms auth without printing the key</pre>
+        <p>
+          Mint the key on the <a href="/dashboard/api">API keys</a> tab. Store it
+          in the vault the agent already uses. If <code>grist</code> is missing
+          or <code>grist usage</code> fails, the agent stops and tells you.
+        </p>
+
+        <h2 id="invoke">How to invoke</h2>
+        <p>
+          Headless, one shot, JSON on stdout. Point <code>--dir</code> at the
+          git checkout. <code>--auto</code> is required so tool permissions are
+          not rejected.
+        </p>
+        <pre>grist run --format json --auto --dir /path/to/repo "Precise task: what to change, where, and how to verify."</pre>
+        <p>Each stdout line is one JSON event:</p>
+        <ul>
+          <li><code>sessionID</code> — capture this from the first event</li>
+          <li><code>type: "text"</code> — assistant output in <code>part.text</code></li>
+          <li><code>type: "tool_use"</code> — file edits and shell</li>
+          <li><code>type: "error"</code> — failure; stop and report</li>
+          <li>process exit — Grist is done; inspect the tree (<code>git status</code>, <code>git diff</code>)</li>
+        </ul>
+        <p>Resume the same session:</p>
+        <pre>grist run --format json --auto --dir /path/to/repo -c "Continue: address the test failure in …"
+grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: …"</pre>
+        <p>
+          Do not use the interactive TUI. Do not run <code>grist auth login</code>
+          on a headless VM — the API key is the credential.
+        </p>
+
+        <h2 id="workflow">Workflow</h2>
+        <ol>
+          <li>Pull the repo. Create a fresh branch. Never work on <code>main</code>.</li>
+          <li>Write a precise prompt (files, behavior, tests). Run Grist as above.</li>
+          <li>Read the diff. If it is wrong or too broad, continue the session with a tighter prompt or stop.</li>
+          <li>Run the repo’s tests.</li>
+          <li>Push the branch. Open or describe a PR. Never merge to <code>main</code>.</li>
+          <li>Report back.</li>
+        </ol>
+
+        <h2 id="hard-rules">Hard rules</h2>
+        <ul>
+          <li>Never run Grist on Necora code, repos, or infrastructure.</li>
+          <li>Never expose the API key. If it leaks, revoke it on the dashboard and stop.</li>
+          <li>Keep tasks scoped. Spend bills to your Grist account. One feature or fix per run — not “clean up the repo.”</li>
+          <li>Branches only. Never push to <code>main</code> or the default branch.</li>
+        </ul>
+
+        <h2 id="report">What the agent reports</h2>
+        <ul>
+          <li>What changed (files and behavior)</li>
+          <li>The branch name</li>
+          <li>Test results</li>
+          <li>Roughly what it cost (<code>grist usage</code> before and after, or remaining USD)</li>
+        </ul>
       </article>
     </main>
 
@@ -541,7 +640,7 @@ GRIST_OBS_PACK=off       # pack only</pre>
       <section class="dash-head">
         <div>
           <p class="eyebrow" id="plan-kicker">[ beta ]</p>
-          <h1>Usage</h1>
+          <h1 id="dash-title">Usage</h1>
         </div>
         <div class="dash-actions">
           <a href="/plans">Plans</a>
@@ -549,15 +648,41 @@ GRIST_OBS_PACK=off       # pack only</pre>
           <button class="text-btn sign-out" type="button">Sign out</button>
         </div>
       </section>
+      <nav class="dash-tabs" aria-label="Dashboard">
+        <a href="/dashboard" data-dash="usage">Usage</a>
+        <a href="/dashboard/api" data-dash="api">API keys</a>
+      </nav>
       <p class="error" id="dash-error" hidden></p>
       <p class="remain" id="remain">—</p>
       <div class="bar" aria-hidden="true"><span id="spent-bar"></span></div>
       <p class="muted" id="cap-line"></p>
-      <section class="rungs" id="rungs"></section>
-      <section class="install">
-        <h2>CLI</h2>
-        <pre id="cli"></pre>
-      </section>
+      <div id="dash-panel-usage">
+        <section class="rungs" id="rungs"></section>
+        <section class="install">
+          <h2>CLI</h2>
+          <pre id="cli"></pre>
+        </section>
+      </div>
+      <div id="dash-panel-api" hidden>
+        <p class="lede">
+          Keys let agents like Muse run Grist on a VM, billed to this account.
+          Store the secret in a vault. Never in chat, never in a skill file.
+        </p>
+        <form id="key-form" class="key-form">
+          <div>
+            <label for="key-name">Label</label>
+            <input id="key-name" name="name" maxlength="64" placeholder="muse-vm" autocomplete="off" />
+          </div>
+          <button class="btn" type="submit">Create key</button>
+        </form>
+        <section class="key-secret" id="key-secret" hidden>
+          <h2>Copy this key now</h2>
+          <p class="muted">It will not be shown again.</p>
+          <pre id="key-secret-value"></pre>
+          <button type="button" class="copy" id="copy-key">Copy</button>
+        </section>
+        <section class="admin-list" id="key-list"></section>
+      </div>
     </main>
 
     <main id="view-admin" hidden>
@@ -1127,6 +1252,7 @@ GRIST_OBS_PACK=off       # pack only</pre>
       <span class="foot-brand">Grist</span>
       <nav class="foot-nav" aria-label="Legal and site">
         <a href="/docs">Docs</a>
+        <a href="/docs/skills">Agent skills</a>
         <a href="/plans">Pricing</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
@@ -1142,9 +1268,11 @@ GRIST_OBS_PACK=off       # pack only</pre>
           "/": "view-home",
           "/login": "view-login",
           "/dashboard": "view-dashboard",
+          "/dashboard/api": "view-dashboard",
           "/admin": "view-admin",
           "/plans": "view-plans",
           "/docs": "view-docs",
+          "/docs/skills": "view-docs-skills",
           "/privacy": "view-privacy",
           "/terms": "view-terms",
           "/acceptable-use": "view-acceptable-use",

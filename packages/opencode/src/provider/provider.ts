@@ -16,7 +16,7 @@ import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
-import { loadInviteConfig } from "@/grist/invite/config"
+import { gatewayAuthHeaders, loadInviteConfig } from "@/grist/invite/config"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -487,7 +487,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
             headers: {
               "HTTP-Referer": "https://github.com/pranav6226/grist",
               "X-Title": "Grist",
-              "X-Grist-Invite": invite.code,
+              ...gatewayAuthHeaders(invite),
             },
           },
         })

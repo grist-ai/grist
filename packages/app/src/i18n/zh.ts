@@ -198,6 +198,8 @@ export const dict = {
 
   "command.prompt.mode.shell": "Shell",
   "command.prompt.mode.normal": "Prompt",
+  "command.prompt.voice": "Voice input",
+  "command.prompt.voice.description": "Dictate a prompt with on-device Whisper Large V3",
 
   "command.permissions.autoaccept.enable": "自动接受权限",
   "command.permissions.autoaccept.disable": "停止自动接受权限",
@@ -414,6 +416,9 @@ export const dict = {
   "prompt.context.removeActiveFile": "从上下文移除活动文件",
   "prompt.context.removeFile": "从上下文移除文件",
   "prompt.action.attachFile": "附加文件",
+  "prompt.action.voice": "Voice input",
+  "prompt.action.voice.stop": "Stop recording",
+  "prompt.action.voice.transcribing": "Transcribing",
   "prompt.menu.addImagesAndFiles": "添加文件及更多内容",
   "prompt.menu.imagesAndFiles": "图片和文件",
   "prompt.menu.commands": "命令",
@@ -422,6 +427,16 @@ export const dict = {
   "prompt.attachment.remove": "移除附件",
   "prompt.action.send": "发送",
   "prompt.action.stop": "停止",
+
+  "prompt.toast.voice.permission.title": "Microphone access needed",
+  "prompt.toast.voice.permission.description": "Allow microphone access to dictate a prompt.",
+  "prompt.toast.voice.empty.title": "No speech detected",
+  "prompt.toast.voice.empty.description": "Try speaking again after clicking the microphone.",
+  "prompt.toast.voice.failed.title": "Voice input failed",
+  "prompt.toast.voice.failed.description": "Couldn't transcribe speech on this device. Try again.",
+  "prompt.toast.voice.download.title": "Downloading Whisper Large V3",
+  "prompt.toast.voice.download.description": "First use downloads the local speech model. It stays on this machine.",
+
   "prompt.toast.pasteUnsupported.title": "不支持的附件",
   "prompt.toast.attachmentDuplicate.title": "此文件已上传",
   "prompt.toast.pasteUnsupported.description": "此处仅能附加图片、PDF 或文本文件。",

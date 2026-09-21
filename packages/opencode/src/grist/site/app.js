@@ -16,9 +16,30 @@ const views = {
   "/": "view-home",
   "/login": "view-login",
   "/dashboard": "view-dashboard",
+  "/dashboard/api": "view-dashboard",
   "/admin": "view-admin",
   "/plans": "view-plans",
   "/docs": "view-docs",
+  "/docs/skills": "view-docs-skills",
+  "/privacy": "view-privacy",
+  "/terms": "view-terms",
+  "/acceptable-use": "view-acceptable-use",
+  "/cookies": "view-cookies",
+}
+
+const titles = {
+  "/": "Grist — the coding agent that learns your codebase",
+  "/login": "Sign in — Grist",
+  "/dashboard": "Usage — Grist",
+  "/dashboard/api": "API keys — Grist",
+  "/admin": "Admin — Grist",
+  "/plans": "Plans — Grist",
+  "/docs": "Docs — Grist",
+  "/docs/skills": "Agent skills — Grist",
+  "/privacy": "Privacy Policy — Grist",
+  "/terms": "Terms of Use — Grist",
+  "/acceptable-use": "Acceptable Use — Grist",
+  "/cookies": "Cookie Policy — Grist",
 }
 
 function pathOf() {
@@ -139,6 +160,7 @@ function setAuthNav() {
 
 function show(id) {
   for (const main of document.querySelectorAll("main")) main.hidden = main.id !== id
+  document.title = titles[pathOf()] ?? titles["/"]
 }
 
 function fail(node, message) {
@@ -187,8 +209,12 @@ async function render() {
     history.replaceState(null, "", state.admin ? "/admin" : "/dashboard")
     show(state.admin ? "view-admin" : "view-dashboard")
     setAuthNav()
-    if (state.admin) void loadAdmin()
-    else void loadDashboard()
+    if (state.admin) {
+      void loadAdmin()
+      return
+    }
+    setDashTab("usage")
+    void loadDashboard()
     return
   }
   if (path === "/admin") {
@@ -204,10 +230,18 @@ async function render() {
     void loadAdmin()
     return
   }
-  if (path === "/dashboard" && !signedIn()) {
-    history.replaceState(null, "", "/login")
-    show("view-login")
+  if (path === "/dashboard" || path === "/dashboard/api") {
+    if (!signedIn()) {
+      history.replaceState(null, "", "/login")
+      show("view-login")
+      setAuthNav()
+      return
+    }
+    show("view-dashboard")
+    setDashTab(path === "/dashboard/api" ? "api" : "usage")
     setAuthNav()
+    void loadDashboard()
+    if (path === "/dashboard/api") void loadApiKeys()
     return
   }
   if (path === "/login" && device() && invite()) {
@@ -217,21 +251,21 @@ async function render() {
   }
   show(views[path] ?? "view-home")
   setAuthNav()
-  if (path === "/dashboard") void loadDashboard()
   loadWaitlist()
   scrollHash()
 }
 
 function scrollHash() {
   const path = pathOf()
-  if (path !== "/" && path !== "/docs") return
   const id = window.location.hash.replace(/^#/, "")
-  if (!id) {
-    window.scrollTo(0, 0)
-    return
+  if ((path === "/" || path === "/docs" || path === "/docs/skills") && id) {
+    const node = document.getElementById(id)
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" })
+      return
+    }
   }
-  const node = document.getElementById(id)
-  if (node) node.scrollIntoView({ behavior: "smooth", block: "start" })
+  window.scrollTo(0, 0)
 }
 
 function loadWaitlist() {
@@ -275,6 +309,47 @@ async function loadDashboard() {
   document.getElementById("cli").textContent = `grist auth login --gateway ${window.location.origin}`
 }
 
+function setDashTab(tab) {
+  const api = tab === "api"
+  document.getElementById("dash-title").textContent = api ? "API keys" : "Usage"
+  document.getElementById("dash-panel-usage").hidden = api
+  document.getElementById("dash-panel-api").hidden = !api
+  for (const node of document.querySelectorAll("[data-dash]")) {
+    node.classList.toggle("is-on", node.getAttribute("data-dash") === tab)
+  }
+}
+
+async function loadApiKeys() {
+  const error = document.getElementById("dash-error")
+  const response = await fetch("/v1/api-keys", { headers: await headers() })
+  if (response.status !== 200) {
+    fail(error, "Couldn’t load API keys. Sign in again.")
+    return
+  }
+  const data = await response.json()
+  const keys = data.keys ?? []
+  if (!keys.length) {
+    document.getElementById("key-list").innerHTML = `<p class="muted">No keys yet.</p>`
+    return
+  }
+  document.getElementById("key-list").innerHTML = keys
+    .map((row) => {
+      const used = row.last_used_at
+        ? `used ${new Date(row.last_used_at).toLocaleDateString()}`
+        : "never used"
+      const revoke = row.revoked
+        ? ""
+        : `<button class="text-btn" type="button" data-revoke-key="${row.id}">Revoke</button>`
+      return `<article class="admin-row${row.revoked ? " is-revoked" : ""}">
+        <code>${row.prefix}</code>
+        <span>${escapeHtml(row.name)}</span>
+        <span>${row.revoked ? "revoked" : used}</span>
+        ${revoke}
+      </article>`
+    })
+    .join("")
+}
+
 async function loadAdmin() {
   const error = document.getElementById("admin-error")
   error.hidden = true
@@ -313,8 +388,21 @@ document.getElementById("google-btn")?.addEventListener("click", async () => {
   }
   try {
     await signInWithPopup(state.auth, new GoogleAuthProvider())
-  } catch {
-    fail(error, "Google sign-in isn’t enabled yet. Use email.")
+  } catch (err) {
+    const code = typeof err?.code === "string" ? err.code : ""
+    if (code === "auth/unauthorized-domain") {
+      fail(error, "This site isn’t on the Firebase authorized domains list.")
+      return
+    }
+    if (code === "auth/popup-blocked" || code === "auth/popup-closed-by-user") {
+      fail(error, "Google popup was blocked or closed. Allow popups and try again.")
+      return
+    }
+    if (code === "auth/operation-not-allowed") {
+      fail(error, "Google sign-in isn’t enabled yet. Use email.")
+      return
+    }
+    fail(error, "Google sign-in failed. Use email, or try again.")
     return
   }
   if (await afterFirebase()) goAuthed()
@@ -409,6 +497,56 @@ document.getElementById("admin-invites")?.addEventListener("click", async (event
   void loadAdmin()
 })
 
+document.getElementById("key-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault()
+  const error = document.getElementById("dash-error")
+  error.hidden = true
+  const name = document.getElementById("key-name").value.trim()
+  const response = await fetch("/v1/api-keys", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await headers()) },
+    body: JSON.stringify({ name }),
+  })
+  const data = await response.json()
+  if (response.status !== 200 || !data.key) {
+    fail(error, data.error === "key limit reached" ? "Twenty keys is the limit. Revoke one first." : "Couldn’t create a key.")
+    return
+  }
+  document.getElementById("key-name").value = ""
+  const panel = document.getElementById("key-secret")
+  panel.hidden = false
+  document.getElementById("key-secret-value").textContent = data.key
+  void loadApiKeys()
+})
+
+document.getElementById("key-list")?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-revoke-key]")
+  if (!button) return
+  const id = button.getAttribute("data-revoke-key")
+  await fetch(`/v1/api-keys/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: await headers(),
+  })
+  document.getElementById("key-secret").hidden = true
+  void loadApiKeys()
+})
+
+document.getElementById("copy-key")?.addEventListener("click", async (event) => {
+  const node = event.currentTarget
+  const ok = await copyText(document.getElementById("key-secret-value").textContent)
+  if (!ok) return
+  flashCopied(node)
+})
+
+document.getElementById("copy-skill")?.addEventListener("click", async (event) => {
+  const node = event.currentTarget
+  const response = await fetch("/grist-skill.md")
+  if (!response.ok) return
+  const ok = await copyText(await response.text())
+  if (!ok) return
+  flashCopied(node)
+})
+
 async function signOutLocal() {
   localStorage.removeItem(KEY)
   state.admin = false
@@ -442,14 +580,26 @@ for (const node of document.querySelectorAll("[data-copy]")) {
     const text = COPIES[key] || key
     const ok = await copyText(text)
     if (!ok) return
-    node.dataset.copied = "true"
-    const label = node.textContent
-    node.textContent = "Copied"
-    setTimeout(() => {
-      delete node.dataset.copied
-      node.textContent = label
-    }, 1400)
+    flashCopied(node)
   })
+}
+
+function flashCopied(node) {
+  node.dataset.copied = "true"
+  const label = node.textContent
+  node.textContent = "Copied"
+  setTimeout(() => {
+    delete node.dataset.copied
+    node.textContent = label
+  }, 1400)
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
 }
 
 async function copyText(text) {
@@ -475,7 +625,7 @@ document.querySelectorAll('a[href^="/"]').forEach((link) => {
   link.addEventListener("click", (event) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     const href = link.getAttribute("href")
-    if (!href || href.startsWith("/v1")) return
+    if (!href || href.startsWith("/v1") || href.endsWith(".md")) return
     event.preventDefault()
     history.pushState(null, "", href)
     void render()

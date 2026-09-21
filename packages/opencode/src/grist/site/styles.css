@@ -248,7 +248,7 @@ nav a:visited,
   font-weight: 600;
   letter-spacing: 0.04em;
   cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 8px 18px rgba(236, 91, 43, 0.28);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset;
 }
 
 .btn:hover {
@@ -1231,6 +1231,76 @@ input:focus {
   display: flex;
   gap: 1.1rem;
   align-items: center;
+}
+
+.dash-tabs,
+.docs-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.4rem;
+  margin: 0 0 1.6rem;
+  padding: 0 0 0.9rem;
+  border-bottom: 1px solid var(--line);
+  max-width: 980px;
+  font-size: 0.92rem;
+}
+
+.docs-tabs {
+  max-width: none;
+}
+
+.dash-tabs a.is-on,
+.docs-tabs a.is-on {
+  color: var(--accent);
+}
+
+.dash-tabs a:visited,
+.docs-tabs a:visited {
+  color: inherit;
+}
+
+.dash-tabs a.is-on:visited,
+.docs-tabs a.is-on:visited {
+  color: var(--accent);
+}
+
+.key-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 0.9rem;
+  align-items: end;
+  max-width: 520px;
+  margin: 0.4rem 0 1.6rem;
+}
+
+.key-form label {
+  display: block;
+  margin: 0 0 0.35rem;
+}
+
+.key-form input {
+  width: 16rem;
+}
+
+.key-secret {
+  max-width: 720px;
+  margin: 0 0 1.6rem;
+  padding: 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+.key-secret h2 {
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+
+.key-secret pre {
+  max-width: none;
 }
 
 .text-btn {

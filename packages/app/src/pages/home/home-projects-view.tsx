@@ -57,7 +57,6 @@ export type HomeProjectsViewProps = {
   onClearNotifications: (server: ServerConnection.Any, project: LocalProject) => void
   onCloseProject: (server: ServerConnection.Any, directory: string) => void
   onOpenSettings: () => void
-  onOpenHelp: () => void
 }
 
 export function HomeProjectsView(props: HomeProjectsViewProps) {
@@ -147,7 +146,6 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
       <HomeUtilityNav
         class="mb-8 mt-4 hidden shrink-0 lg:flex"
         onOpenSettings={props.onOpenSettings}
-        onOpenHelp={props.onOpenHelp}
         language={props.language}
       />
     </aside>
@@ -157,7 +155,6 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
 export function HomeUtilityNav(props: {
   class?: string
   onOpenSettings: () => void
-  onOpenHelp: () => void
   language: ReturnType<typeof useLanguage>
 }) {
   return (
@@ -169,14 +166,6 @@ export function HomeUtilityNav(props: {
       >
         <IconV2 name="settings-gear" size="small" />
         <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("sidebar.settings")}</span>
-      </HomeProjectNavButton>
-      <HomeProjectNavButton
-        type="button"
-        class="text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted"
-        onClick={props.onOpenHelp}
-      >
-        <IconV2 name="help" size="small" />
-        <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("sidebar.help")}</span>
       </HomeProjectNavButton>
     </div>
   )

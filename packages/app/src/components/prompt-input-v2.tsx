@@ -33,6 +33,7 @@ import {
   createPromptInputV2State,
   type PromptInputV2Interaction,
 } from "@opencode-ai/session-ui/v2/prompt-input/interaction"
+import { useVoiceInput, VoiceInputButton } from "@/components/voice-input-button"
 
 export type PromptInputV2ComposerProps = {
   class?: string
@@ -43,6 +44,7 @@ export type PromptInputV2ComposerProps = {
 export type PromptInputV2ControllerProps = Omit<PromptInputProps, "class" | "submission">
 export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
+  readonly voice: ReturnType<typeof useVoiceInput>
 }
 
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
@@ -59,6 +61,9 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         variantControlVisible={!HIDE_MODEL_UI && !props.controller.model.loading}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
+        extraActions={
+          <VoiceInputButton voice={props.controller.voice} disabled={props.controller.state.mode !== "normal"} />
+        }
         modelControl={
           HIDE_MODEL_UI ? undefined : (
           <PromptInputV2ModelControl
@@ -411,7 +416,11 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       },
     },
   })
+  const voice = useVoiceInput({
+    onTranscript: (text) => controller.insertText(text),
+  })
   Object.defineProperty(controller, "model", { get: () => props.controls.model })
+  Object.defineProperty(controller, "voice", { get: () => voice })
 
   command.register("prompt-input", () => [
     {
@@ -437,6 +446,15 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       keybind: "mod+shift+e",
       disabled: controller.state.mode === "normal",
       onSelect: () => controller.dispatch({ type: "mode.normal" }),
+    },
+    {
+      id: "prompt.voice",
+      title: language.t("command.prompt.voice"),
+      description: language.t("command.prompt.voice.description"),
+      category: language.t("command.category.session"),
+      keybind: "mod+shift+v",
+      disabled: controller.state.mode !== "normal",
+      onSelect: () => void voice.toggle(),
     },
   ])
 
