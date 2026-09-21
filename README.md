@@ -26,8 +26,8 @@ bun run --cwd packages/core fix-node-pty
 export OPENROUTER_API_KEY=sk-or-v1-...
 export GRIST_ADMIN_TOKEN=dev
 bun run --cwd packages/opencode src/index.ts gateway
-# Tester (or you dogfooding): opens the site; enter your invite there
-bun run --cwd packages/opencode src/index.ts auth login --gateway http://127.0.0.1:8787
+# Tester (or you dogfooding): pick Grist, then invite or a dashboard API key
+bun run --cwd packages/opencode src/index.ts auth login --provider grist --gateway http://127.0.0.1:8787
 bun run --cwd packages/opencode test src/grist/
 bun scripts/grist-eval.ts
 bun scripts/burn-in-report.ts
@@ -43,7 +43,7 @@ bun run --cwd packages/desktop dev
 
 ```bash
 cd /path/to/your-repo
-grist auth login --gateway <url>
+grist auth login --provider grist --gateway <url>
 grist init
 grist bootstrap            # pin SHA + ownership mine (+ Graphify if installed)
 grist                      # start agent

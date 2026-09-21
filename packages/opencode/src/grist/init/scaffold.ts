@@ -34,7 +34,7 @@ Local Grist state for this codebase (gitignored by default).
 
 ## Next steps
 
-1. \`grist auth login --gateway <url>\` — required; inference is billed to the founder
+1. \`grist auth login --provider grist\` — required; inference is billed to the founder
 2. Optional: \`bunx supermemory local install\` then keep \`supermemory-server\` available
 3. \`grist bootstrap\` — mine ownership / build map (review before \`memory remember\`)
 4. \`grist\` — start the agent; \`grist usage\` shows remaining invite spend
@@ -89,7 +89,7 @@ export function scaffoldGrist(input?: { cwd?: string; force?: boolean }): InitRe
   }
 
   if (!loadInviteConfig()) {
-    warnings.push("Not signed in — run `grist auth login --gateway <url>`")
+    warnings.push("Not signed in — run `grist auth login --provider grist`")
   }
 
   return { directory, created, skipped, warnings }
