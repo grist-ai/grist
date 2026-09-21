@@ -3,8 +3,12 @@ import os from "os"
 import path from "path"
 import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generateApiKeySecret, generateDeviceUserCode, generateInviteCode } from "./codes"
 import { usdForUsage } from "./prices"
-import { createGateway } from "./http"
+import { createGateway, DEFAULT_ADMIN_EMAIL } from "./http"
 import { openGatewayStore } from "./store"
+
+test("admin sign-in identity is the founder Gmail, not the public inbox", () => {
+  expect(DEFAULT_ADMIN_EMAIL).toBe("pranavmm25@gmail.com")
+})
 
 describe("invite codes", () => {
   test("canonicalizes separators and Crockford folds", () => {
@@ -348,10 +352,10 @@ describe("gateway HTTP", () => {
     process.env.FIREBASE_PROJECT_ID = "grist-test"
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
     const gateway = createGateway({
-      adminEmail: "admin@grist.lol",
+      adminEmail: "pranavmm25@gmail.com",
       fetch: async (_input, init) => {
         const body = JSON.parse(String(init?.body ?? "{}")) as { idToken?: string }
-        const email = body.idToken === "admin-tok" ? "admin@grist.lol" : "tester@beta"
+        const email = body.idToken === "admin-tok" ? "pranavmm25@gmail.com" : "tester@beta"
         const localId = body.idToken === "admin-tok" ? "uid_admin" : "uid_tester"
         return new Response(JSON.stringify({ users: [{ localId, email }] }), {
           status: 200,

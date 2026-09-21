@@ -24,7 +24,8 @@ export type GatewayOptions = {
   siteRoot?: string
 }
 
-export const DEFAULT_ADMIN_EMAIL = "admin@grist.lol"
+/** Sign-in identity for /admin (Google or email/password). Public mailto is admin@grist.lol. */
+export const DEFAULT_ADMIN_EMAIL = "pranavmm25@gmail.com"
 
 const SITE_ROOT = path.join(import.meta.dir, "..", "site")
 const SITE_PAGES = new Set([
