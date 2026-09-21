@@ -1,4 +1,5 @@
 import path from "path"
+import { createHash } from "node:crypto"
 import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
 import { RUNG_MODELS } from "../rung"
@@ -47,7 +48,6 @@ const SITE_FILES: Record<string, string> = {
   "favicon.svg": "image/svg+xml",
   "favicon-32.png": "image/png",
   "apple-touch-icon.png": "image/png",
-  "grist-skill.md": "text/markdown; charset=utf-8",
 }
 const MAC_DMG = /^\/download\/(grist-desktop-mac-(arm64|x64)\.dmg)$/
 const PUBLIC_MAC_DMGS: Record<string, string> = {
@@ -648,6 +648,8 @@ async function readJson(req: Request): Promise<Record<string, unknown> | undefin
 }
 
 async function serveSite(root: string, pathname: string): Promise<Response> {
+  const skill = await serveAgentSkill(root, pathname)
+  if (skill) return skill
   const dmg = pathname.match(MAC_DMG)?.[1]
   if (dmg) return serveMacDmg(root, dmg)
   const name = SITE_PAGES.has(pathname) ? "index.html" : pathname.replace(/^\//, "")
@@ -656,6 +658,37 @@ async function serveSite(root: string, pathname: string): Promise<Response> {
   const file = Bun.file(path.join(root, name))
   if (!(await file.exists())) return json(404, { error: "not found" })
   return new Response(file, { headers: { "Content-Type": type } })
+}
+
+const GRIST_SKILL_DESCRIPTION =
+  "Delegate multi-step coding tasks in a git repo to Grist: features, bug fixes, refactors spanning multiple files. Not for single-file edits or non-coding questions."
+
+async function serveAgentSkill(root: string, pathname: string): Promise<Response | undefined> {
+  if (
+    pathname !== "/grist-skill.md" &&
+    pathname !== "/.well-known/agent-skills/grist/SKILL.md" &&
+    pathname !== "/.well-known/agent-skills/index.json"
+  ) {
+    return
+  }
+  const file = Bun.file(path.join(root, "grist-skill.md"))
+  if (!(await file.exists())) return json(404, { error: "not found" })
+  if (pathname !== "/.well-known/agent-skills/index.json") {
+    return new Response(file, { headers: { "Content-Type": "text/markdown; charset=utf-8" } })
+  }
+  const digest = createHash("sha256").update(await file.bytes()).digest("hex")
+  return json(200, {
+    $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+    skills: [
+      {
+        name: "grist",
+        type: "skill-md",
+        description: GRIST_SKILL_DESCRIPTION,
+        url: "/.well-known/agent-skills/grist/SKILL.md",
+        digest: `sha256:${digest}`,
+      },
+    ],
+  })
 }
 
 async function serveMacDmg(root: string, name: string): Promise<Response> {
