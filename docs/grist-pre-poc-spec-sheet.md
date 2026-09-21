@@ -68,6 +68,8 @@ OBSERVABILITY — Langfuse (traces, $/task) · inspect_ai (gate precision, evals
   gaps as noise. SWE-bench Pro discriminates better.
 - Explicitly rejected: Meta Muse Spark (proprietary, beta; contributor tier
   feeds code into training — incompatible with opt-out stance).
+- Gateway metering uses first-party rates so caps are not under-counted:
+  Kimi $3/$15, Sol $4/$20 (see [`providers.md`](providers.md)).
 
 ## 4. Confidence gate (Jev)
 

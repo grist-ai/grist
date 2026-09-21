@@ -265,8 +265,13 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   async function completions(req: Request): Promise<Response> {
+    const started = now()
     const invite = await resolveInvite(req)
-    if (invite instanceof Response) return invite
+    const authMs = now() - started
+    if (invite instanceof Response) {
+      console.info(`[grist-gateway] completions auth_ms=${authMs} status=${invite.status}`)
+      return invite
+    }
     if (invite.spent_usd >= invite.cap_usd) return capHit(invite)
 
     const body = await readJson(req)
@@ -285,6 +290,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       model,
       ...(stream ? { stream_options: { include_usage: true } } : {}),
     }
+    const upstreamStarted = now()
     const upstream = await fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -295,6 +301,11 @@ export function createGateway(opts: GatewayOptions = {}) {
       },
       body: JSON.stringify(payload),
     })
+    const upstreamMs = now() - upstreamStarted
+    const provider = upstream.headers.get("x-openrouter-provider") ?? upstream.headers.get("x-provider") ?? ""
+    console.info(
+      `[grist-gateway] completions model=${model} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs}${provider ? ` provider=${provider}` : ""}`,
+    )
 
     if (!stream) {
       const data = (await upstream.json()) as Record<string, unknown>
