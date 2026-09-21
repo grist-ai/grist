@@ -63,7 +63,6 @@ jobs:
         env:
           OPENCODE_VERSION: ${{ inputs.version }}
           OPENCODE_CHANNEL: ${{ inputs.channel }}
-          OPENCODE_RELEASE: "1"
 
       # Do not set NODE_AUTH_TOKEN. An npm token overrides OIDC and currently
       # fails with EOTP because 2FA-bypass tokens can no longer publish.
