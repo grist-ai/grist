@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { flattenPcm, joinPromptText, resamplePcm } from "./voice-input"
-import { isWhisperDownloadProgress, textFromAsr } from "./whisper-local"
+import { isWhisperDownloadProgress, textFromAsr, WHISPER_MODEL_ID } from "./whisper-local"
 
 describe("voice input text", () => {
   test("inserts a space between existing prompt text and speech", () => {
@@ -27,6 +27,10 @@ describe("pcm helpers", () => {
 })
 
 describe("whisper progress", () => {
+  test("uses the public turbo ONNX weights", () => {
+    expect(WHISPER_MODEL_ID).toBe("onnx-community/whisper-large-v3-turbo")
+  })
+
   test("treats incomplete file fetches as downloads", () => {
     expect(isWhisperDownloadProgress({ status: "progress", progress: 0.4 })).toBe(true)
     expect(isWhisperDownloadProgress({ status: "ready" })).toBe(false)

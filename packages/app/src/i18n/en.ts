@@ -319,8 +319,8 @@ export const dict = {
   "prompt.toast.voice.empty.description": "Try speaking again after clicking the microphone.",
   "prompt.toast.voice.failed.title": "Voice input failed",
   "prompt.toast.voice.failed.description": "Couldn't transcribe speech on this device. Try again.",
-  "prompt.toast.voice.download.title": "Downloading Whisper Large V3",
-  "prompt.toast.voice.download.description": "First use downloads the local speech model. It stays on this machine.",
+  "prompt.toast.voice.download.title": "Loading speech model",
+  "prompt.toast.voice.download.description": "Grist is loading the on-device Whisper model.",
 
   "prompt.toast.pasteUnsupported.title": "Unsupported attachment",
   "prompt.toast.pasteUnsupported.description": "Only images, PDFs, or text files can be attached here.",

@@ -1,6 +1,8 @@
 import { WHISPER_SAMPLE_RATE } from "./voice-input"
 
-export const WHISPER_MODEL_ID = "onnx-community/whisper-large-v3"
+export const WHISPER_MODEL_ID = "onnx-community/whisper-large-v3-turbo"
+export const BUNDLED_WHISPER_MODEL_BASE = "grist-model://models/"
+export const BUNDLED_WHISPER_WASM_BASE = "grist-model://wasm/"
 
 export type WhisperProgress = {
   status?: string
@@ -51,19 +53,31 @@ async function loadWhisper(onProgress?: (progress: WhisperProgress) => void) {
 
 async function createWhisperPipeline(onProgress?: (progress: WhisperProgress) => void) {
   const transformers = await import("@huggingface/transformers")
-  transformers.env.allowLocalModels = false
-  transformers.env.useBrowserCache = true
+  const bundled = await bundledWhisperAvailable()
+  transformers.env.allowLocalModels = bundled
+  transformers.env.allowRemoteModels = !bundled
+  transformers.env.useBrowserCache = !bundled
   transformers.env.useFS = false
   transformers.env.useFSCache = false
+  if (bundled) transformers.env.localModelPath = BUNDLED_WHISPER_MODEL_BASE
   const wasm = transformers.env.backends.onnx.wasm
-  if (wasm) wasm.proxy = false
+  if (wasm) {
+    wasm.proxy = false
+    if (bundled) wasm.wasmPaths = BUNDLED_WHISPER_WASM_BASE
+  }
   const device = await whisperDevice()
   const transcriber = await transformers.pipeline("automatic-speech-recognition", WHISPER_MODEL_ID, {
     dtype: "q4",
     device,
+    local_files_only: bundled,
     progress_callback: onProgress,
   })
   return transcriber as unknown as Transcriber
+}
+
+async function bundledWhisperAvailable() {
+  const response = await fetch(`${BUNDLED_WHISPER_MODEL_BASE}${WHISPER_MODEL_ID}/config.json`).catch(() => undefined)
+  return response?.ok === true
 }
 
 async function whisperDevice() {

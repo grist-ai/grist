@@ -69,5 +69,8 @@ developerID_application.cer
 # Electron Vite output
 packages/desktop/out/
 
+# Whisper ONNX + ORT wasm downloaded at package time
+packages/desktop/resources/whisper/
+
 # Desktop installers hosted by the gateway, not git
 packages/opencode/src/grist/site/download/*.dmg

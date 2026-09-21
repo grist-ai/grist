@@ -10,7 +10,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js"
 
 const KEY = "grist_invite"
-const state = { auth: undefined, ready: false, admin: false }
+const state = {
+  auth: undefined,
+  ready: false,
+  admin: false,
+  uid: "",
+  sessionKnown: false,
+  needsInvite: false,
+}
+let sessionTicket = 0
+let renderChain = Promise.resolve()
+let authGen = 0
 
 const views = {
   "/": "view-home",
@@ -18,6 +28,7 @@ const views = {
   "/dashboard": "view-dashboard",
   "/dashboard/api": "view-dashboard",
   "/admin": "view-admin",
+  "/admin/requests": "view-admin",
   "/plans": "view-plans",
   "/docs": "view-docs",
   "/docs/skills": "view-docs-skills",
@@ -33,6 +44,7 @@ const titles = {
   "/dashboard": "Usage — Grist",
   "/dashboard/api": "API keys — Grist",
   "/admin": "Admin — Grist",
+  "/admin/requests": "Requests — Grist",
   "/plans": "Plans — Grist",
   "/docs": "Docs — Grist",
   "/docs/skills": "Agent skills — Grist",
@@ -119,36 +131,82 @@ async function bootFirebase() {
       appId: config.appId,
     })
     state.auth = getAuth(app)
-    await new Promise((resolve) => {
-      onAuthStateChanged(state.auth, () => resolve())
+    await state.auth.authStateReady()
+    state.uid = state.auth.currentUser?.uid ?? ""
+    onAuthStateChanged(state.auth, (user) => {
+      const uid = user?.uid ?? ""
+      const gen = ++authGen
+      if (uid === state.uid) return
+      if (!uid) {
+        void confirmSignedOut(gen)
+        return
+      }
+      state.uid = uid
+      state.sessionKnown = false
+      state.needsInvite = false
+      if (!state.ready) return
+      void render()
     })
   } catch {
     showInviteOnly()
   }
 }
 
+async function confirmSignedOut(gen) {
+  // Firebase can emit a signed-out tick between the persisted user and the
+  // restored one. Leaving /admin on that tick is the flash back to sign-in.
+  await new Promise((resolve) => setTimeout(resolve, 400))
+  if (gen !== authGen) return
+  const uid = state.auth?.currentUser?.uid ?? ""
+  if (uid) {
+    if (uid === state.uid) return
+    state.uid = uid
+    state.sessionKnown = false
+    state.needsInvite = false
+    if (state.ready) void render()
+    return
+  }
+  state.uid = ""
+  state.admin = false
+  state.sessionKnown = false
+  state.needsInvite = false
+  showAuthStep()
+  if (state.ready) void render()
+}
+
 async function afterFirebase() {
+  const ticket = ++sessionTicket
   const user = state.auth?.currentUser
   if (!user) {
+    if (ticket !== sessionTicket) return
     state.admin = false
+    state.needsInvite = false
+    state.sessionKnown = true
     showAuthStep()
     return false
   }
-  const response = await fetch("/v1/auth/session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id_token: await user.getIdToken() }),
-  })
-  const data = await response.json()
-  if (!data.ok) return false
-  state.admin = Boolean(data.admin)
-  if (data.code) localStorage.setItem(KEY, data.code)
-  if (data.admin) return true
-  if (data.needs_invite) {
-    showInviteStep(data.email || user.email)
+  let data
+  try {
+    const response = await fetch("/v1/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id_token: await user.getIdToken() }),
+    })
+    data = await response.json()
+  } catch {
+    if (ticket !== sessionTicket) return
     return false
   }
-  return true
+  // A newer sign-in already owns the session. Painting from this response
+  // is what bounced the admin view off and back on.
+  if (ticket !== sessionTicket) return
+  if (!data || !data.ok) return false
+  state.admin = Boolean(data.admin)
+  state.needsInvite = !state.admin && Boolean(data.needs_invite)
+  state.sessionKnown = true
+  if (data.code) localStorage.setItem(KEY, data.code)
+  if (state.needsInvite) showInviteStep(data.email || user.email)
+  return !state.needsInvite
 }
 
 function setAuthNav() {
@@ -199,17 +257,33 @@ function goAuthed() {
     void finishCliLogin(invite())
     return
   }
-  history.pushState(null, "", state.admin ? "/admin" : "/dashboard")
-  render()
+  const next = state.admin ? "/admin" : "/dashboard"
+  if (pathOf() !== next) history.replaceState(null, "", next)
+  return render()
 }
 
-async function render() {
+function render() {
+  const run = renderChain.then(route)
+  renderChain = run.then(
+    () => {},
+    () => {},
+  )
+  return run
+}
+
+async function route() {
+  if (!state.ready) return
+  if (state.auth?.currentUser && !state.sessionKnown) {
+    const admitted = await afterFirebase()
+    if (admitted === undefined) return
+  }
   const path = pathOf()
-  if (path === "/login" && state.auth?.currentUser && !device() && (await afterFirebase())) {
+  if (path === "/login" && state.auth?.currentUser && !device() && state.sessionKnown && !state.needsInvite) {
     history.replaceState(null, "", state.admin ? "/admin" : "/dashboard")
     show(state.admin ? "view-admin" : "view-dashboard")
     setAuthNav()
     if (state.admin) {
+      setAdminTab("codes")
       void loadAdmin()
       return
     }
@@ -217,8 +291,7 @@ async function render() {
     void loadDashboard()
     return
   }
-  if (path === "/admin") {
-    if (!state.admin && state.auth?.currentUser) await afterFirebase()
+  if (path === "/admin" || path === "/admin/requests") {
     if (!state.admin) {
       history.replaceState(null, "", "/login")
       show("view-login")
@@ -227,7 +300,10 @@ async function render() {
     }
     show("view-admin")
     setAuthNav()
-    void loadAdmin()
+    const requests = path === "/admin/requests"
+    setAdminTab(requests ? "requests" : "codes")
+    if (requests) void loadRequests()
+    else void loadAdmin()
     return
   }
   if (path === "/dashboard" || path === "/dashboard/api") {
@@ -251,7 +327,6 @@ async function render() {
   }
   show(views[path] ?? "view-home")
   setAuthNav()
-  loadWaitlist()
   scrollHash()
 }
 
@@ -268,15 +343,14 @@ function scrollHash() {
   window.scrollTo(0, 0)
 }
 
-function loadWaitlist() {
-  const tally = globalThis.Tally
-  if (tally) {
-    tally.loadEmbeds()
-    return
+function setAdminTab(tab) {
+  const requests = tab === "requests"
+  document.getElementById("admin-title").textContent = requests ? "Requests" : "Beta codes"
+  document.getElementById("admin-panel-codes").hidden = requests
+  document.getElementById("admin-panel-requests").hidden = !requests
+  for (const node of document.querySelectorAll("[data-admin]")) {
+    node.classList.toggle("is-on", node.getAttribute("data-admin") === tab)
   }
-  document.querySelectorAll("iframe[data-tally-src]:not([src])").forEach((frame) => {
-    frame.src = frame.dataset.tallySrc
-  })
 }
 
 async function loadDashboard() {
@@ -384,6 +458,75 @@ async function loadAdmin() {
     .join("")
 }
 
+async function loadRequests() {
+  const error = document.getElementById("admin-request-error")
+  error.hidden = true
+  const response = await fetch("/v1/admin/requests", { headers: await headers() })
+  if (response.status !== 200) {
+    fail(error, "Admin session expired. Sign in again.")
+    return
+  }
+  const data = await response.json()
+  const rows = data.requests ?? []
+  if (!rows.length) {
+    document.getElementById("admin-requests").innerHTML = `<p class="muted">No requests.</p>`
+    return
+  }
+  document.getElementById("admin-requests").innerHTML = rows
+    .map((row) => {
+      const when = new Date(row.created_at).toLocaleDateString()
+      const detail = [row.name, row.note, when].filter(Boolean).join(" · ")
+      const code = row.code ? `<code>${escapeHtml(row.code)}</code>` : "waiting"
+      const copy = row.code
+        ? `<button class="text-btn" type="button" data-copy-mail data-mail-email="${escapeHtml(row.email)}" data-mail-name="${escapeHtml(row.name || "")}" data-mail-code="${escapeHtml(row.code)}" data-mail-cap="${escapeHtml(row.cap_usd ?? 5)}" data-mail-days="${escapeHtml(row.days ?? 30)}">Copy email</button>`
+        : ""
+      const generate =
+        row.status === "open"
+          ? `<button class="text-btn" type="button" data-mint-request="${escapeHtml(row.id)}">Generate</button>`
+          : ""
+      const sent =
+        row.status === "coded"
+          ? `<button class="text-btn" type="button" data-sent-request="${escapeHtml(row.id)}">Sent</button>`
+          : ""
+      const dismiss =
+        row.status === "open"
+          ? `<button class="text-btn" type="button" data-dismiss-request="${escapeHtml(row.id)}">Dismiss</button>`
+          : ""
+      return `<article class="admin-row${row.status === "sent" ? " is-revoked" : ""}">
+        <span>${escapeHtml(row.email)}</span>
+        <span>${escapeHtml(detail)}</span>
+        <span>${code}</span>
+        <span class="row-actions">${generate}${copy}${sent}${dismiss}</span>
+      </article>`
+    })
+    .join("")
+}
+
+document.getElementById("request-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault()
+  const error = document.getElementById("request-error")
+  error.hidden = true
+  const email = document.getElementById("request-email").value.trim()
+  const name = document.getElementById("request-name").value.trim()
+  const note = document.getElementById("request-note").value.trim()
+  const response = await fetch("/v1/access/requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, name, note }),
+  })
+  if (response.status === 429) {
+    fail(error, "Too many requests. Try again in a minute.")
+    return
+  }
+  if (response.status !== 200) {
+    fail(error, "Enter a real email.")
+    return
+  }
+  document.getElementById("request-form").hidden = true
+  document.getElementById("request-legal").hidden = true
+  document.getElementById("request-done").hidden = false
+})
+
 document.getElementById("google-btn")?.addEventListener("click", async () => {
   const error = document.getElementById("login-error")
   error.hidden = true
@@ -486,10 +629,112 @@ document.getElementById("mint-form")?.addEventListener("submit", async (event) =
   }
   const minted = document.getElementById("minted")
   minted.hidden = false
-  document.getElementById("minted-codes").textContent = data.codes.join("\n")
+  const email = looksLikeEmail(note) ? note : ""
+  const name = email ? "" : note
+  document.getElementById("minted-codes").textContent = data.codes
+    .map((code) => inviteMail({ email, name, code, capUsd: cap_usd, days }))
+    .join("\n\n")
   document.getElementById("mint-note").value = ""
   void loadAdmin()
 })
+
+document.getElementById("copy-mint-mail")?.addEventListener("click", async (event) => {
+  const ok = await copyText(document.getElementById("minted-codes").textContent)
+  if (ok) flashCopied(event.currentTarget)
+})
+
+document.getElementById("copy-request-mail")?.addEventListener("click", async (event) => {
+  const ok = await copyText(document.getElementById("request-mail-body").textContent)
+  if (ok) flashCopied(event.currentTarget)
+})
+
+document.getElementById("admin-requests")?.addEventListener("click", async (event) => {
+  const error = document.getElementById("admin-request-error")
+  error.hidden = true
+  const copy = event.target.closest("[data-copy-mail]")
+  if (copy) {
+    const text = inviteMail({
+      email: copy.getAttribute("data-mail-email") || "",
+      name: copy.getAttribute("data-mail-name") || "",
+      code: copy.getAttribute("data-mail-code") || "",
+      capUsd: copy.getAttribute("data-mail-cap"),
+      days: copy.getAttribute("data-mail-days"),
+    })
+    showRequestMail(text)
+    const ok = await copyText(text)
+    if (ok) flashCopied(copy)
+    return
+  }
+  const mint = event.target.closest("[data-mint-request]")
+  const sent = event.target.closest("[data-sent-request]")
+  const dismiss = event.target.closest("[data-dismiss-request]")
+  const id = mint?.getAttribute("data-mint-request") || sent?.getAttribute("data-sent-request") || dismiss?.getAttribute("data-dismiss-request")
+  if (!id) return
+  const action = mint ? "code" : sent ? "sent" : "dismiss"
+  const response = await fetch(`/v1/admin/requests/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    headers: await headers(),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (response.status !== 200) {
+    fail(error, "Couldn’t update that request.")
+    return
+  }
+  if (action === "code" && data.code) {
+    const text = inviteMail({
+      email: data.email,
+      name: data.name,
+      code: data.code,
+      capUsd: data.cap_usd,
+      days: data.days,
+    })
+    showRequestMail(text)
+    const copied = await copyText(text)
+    const button = document.getElementById("copy-request-mail")
+    if (copied && button) flashCopied(button)
+  }
+  void loadRequests()
+  if (action === "code") void loadAdmin()
+})
+
+function showRequestMail(text) {
+  const box = document.getElementById("request-mail")
+  box.hidden = false
+  document.getElementById("request-mail-body").textContent = text
+}
+
+function looksLikeEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function inviteMail(input) {
+  const name = String(input.name || "").trim()
+  const greeting = name ? `Hi ${name},` : "Hi,"
+  const cap = Number(input.capUsd)
+  const dollars = Number.isFinite(cap) ? (Number.isInteger(cap) ? String(cap) : cap.toFixed(2)) : "5"
+  const days = Number(input.days) || 30
+  const to = input.email ? `To: ${input.email}\n` : ""
+  return `${to}Subject: Your Grist invite
+
+${greeting}
+
+You’re in the Grist beta. Your invite code is:
+
+${input.code}
+
+It includes $${dollars} of inference and lasts ${days} days.
+
+Sign in at https://grist.lol/login with Google, then enter this code. You only do that once.
+
+Install:
+npm install -g grist-ai
+grist
+
+Pick Grist when it asks you to sign in. Your code stays on your machine.
+
+— Grist
+`
+}
 
 document.getElementById("admin-invites")?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-revoke]")
@@ -555,6 +800,8 @@ document.getElementById("copy-skill")?.addEventListener("click", async (event) =
 async function signOutLocal() {
   localStorage.removeItem(KEY)
   state.admin = false
+  state.sessionKnown = false
+  state.needsInvite = false
   if (state.auth) await signOut(state.auth)
   showAuthStep()
 }
