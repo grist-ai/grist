@@ -1,18 +1,24 @@
-import { Effect } from "effect"
 import readline from "node:readline"
 import open from "open"
-import { cmd } from "./cmd"
-import { CliError, effectCmd, fail } from "../effect-cmd"
-import { intro, log, outro } from "../effect/prompt"
 import { UI } from "../ui"
-import { clearInviteConfig, DEFAULT_GATEWAY_URL, loadInviteConfig, saveInviteConfig } from "@/grist/invite/config"
+import { canonicalApiKey } from "@/grist/gateway/codes"
+import { fetchUsage, pollCliLogin, startCliLogin } from "@/grist/invite/client"
+import {
+  clearInviteConfig,
+  DEFAULT_GATEWAY_URL,
+  loadInviteConfig,
+  saveAuthConfig,
+  saveInviteConfig,
+} from "@/grist/invite/config"
 
 function strip(url: string) {
   return url.replace(/\/+$/, "")
 }
 
-function resolveGateway(arg?: string) {
-  return strip(arg?.trim() || process.env.GRIST_GATEWAY_URL?.trim() || loadInviteConfig()?.gatewayUrl || DEFAULT_GATEWAY_URL)
+export function resolveGateway(arg?: string) {
+  return strip(
+    arg?.trim() || process.env.GRIST_GATEWAY_URL?.trim() || loadInviteConfig()?.gatewayUrl || DEFAULT_GATEWAY_URL,
+  )
 }
 
 export function canPromptLogin() {
@@ -23,7 +29,6 @@ export async function runAuthLogin(gateway?: string) {
   const gatewayUrl = resolveGateway(gateway)
   if (!gatewayUrl) return { ok: false as const, reason: "unreachable" as const }
 
-  const { startCliLogin, pollCliLogin } = await import("@/grist/invite/client")
   const login = await startCliLogin(gatewayUrl).catch(() => undefined)
   if (!login) return { ok: false as const, reason: "unreachable" as const }
 
@@ -41,9 +46,22 @@ export async function runAuthLogin(gateway?: string) {
     if (next.status === "pending") continue
     if (next.status !== "approved") return { ok: false as const, reason: "expired" as const }
     saveInviteConfig({ code: next.code, gatewayUrl })
-    return { ok: true as const }
+    return { ok: true as const, gatewayUrl, code: next.code }
   }
   return { ok: false as const, reason: "expired" as const }
+}
+
+export async function runAuthApiKey(input: { key: string; gatewayUrl?: string }) {
+  const key = canonicalApiKey(input.key)
+  if (!key) return { ok: false as const, reason: "invalid" as const }
+  const gatewayUrl = resolveGateway(input.gatewayUrl)
+  try {
+    await fetchUsage({ code: key, gatewayUrl, kind: "api_key" })
+  } catch {
+    return { ok: false as const, reason: "unauthorized" as const }
+  }
+  saveAuthConfig({ code: key, gatewayUrl })
+  return { ok: true as const, key, gatewayUrl }
 }
 
 export async function ensureSignedIn(gateway?: string) {
@@ -62,6 +80,10 @@ export async function ensureSignedIn(gateway?: string) {
   return false
 }
 
+export function forgetGristLogin() {
+  clearInviteConfig()
+}
+
 function promptYes(question: string) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
   return new Promise<boolean>((resolve) => {
@@ -72,60 +94,3 @@ function promptYes(question: string) {
     })
   })
 }
-
-export const AuthLoginCommand = effectCmd({
-  command: "login",
-  describe: "open the site and log in with your invite",
-  instance: false,
-  builder: (yargs) =>
-    yargs.option("gateway", {
-      describe: "site / gateway URL (default GRIST_GATEWAY_URL)",
-      type: "string",
-    }),
-  handler: Effect.fn("Cli.auth.login")(function* (args) {
-    UI.empty()
-    const gatewayUrl = resolveGateway(args.gateway)
-    if (!gatewayUrl) return yield* fail("could not resolve the Grist site")
-
-    yield* intro("Log in")
-    yield* log.info("Sign in on the site, then return here.")
-    const result = yield* Effect.tryPromise({
-      try: () => runAuthLogin(args.gateway),
-      catch: (error) =>
-        new CliError({
-          message: error instanceof Error ? error.message : "could not reach the Grist site",
-        }),
-    })
-    if (!result.ok) {
-      if (result.reason === "expired") return yield* fail("Login expired. Run grist auth login again.")
-      return yield* fail("could not reach the Grist site")
-    }
-    yield* outro("You're authenticated. Run grist to start.")
-  }),
-})
-
-export const AuthLogoutCommand = effectCmd({
-  command: "logout",
-  describe: "forget the saved invite on this machine",
-  instance: false,
-  handler: Effect.fn("Cli.auth.logout")(function* () {
-    UI.empty()
-    if (!loadInviteConfig()) {
-      UI.println("Not logged in")
-      return
-    }
-    clearInviteConfig()
-    yield* outro("Logged out")
-  }),
-})
-
-export const AuthCommand = cmd({
-  command: "auth",
-  describe: "log in to Grist (opens the site)",
-  builder: (yargs) =>
-    yargs
-      .command(AuthLoginCommand)
-      .command(AuthLogoutCommand)
-      .demandCommand(),
-  async handler() {},
-})
