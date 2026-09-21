@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test"
-import { resolvePluginProviders } from "../../src/cli/cmd/providers"
+import { resolvePluginProviders, loginProviderChoices, parseWellKnownAuth } from "../../src/cli/cmd/providers"
 import type { Hooks } from "@opencode-ai/plugin"
 
 function hookWithAuth(provider: string): Hooks {
@@ -116,5 +116,32 @@ describe("resolvePluginProviders", () => {
       providerNames: {},
     })
     expect(result).toEqual([])
+  })
+})
+
+describe("loginProviderChoices", () => {
+  test("puts Grist first and marks it recommended", () => {
+    const result = loginProviderChoices({
+      providers: [
+        { id: "openai", name: "OpenAI" },
+        { id: "anthropic", name: "Anthropic" },
+      ],
+      pluginProviders: [{ id: "grist", name: "grist" }],
+    })
+    expect(result[0]).toEqual({ label: "Grist", value: "grist", hint: "recommended" })
+    expect(result.map((x) => x.value)).toEqual(["grist", "openai", "anthropic"])
+  })
+})
+
+describe("parseWellKnownAuth", () => {
+  test("returns undefined for HTML or missing command so URL login cannot crash", () => {
+    expect(parseWellKnownAuth(undefined)).toBeUndefined()
+    expect(parseWellKnownAuth("<!doctype html>")).toBeUndefined()
+    expect(parseWellKnownAuth({ auth: {} })).toBeUndefined()
+    expect(parseWellKnownAuth({ auth: { command: "oops", env: "TOKEN" } })).toBeUndefined()
+    expect(parseWellKnownAuth({ auth: { command: ["tool", "login"], env: "TOKEN" } })).toEqual({
+      command: ["tool", "login"],
+      env: "TOKEN",
+    })
   })
 })
