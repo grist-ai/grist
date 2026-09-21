@@ -68,3 +68,6 @@ developerID_application.cer
 
 # Electron Vite output
 packages/desktop/out/
+
+# Desktop installers hosted by the gateway, not git
+packages/opencode/src/grist/site/download/*.dmg

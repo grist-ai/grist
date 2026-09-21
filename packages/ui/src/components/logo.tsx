@@ -16,12 +16,13 @@ export const Mark = (props: { class?: string }) => {
 }
 
 /** Loading splash — full GRIST wordmark (not the old O mark). */
-export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => {
+export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class" | "style">) => {
   return (
     <svg
       ref={props.ref}
       data-component="logo-splash"
       classList={{ [props.class ?? ""]: !!props.class }}
+      style={props.style}
       viewBox="0 0 156 42"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"

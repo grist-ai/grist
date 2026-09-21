@@ -14,21 +14,30 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css?v=stitch7" />
+    <link rel="stylesheet" href="/styles.css?v=stitch9" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script src="https://tally.so/widgets/embed.js"></script>
   </head>
   <body>
     <header class="top">
       <a class="mark" href="/" aria-label="Grist">
-        <pre class="wordmark">█▀▀▀ █▀▀█  █  █▀▀▀ ▀▀█▀▀
-█ ▀█ █▀▀   █  ▀▀▀█   █
-▀▀▀▀ █ ▀█  █  ▀▀▀▀   ▀</pre>
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H144V36H132V12H120V6Z" />
+          </g>
+        </svg>
       </a>
       <nav>
         <a href="/#product">Product</a>
         <a href="/docs">Docs</a>
         <a href="/plans">Pricing</a>
-        <a href="/#waitlist" data-auth="out">Request access</a>
+        <a class="btn" href="/#waitlist" data-auth="out">Request access</a>
         <a class="btn btn-light" href="/login" data-auth="out">Sign in</a>
         <a href="/admin" data-auth="admin" hidden>Admin</a>
         <a href="/dashboard" data-auth="in" hidden>Dashboard</a>
@@ -58,7 +67,7 @@ grist</pre>
             <a
               class="btn btn-mac"
               id="mac-download"
-              href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-arm64.dmg"
+              href="https://github.com/pranav6226/grist-downloads/releases/latest/download/grist-desktop-mac-arm64.dmg"
             >
               <svg class="apple" viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -68,15 +77,8 @@ grist</pre>
               </svg>
               Download for macOS
             </a>
-            <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+            <a class="btn" href="/#waitlist">Request access</a>
           </div>
-          <p class="mac-note">
-            Apple Silicon
-            <a
-              id="mac-intel"
-              href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-x64.dmg"
-            >Intel Mac</a>
-          </p>
           <p class="hero-meta">
             <span><i></i> Local tree execution</span>
             <span><i class="mute"></i> Prompt goes out. Source does not.</span>
@@ -338,16 +340,24 @@ grist</pre>
             there is room.
           </p>
         </div>
-        <iframe
-          data-tally-src="https://tally.so/embed/QKGWYG?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"
-          loading="lazy"
-          width="100%"
-          height="177"
-          frameborder="0"
-          marginheight="0"
-          marginwidth="0"
-          title="Grist Waitlist"
-        ></iframe>
+        <div>
+          <iframe
+            data-tally-src="https://tally.so/embed/QKGWYG?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"
+            loading="lazy"
+            width="100%"
+            height="177"
+            frameborder="0"
+            marginheight="0"
+            marginwidth="0"
+            title="Grist Waitlist"
+          ></iframe>
+          <p class="muted legal-agree">
+            By submitting this form you agree to the
+            <a href="/terms">Terms of Use</a>,
+            <a href="/privacy">Privacy Policy</a>, and
+            <a href="/acceptable-use">Acceptable Use Policy</a>.
+          </p>
+        </div>
       </section>
 
       <section class="cta">
@@ -389,9 +399,7 @@ grist</pre>
         </p>
         <p>
           macOS desktop:
-          <a href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-arm64.dmg">Apple Silicon</a>
-          ·
-          <a href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-x64.dmg">Intel</a>.
+          <a href="https://github.com/pranav6226/grist-downloads/releases/latest/download/grist-desktop-mac-arm64.dmg">Download Grist.dmg</a>.
           First launch opens login.
         </p>
 
@@ -512,6 +520,11 @@ GRIST_OBS_PACK=off       # pack only</pre>
         <p class="muted" id="login-waitlist">
           No invite yet? <a href="/#waitlist">Request access</a>
         </p>
+        <p class="muted legal-agree">
+          By signing in you agree to the
+          <a href="/terms">Terms of Use</a> and
+          <a href="/privacy">Privacy Policy</a>.
+        </p>
       </section>
     </main>
 
@@ -604,10 +617,522 @@ GRIST_OBS_PACK=off       # pack only</pre>
       </div>
     </main>
 
+    <main id="view-privacy" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ legal ]</p>
+        <h1>Privacy Policy</h1>
+        <p class="legal-meta">Effective 20 September 2026 · Last updated 20 September 2026</p>
+        <nav class="legal-nav" aria-label="Legal pages">
+          <a href="/privacy" aria-current="page">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/acceptable-use">Acceptable use</a>
+          <a href="/cookies">Cookies</a>
+        </nav>
+        <p class="lede">
+          This policy is strict on purpose. It describes what Grist actually
+          collects, what leaves your machine, who receives it, and what we
+          refuse to do. If a sentence would be convenient but untrue, it is
+          not in this document.
+        </p>
+
+        <h2>1. Who we are</h2>
+        <p>
+          Grist is operated by Pranav Mahesh Mekal (“Grist,” “we,” “us”). The
+          service is provided from <a href="https://grist.lol">grist.lol</a>
+          and related CLI, desktop, and gateway software. Contact for privacy
+          requests: <a href="mailto:pranavmm25@gmail.com">pranavmm25@gmail.com</a>.
+        </p>
+
+        <h2>2. Scope</h2>
+        <p>
+          This policy covers the website, waitlist, sign-in, dashboard, invite
+          gateway, and the Grist CLI / desktop client when they talk to our
+          servers. It does not cover third-party sites we link to, or software
+          you run that is not Grist.
+        </p>
+
+        <h2>3. What we do not take</h2>
+        <ul>
+          <li>We do not ingest your repository as a dataset.</li>
+          <li>We do not copy your working tree to our servers as a condition of use.</li>
+          <li>We do not sell personal information.</li>
+          <li>We do not use tester repositories to train Grist or any model we operate.</li>
+          <li>We do not run advertising pixels or sell access to your identity.</li>
+          <li>We do not require you to paste an API key. The inference key stays on our gateway.</li>
+        </ul>
+        <p>
+          Tools execute on your machine. Source files stay on your disk unless
+          you or the agent include file contents, diffs, logs, or excerpts in
+          a prompt or tool result that is sent for inference. That exception
+          is real. Do not treat “code stays local” as a guarantee that no
+          snippet ever leaves.
+        </p>
+
+        <h2>4. What we collect</h2>
+        <h3>Account and access</h3>
+        <ul>
+          <li>Google account identifiers and email when you sign in with Google.</li>
+          <li>Email and password credentials if you use email sign-in (stored by our authentication provider, not as a plaintext password on our gateway).</li>
+          <li>Invite code binding to your account.</li>
+          <li>Admin-entered invite notes, which may include an email or name.</li>
+        </ul>
+        <h3>Waitlist</h3>
+        <ul>
+          <li>Information you submit on the waitlist form, processed by Tally on our behalf.</li>
+        </ul>
+        <h3>Usage and metering</h3>
+        <ul>
+          <li>Token counts, model rung, timestamp, and estimated USD spend per completion.</li>
+          <li>Invite cap, remaining balance, expiry, and revocation state.</li>
+          <li>CLI device-login codes, which expire and are deleted after use or timeout.</li>
+        </ul>
+        <h3>Inference payload</h3>
+        <ul>
+          <li>Prompts, conversation context, tool names, and packed tool excerpts required to complete a turn.</li>
+          <li>Routing scores used to pick a model ladder rung.</li>
+        </ul>
+        <h3>Technical data</h3>
+        <ul>
+          <li>IP address used for short-window rate limiting of invite validation.</li>
+          <li>Standard request metadata on our host (time, path, status). We do not use this for advertising.</li>
+          <li>A local invite token in your browser <code>localStorage</code> after you bind a code.</li>
+        </ul>
+
+        <h2>5. Why we collect it</h2>
+        <ul>
+          <li>To authenticate you and enforce invite-only access.</li>
+          <li>To run the agent: send prompts to model providers and return completions.</li>
+          <li>To meter included inference against your cap and stop work at the cap.</li>
+          <li>To operate, secure, and debug the gateway.</li>
+          <li>To decide whether to grant waitlist access.</li>
+          <li>To comply with law and to prevent abuse.</li>
+        </ul>
+        <p>
+          Legal bases where GDPR or UK GDPR apply: contract (providing the
+          beta), legitimate interests (security, metering, abuse prevention),
+          consent (waitlist form and non-essential cookies, if any), and legal
+          obligation.
+        </p>
+
+        <h2>6. Processors and subprocessors</h2>
+        <p>
+          We send personal data and inference content only as needed to run
+          Grist. Current categories:
+        </p>
+        <ul>
+          <li><strong>Google LLC</strong> — Firebase Authentication and Google Sign-In.</li>
+          <li><strong>Tally</strong> — waitlist form hosting and storage.</li>
+          <li><strong>OpenRouter and downstream model providers</strong> — completions. Providers on the ladder may include DeepSeek, Moonshot, OpenAI, and others we route to. Those providers receive the prompt payload for that turn.</li>
+          <li><strong>TypeSafe</strong> — routing scores for task difficulty and sensitivity. That request includes the task state we send to the gate, not your entire repo.</li>
+          <li><strong>Hosting and infrastructure providers</strong> — currently including Railway, to serve the site and gateway.</li>
+        </ul>
+        <p>
+          Each processor has its own terms. We do not control how a model
+          provider logs prompts on its side. Assume a prompt you send could be
+          retained by that provider under its policy, even though we do not
+          train on tester repos.
+        </p>
+
+        <h2>7. Training, sale, and sharing</h2>
+        <ul>
+          <li>We do not train models on tester repositories.</li>
+          <li>We do not sell personal information as defined by the CCPA / CPRA.</li>
+          <li>We do not share personal information for cross-context behavioral advertising.</li>
+          <li>We may disclose data if required by law, to prevent harm or abuse, or to a successor if the project is transferred — in which case this policy still applies until you are notified of a change.</li>
+        </ul>
+
+        <h2>8. Retention</h2>
+        <ul>
+          <li>Account and invite binding: until you ask us to delete the account, or we revoke / expire the invite and delete stale records in the ordinary course of operating the beta.</li>
+          <li>Usage events: retained to meter spend, detect abuse, and operate the beta. We may aggregate or delete raw events after they are no longer needed for those purposes.</li>
+          <li>Device login codes: minutes, then deleted.</li>
+          <li>Rate-limit IP windows: minutes.</li>
+          <li>Waitlist submissions: until we reject, admit, or delete them on request.</li>
+          <li>Inference payloads are processed to complete a turn. We do not operate a product feature that lets others browse your repo. Logs sufficient to debug a failure or abuse report may exist for a limited time.</li>
+        </ul>
+
+        <h2>9. Your rights</h2>
+        <p>
+          Depending on where you live, you may have the right to access,
+          correct, delete, or export personal information, to object or
+          restrict certain processing, and to withdraw consent where
+          processing is consent-based. California residents may request
+          access, deletion, correction, and information about sharing; we do
+          not sell or share personal information for ads. We will not
+          discriminate against you for exercising these rights.
+        </p>
+        <p>
+          Email <a href="mailto:pranavmm25@gmail.com">pranavmm25@gmail.com</a>
+          from the address on the account. We may need to verify it is you.
+          Authorized agents may submit a request with proof of authority. You
+          may also close the account by asking us to delete it; local files
+          and git history on your machine are yours to remove.
+        </p>
+
+        <h2>10. Children</h2>
+        <p>
+          Grist is not directed at children. You must be at least 18 to
+          request access, create an account, or use the agent. We do not
+          knowingly collect personal information from anyone under 18. If we
+          learn that we have, we will delete it.
+        </p>
+
+        <h2>11. International transfers</h2>
+        <p>
+          We are based in the United States. If you use Grist from another
+          country, your information is processed in the United States and in
+          any country where a processor listed above operates. Model providers
+          may process prompts outside your country.
+        </p>
+
+        <h2>12. Security</h2>
+        <p>
+          We use HTTPS, invite-gated access, hashed/provider-managed
+          credentials, and we keep the inference API key on the server. No
+          method of transmission or storage is perfectly secure. You are
+          responsible for protecting your machine, your git remotes, and
+          anything the agent can execute locally.
+        </p>
+
+        <h2>13. Changes</h2>
+        <p>
+          We may update this policy. The “Last updated” date will change. For
+          material changes we will post the new policy on this page. Continued
+          use after the effective date means you accept the updated policy.
+          If you do not, stop using Grist and ask us to delete your account.
+        </p>
+
+        <h2>14. Contact</h2>
+        <p>
+          Privacy requests and complaints:
+          <a href="mailto:pranavmm25@gmail.com">pranavmm25@gmail.com</a>.
+          Site: <a href="https://grist.lol">https://grist.lol</a>.
+          Related documents:
+          <a href="/terms">Terms of Use</a>,
+          <a href="/acceptable-use">Acceptable Use Policy</a>,
+          <a href="/cookies">Cookie Policy</a>.
+        </p>
+      </article>
+    </main>
+
+    <main id="view-terms" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ legal ]</p>
+        <h1>Terms of Use</h1>
+        <p class="legal-meta">Effective 20 September 2026 · Last updated 20 September 2026</p>
+        <nav class="legal-nav" aria-label="Legal pages">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms" aria-current="page">Terms</a>
+          <a href="/acceptable-use">Acceptable use</a>
+          <a href="/cookies">Cookies</a>
+        </nav>
+        <p class="lede">
+          These terms are the contract for the Grist beta. They are written to
+          be enforceable, not decorative. If you do not agree, do not use the
+          site, waitlist, CLI, or desktop app.
+        </p>
+
+        <h2>1. Agreement</h2>
+        <p>
+          By visiting grist.lol, requesting access, signing in, installing
+          Grist, or running the agent, you agree to these Terms of Use, the
+          <a href="/privacy">Privacy Policy</a>, the
+          <a href="/acceptable-use">Acceptable Use Policy</a>, and the
+          <a href="/cookies">Cookie Policy</a> (together, the “Terms”).
+          The operator is Pranav Mahesh Mekal (“Grist,” “we,” “us”).
+        </p>
+
+        <h2>2. Invite-only beta</h2>
+        <p>
+          Grist is an invite-gated beta. An invite is a revocable license to
+          use the service during the beta, not a subscription, not a sale of
+          software, and not a guarantee of capacity, uptime, or future
+          pricing. We may refuse, delay, cap, pause, or revoke access at any
+          time, including when included inference is exhausted or we suspect
+          abuse.
+        </p>
+        <p>
+          Included inference (currently described as a small USD cap on the
+          site) is a courtesy funded by us. It is not a purchased credit
+          balance. Unused cap has no cash value. There are no refunds for
+          beta access.
+        </p>
+
+        <h2>3. Eligibility</h2>
+        <p>
+          You must be at least 18 years old and able to form a binding
+          contract. You must not use Grist if you are barred from receiving
+          US services or if your use would violate export or sanctions law.
+          You may not share an invite, account, or dashboard session.
+        </p>
+
+        <h2>4. Accounts and security</h2>
+        <p>
+          You are responsible for the Google or email account you use to sign
+          in, for the invite bound to it, and for every action the agent
+          takes while authenticated as you. Notify us immediately if you
+          believe the invite or account is compromised. We may invalidate
+          codes and sessions.
+        </p>
+
+        <h2>5. The software</h2>
+        <p>
+          The CLI, desktop app, and related client software are licensed to
+          you, not sold. Upstream OpenCode components remain under their
+          existing licenses (including MIT where applicable). These Terms
+          govern your use of our hosted gateway, branding, invite system, and
+          the Grist service. You may not scrape, probe, overload, or reverse
+          engineer the gateway except as allowed by mandatory law.
+        </p>
+
+        <h2>6. Your code and your machine</h2>
+        <p>
+          You retain ownership of your source code, git history, and local
+          files. We do not claim those rights. You grant us a limited
+          permission to process prompts, excerpts, metadata, and usage data
+          as described in the Privacy Policy solely to provide, meter, secure,
+          and improve operation of the beta (not to train models on tester
+          repos).
+        </p>
+        <p>
+          The agent runs tools in your working tree with your permissions.
+          That can edit, delete, install, and execute. You are solely
+          responsible for reviewing diffs, tests, commits, and any command
+          the agent proposes or runs.
+        </p>
+
+        <h2>7. AI output — no reliance</h2>
+        <p>
+          Completions can be wrong, insecure, incomplete, or infringing. Grist
+          does not practice law, provide professional advice, or warrant that
+          generated code is fit for production. You must review output before
+          you rely on it. We are not liable for bugs, outages, data loss,
+          leaked secrets, or shipping defective software that involved Grist.
+        </p>
+
+        <h2>8. Acceptable use</h2>
+        <p>
+          You must follow the <a href="/acceptable-use">Acceptable Use Policy</a>.
+          Breach is grounds for immediate revocation without notice.
+        </p>
+
+        <h2>9. Third parties</h2>
+        <p>
+          Sign-in, waitlist, hosting, routing, and model inference are provided
+          in part by third parties. Their outages, policies, and content
+          filters are outside our control. Your use of Google Sign-In is also
+          subject to Google’s terms.
+        </p>
+
+        <h2>10. Disclaimers</h2>
+        <p>
+          GRIST IS PROVIDED “AS IS” AND “AS AVAILABLE.” TO THE MAXIMUM EXTENT
+          PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED,
+          INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+          TITLE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE
+          WILL BE UNINTERRUPTED, SECURE, ERROR-FREE, OR THAT INCLUDED
+          INFERENCE WILL REMAIN AVAILABLE.
+        </p>
+
+        <h2>11. Limitation of liability</h2>
+        <p>
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE WILL NOT BE LIABLE FOR
+          ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR
+          PUNITIVE DAMAGES, OR FOR LOST PROFITS, REVENUE, DATA, OR GOODWILL,
+          EVEN IF ADVISED OF THE POSSIBILITY. OUR TOTAL LIABILITY FOR ALL
+          CLAIMS RELATING TO GRIST WILL NOT EXCEED THE GREATER OF TEN US
+          DOLLARS (US$10) OR THE AMOUNT YOU PAID US FOR THE SERVICE IN THE
+          THREE MONTHS BEFORE THE CLAIM. THE BETA IS CURRENTLY PROVIDED
+          WITHOUT A PAID FEE TO US, SO THAT CAP WILL USUALLY BE US$10.
+        </p>
+        <p>
+          Some jurisdictions do not allow certain limitations. In those
+          places, the limitation applies to the fullest extent allowed.
+        </p>
+
+        <h2>12. Indemnity</h2>
+        <p>
+          You will defend and indemnify us against claims, damages, and
+          costs arising from your content, your use of the agent (including
+          code it writes or commands it runs), your violation of these Terms,
+          or your violation of law or third-party rights.
+        </p>
+
+        <h2>13. Termination</h2>
+        <p>
+          You may stop using Grist at any time and request deletion as
+          described in the Privacy Policy. We may suspend or terminate access
+          immediately for any breach, for abuse of included inference, or if
+          we shut down the beta. Provisions that should survive (including
+          ownership, disclaimers, liability limits, indemnity, and governing
+          law) survive termination.
+        </p>
+
+        <h2>14. Changes</h2>
+        <p>
+          We may modify these Terms by posting an updated version on this
+          page. Continued use after the effective date constitutes acceptance.
+          If a change is material and you do not agree, stop using Grist.
+        </p>
+
+        <h2>15. Governing law</h2>
+        <p>
+          These Terms are governed by the laws of the State of California,
+          United States, excluding conflict-of-law rules. Except where
+          prohibited, you and we submit to the exclusive jurisdiction of the
+          state and federal courts located in California.
+        </p>
+
+        <h2>16. General</h2>
+        <p>
+          These Terms are the entire agreement for the service. If a section
+          is unenforceable, the rest remains in effect. Failure to enforce a
+          provision is not a waiver. You may not assign your invite or these
+          Terms. We may assign them in connection with a transfer of the
+          project. Headings are for convenience only.
+        </p>
+
+        <h2>17. Contact</h2>
+        <p>
+          <a href="mailto:pranavmm25@gmail.com">pranavmm25@gmail.com</a>
+          · <a href="https://grist.lol">https://grist.lol</a>
+        </p>
+      </article>
+    </main>
+
+    <main id="view-acceptable-use" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ legal ]</p>
+        <h1>Acceptable Use Policy</h1>
+        <p class="legal-meta">Effective 20 September 2026 · Last updated 20 September 2026</p>
+        <nav class="legal-nav" aria-label="Legal pages">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/acceptable-use" aria-current="page">Acceptable use</a>
+          <a href="/cookies">Cookies</a>
+        </nav>
+        <p class="lede">
+          Grist can edit files and run commands on your machine. This policy
+          is the bright line. Violations void access immediately.
+        </p>
+
+        <h2>You must</h2>
+        <ul>
+          <li>Use Grist only on systems, repos, and data you are allowed to modify.</li>
+          <li>Review agent output before you commit, deploy, or ship it.</li>
+          <li>Keep secrets out of prompts when you can. Treat anything sent for inference as potentially logged by a model provider.</li>
+          <li>Stay within your invite cap. Do not attempt to bypass metering, routing, or authentication.</li>
+          <li>Comply with law and with third-party terms that apply to your work (licenses, employer policy, cloud provider rules).</li>
+        </ul>
+
+        <h2>You must not</h2>
+        <ul>
+          <li>Use Grist to probe, exploit, or gain unauthorized access to any system, account, or data — including “research,” CTF, or classroom framing that you are not explicitly authorized to attack.</li>
+          <li>Generate, improve, or operationalize malware, ransomware, spyware, credential stealers, or attack tooling.</li>
+          <li>Share, sell, or publish invite codes, or allow others to consume your included inference.</li>
+          <li>Scrape, flood, or reverse the gateway, or interfere with other testers.</li>
+          <li>Attempt to extract our system prompts, keys, or other testers’ data.</li>
+          <li>Submit others’ personal data into prompts without a lawful basis.</li>
+          <li>Use the service to create or distribute child sexual abuse material, to sexually exploit minors, or to traffic in such content. We will report required incidents.</li>
+          <li>Use the service to develop chemical, biological, or nuclear weapons, or to provide operational assistance for violent crime.</li>
+          <li>Misrepresent Grist output as human-authored professional advice, or as having been audited when it has not.</li>
+          <li>Use Grist in a way that would make us a processor of special-category data or PHI unless we have a signed written agreement to that effect. We do not offer that agreement in this beta.</li>
+        </ul>
+
+        <h2>Local execution</h2>
+        <p>
+          If the agent can run a command, that command is yours. “The model
+          did it” is not a defense. You are the operator of the machine.
+        </p>
+
+        <h2>Enforcement</h2>
+        <p>
+          We may investigate, throttle, revoke invites, delete accounts, and
+          preserve logs needed to respond to abuse or to law enforcement.
+          We are not obligated to monitor every session.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+          Report abuse:
+          <a href="mailto:pranavmm25@gmail.com">pranavmm25@gmail.com</a>.
+        </p>
+      </article>
+    </main>
+
+    <main id="view-cookies" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ legal ]</p>
+        <h1>Cookie Policy</h1>
+        <p class="legal-meta">Effective 20 September 2026 · Last updated 20 September 2026</p>
+        <nav class="legal-nav" aria-label="Legal pages">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/acceptable-use">Acceptable use</a>
+          <a href="/cookies" aria-current="page">Cookies</a>
+        </nav>
+        <p class="lede">
+          This page lists the cookies, local storage, and similar technologies
+          Grist uses. We do not use advertising cookies.
+        </p>
+
+        <h2>1. What we mean by “cookies”</h2>
+        <p>
+          Browsers may store cookies, local storage keys, and similar items.
+          Some are set by us, some by processors (Google / Firebase, Tally).
+        </p>
+
+        <h2>2. Strictly necessary</h2>
+        <ul>
+          <li><strong>Authentication.</strong> Google Sign-In and Firebase Auth set cookies or storage required to keep you signed in and to complete OAuth. Without them, Sign in does not work.</li>
+          <li><strong>Invite token.</strong> After you bind an invite, the site stores <code>grist_invite</code> in <code>localStorage</code> so the dashboard and CLI approval can function on this browser. You can clear it by signing out or clearing site data.</li>
+          <li><strong>Security and rate limits.</strong> We may use transient IP-based counters on the server. Those are not browser cookies.</li>
+        </ul>
+
+        <h2>3. Waitlist (Tally)</h2>
+        <p>
+          The waitlist is an embedded Tally form. Tally may set cookies or
+          collect device data according to
+          <a href="https://tally.so/help/privacy-policy">Tally’s privacy policy</a>.
+          If you do not want that embed, do not open the waitlist section and
+          do not submit the form. Email
+          <a href="mailto:pranavmm25@gmail.com">pranavmm25@gmail.com</a>
+          instead to request access.
+        </p>
+
+        <h2>4. What we do not use</h2>
+        <ul>
+          <li>No advertising cookies.</li>
+          <li>No cross-site behavioral advertising.</li>
+          <li>No social retargeting pixels.</li>
+          <li>No third-party analytics product is required to load the homepage.</li>
+        </ul>
+
+        <h2>5. How to control them</h2>
+        <p>
+          You can block or delete cookies in your browser, and you can clear
+          <code>localStorage</code> for grist.lol. Blocking authentication
+          cookies will prevent sign-in. Browser “Do Not Track” signals are
+          not a consistent standard; we already do not sell or advertise with
+          your data.
+        </p>
+        <p>
+          See the <a href="/privacy">Privacy Policy</a> for retention, rights,
+          and processors.
+        </p>
+      </article>
+    </main>
+
     <footer>
       <span class="foot-brand">Grist</span>
-      <a href="/docs">Docs</a>
-      <a href="/plans">Pricing</a>
+      <nav class="foot-nav" aria-label="Legal and site">
+        <a href="/docs">Docs</a>
+        <a href="/plans">Pricing</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/acceptable-use">Acceptable use</a>
+        <a href="/cookies">Cookies</a>
+      </nav>
       <span>No training on tester repos. Code stays local.</span>
     </footer>
     <script>
@@ -620,6 +1145,10 @@ GRIST_OBS_PACK=off       # pack only</pre>
           "/admin": "view-admin",
           "/plans": "view-plans",
           "/docs": "view-docs",
+          "/privacy": "view-privacy",
+          "/terms": "view-terms",
+          "/acceptable-use": "view-acceptable-use",
+          "/cookies": "view-cookies",
         }
         if (path === "/") return
         const id = views[path] || "view-home"
