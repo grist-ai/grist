@@ -1,4 +1,4 @@
-import { RUNG_MODELS, type ModelRef, type Rung } from "./rung"
+import { publicModelRef, type ModelRef, type Rung } from "./rung"
 import { loadThresholds, type GateThresholds } from "./thresholds"
 import { createBurnInLog } from "./burn-in"
 import { applyModeCap, loadOperatingMode, type OperatingMode } from "./mode"
@@ -148,7 +148,7 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
     state: {
       task: text,
       product: "Grist",
-      ladder: "cheapest=DeepSeek Flash, medium=Kimi K3, frontier=GPT-5.6 Sol",
+      ladder: "cheapest, medium, frontier",
     },
     questions: {
       difficulty: {
@@ -193,7 +193,7 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
 }
 
 function modelForRung(rung: Rung, _current: ModelRef): ModelRef {
-  return { ...RUNG_MODELS[rung] }
+  return publicModelRef(rung)
 }
 
 /**
@@ -265,7 +265,7 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
     })
   }
   gristLog(
-    `[grist:gate] ${rung} via ${provider} mode=${mode} · diff=${scores.difficulty.toFixed(2)} sens=${scores.sensitivity.toFixed(2)} under=${scores.underspecified.toFixed(2)} · ${reasons.join(",")} · ${decision.latencyMs}ms → ${model.providerID}/${model.modelID}`,
+    `[grist:gate] ${rung} via ${provider} mode=${mode} · diff=${scores.difficulty.toFixed(2)} sens=${scores.sensitivity.toFixed(2)} under=${scores.underspecified.toFixed(2)} · ${reasons.join(",")} · ${decision.latencyMs}ms`,
   )
   gristLog(
     `[grist:mech] ${mechanisms.resolved} pack=${mechanisms.observationPack} fusion=${mechanisms.actionFusion} · ${mechanisms.reasons.join(",")}`,
@@ -330,7 +330,7 @@ async function routeViaGateway(
     })
   }
   gristLog(
-    `[grist:gate] ${decision.rung} via gateway/${decision.provider} mode=${decision.mode} · ${decision.reasons.join(",")} · ${decision.latencyMs}ms → ${model.providerID}/${model.modelID}`,
+    `[grist:gate] ${decision.rung} via gateway/${decision.provider} mode=${decision.mode} · ${decision.reasons.join(",")} · ${decision.latencyMs}ms`,
   )
   return decision
 }

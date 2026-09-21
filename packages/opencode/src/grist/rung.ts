@@ -29,3 +29,14 @@ export const RUNG_MODELS: Record<Rung, ModelRef> = {
     modelID: process.env.GRIST_FRONTIER_MODEL ?? "openai/gpt-5.6-sol",
   },
 }
+
+/** Tester-facing labels. Vendor ids stay on the gateway. */
+export const PUBLIC_RUNG_NAME: Record<Rung, string> = {
+  cheapest: "Fast",
+  medium: "Standard",
+  frontier: "Max",
+}
+
+export function publicModelRef(rung: Rung): ModelRef {
+  return { providerID: "openrouter", modelID: rung }
+}

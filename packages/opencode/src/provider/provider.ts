@@ -17,7 +17,8 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import { gatewayAuthHeaders, loadInviteConfig } from "@/grist/invite/config"
-import { RUNG_MODELS } from "@/grist/rung"
+import { publicLadderID } from "@/grist/gateway/prices"
+import { PUBLIC_RUNG_NAME, publicModelRef } from "@/grist/rung"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -1343,16 +1344,17 @@ function ensureGristLadderModels(providers: Record<string, Info>) {
   if (!openrouter) return
   const template = Object.values(openrouter.models)[0]
   if (!template) return
-  for (const rung of Object.values(RUNG_MODELS)) {
-    if (rung.providerID !== "openrouter") continue
-    if (openrouter.models[rung.modelID]) continue
-    openrouter.models[rung.modelID] = {
+  openrouter.name = "Grist"
+  const models: Record<string, Model> = {}
+  for (const rung of ["cheapest", "medium", "frontier"] as const) {
+    models[rung] = {
       ...template,
-      id: ModelV2.ID.make(rung.modelID),
-      name: rung.modelID,
-      api: { ...template.api, id: rung.modelID },
+      id: ModelV2.ID.make(rung),
+      name: PUBLIC_RUNG_NAME[rung],
+      api: { ...template.api, id: rung },
     }
   }
+  openrouter.models = models
 }
 
 export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
@@ -1925,12 +1927,14 @@ const layer = Layer.effect(
         return yield* new ModelNotFoundError({ providerID, modelID, suggestions })
       }
 
-      const info = provider.models[modelID]
+      const lookupID = loadInviteConfig() ? ModelV2.ID.make(publicLadderID(modelID) ?? modelID) : modelID
+      const info = provider.models[lookupID]
       if (!info) {
-        const current = modelSuggestions(provider, modelID, runtimeFlags.enableExperimentalModels)
-        const suggestions = current.length
-          ? current
-          : modelSuggestions(s.catalog[providerID], modelID, runtimeFlags.enableExperimentalModels)
+        const current = modelSuggestions(provider, lookupID, runtimeFlags.enableExperimentalModels)
+        const suggestions =
+          current.length || loadInviteConfig()
+            ? current
+            : modelSuggestions(s.catalog[providerID], modelID, runtimeFlags.enableExperimentalModels)
         return yield* new ModelNotFoundError({ providerID, modelID, suggestions })
       }
       return info
@@ -1994,7 +1998,7 @@ const layer = Layer.effect(
       if (!provider) return undefined
 
       if (loadInviteConfig()) {
-        const cheapest = RUNG_MODELS.cheapest
+        const cheapest = publicModelRef("cheapest")
         if (providerID === ProviderV2.ID.openrouter || providerID === ProviderV2.ID.make(cheapest.providerID)) {
           const ladder = yield* getModel(ProviderV2.ID.make(cheapest.providerID), ModelV2.ID.make(cheapest.modelID)).pipe(
             Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
@@ -2065,10 +2069,8 @@ const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       if (loadInviteConfig()) {
         const gateway = s.providers[ProviderV2.ID.openrouter]
-        if (gateway) {
-          const [model] = sort(Object.values(gateway.models))
-          if (model) return { providerID: gateway.id, modelID: model.id }
-        }
+        const model = gateway?.models.cheapest
+        if (gateway && model) return { providerID: gateway.id, modelID: model.id }
       }
       const recent = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(
         Effect.map((x): { providerID: ProviderV2.ID; modelID: ModelV2.ID }[] => {
