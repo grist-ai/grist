@@ -33,7 +33,6 @@ import { InitCommand } from "./cli/cmd/init"
 import { BootstrapCommand } from "./cli/cmd/bootstrap"
 import { GatewayCommand } from "./cli/cmd/gateway"
 import { UsageCommand } from "./cli/cmd/usage"
-import { AuthCommand } from "./cli/cmd/auth"
 
 const args = hideBin(process.argv)
 
@@ -94,7 +93,6 @@ const cli = yargs(args)
   .command(AcpCommand)
   .command(McpCommand)
   .command(InitCommand)
-  .command(AuthCommand)
   .command(BootstrapCommand)
   .command(GatewayCommand)
   .command(UsageCommand)

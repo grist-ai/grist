@@ -61,7 +61,7 @@
             </div>
             <pre>npm install -g grist-ai
 grist</pre>
-            <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Invite required. We hold the inference key.</p>
+            <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Pick Grist. Invite or a dashboard <code>grist_sk_</code> key. We hold the inference key.</p>
           </div>
           <div class="actions">
             <a
@@ -399,8 +399,9 @@ grist</pre>
         <pre>npm install -g grist-ai
 grist</pre>
         <p>
-          The first <code>grist</code> run prompts to open <code>grist auth login</code>.
-          Sign in with your invite. Completions will not run until you do.
+          The first <code>grist</code> run prompts <code>grist auth login</code>.
+          Pick <strong>Grist</strong> (recommended). Completions will not run
+          until you are signed in.
         </p>
         <p>
           macOS desktop:
@@ -410,19 +411,26 @@ grist</pre>
 
         <h2 id="sign-in">Sign in</h2>
         <p>
-          <code>grist auth login</code> opens this site. Sign in with Google.
-          The first time, enter the invite you were given. After the account
-          exists, Google is enough — you do not enter the code again. The
-          terminal polls until the site approves it. You do not paste an API
-          key.
+          <code>grist auth login</code> lists providers with Grist first.
+          You can paste a dashboard API key (<code>grist_sk_…</code>) or use
+          an invite (opens this site). We still hold the OpenRouter inference
+          key — you never paste OpenAI or Anthropic credentials.
         </p>
-        <pre>grist auth login</pre>
+        <pre>grist auth login --provider grist
+# or, with a key from the dashboard:
+grist auth login --provider grist --api-key grist_sk_…</pre>
+        <p>
+          Invite path: the CLI opens this site. Sign in with Google. The first
+          time, enter the invite you were given. After the account exists,
+          Google is enough — you do not enter the code again. The terminal
+          polls until the site approves it.
+        </p>
         <p>
           Usage, remaining spend, and the current plan live on the
           <a href="/dashboard">dashboard</a>. Same account, same origin.
           Agents that run Grist on a VM use an
-          <a href="/dashboard/api">API key</a> from that dashboard — not this
-          login. See <a href="/docs/skills">agent skills</a>.
+          <a href="/dashboard/api">API key</a> from that dashboard. See
+          <a href="/docs/skills">agent skills</a>.
         </p>
 
         <h2 id="repo">Start in a repo</h2>
@@ -564,8 +572,10 @@ grist usage            # confirms auth without printing the key</pre>
         <pre>grist run --format json --auto --dir /path/to/repo -c "Continue: address the test failure in …"
 grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: …"</pre>
         <p>
-          Do not use the interactive TUI. Do not run <code>grist auth login</code>
-          on a headless VM — the API key is the credential.
+          Do not use the interactive TUI. On a headless VM, set
+          <code>GRIST_API_KEY</code> (or run
+          <code>grist auth login --provider grist --api-key "$GRIST_API_KEY"</code>
+          once). Do not open a browser login.
         </p>
 
         <h2 id="workflow">Workflow</h2>
@@ -816,7 +826,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           <li>We do not sell personal information.</li>
           <li>We do not use tester repositories to train Grist or any model we operate.</li>
           <li>We do not run advertising pixels or sell access to your identity.</li>
-          <li>We do not require you to paste an API key. The inference key stays on our gateway.</li>
+          <li>We do not require you to bring an OpenAI or Anthropic key. The inference key stays on our gateway. A Grist dashboard key (<code>grist_sk_…</code>) is optional agent auth and spends against your invite cap.</li>
         </ul>
         <p>
           Tools execute on your machine. Source files stay on your disk unless

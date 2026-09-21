@@ -17,6 +17,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import { gatewayAuthHeaders, loadInviteConfig } from "@/grist/invite/config"
+import { RUNG_MODELS } from "@/grist/rung"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -1336,6 +1337,24 @@ function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model
   }
 }
 
+function ensureGristLadderModels(providers: Record<string, Info>) {
+  if (!loadInviteConfig()) return
+  const openrouter = providers[ProviderV2.ID.openrouter]
+  if (!openrouter) return
+  const template = Object.values(openrouter.models)[0]
+  if (!template) return
+  for (const rung of Object.values(RUNG_MODELS)) {
+    if (rung.providerID !== "openrouter") continue
+    if (openrouter.models[rung.modelID]) continue
+    openrouter.models[rung.modelID] = {
+      ...template,
+      id: ModelV2.ID.make(rung.modelID),
+      name: rung.modelID,
+      api: { ...template.api, id: rung.modelID },
+    }
+  }
+}
+
 export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
   const models: Record<string, Model> = {}
   for (const [key, model] of Object.entries(provider.models)) {
@@ -1617,6 +1636,7 @@ const layer = Layer.effect(
         for (const [id, provider] of Object.entries(auths)) {
           const providerID = ProviderV2.ID.make(id)
           if (disabled.has(providerID)) continue
+          if (providerID === ProviderV2.ID.make("grist")) continue
           if (providerID === ProviderV2.ID.openrouter && process.env.OPENCODE === "1" && !invite) continue
           if (provider.type === "api") {
             mergeProvider(providerID, {
@@ -1738,6 +1758,8 @@ const layer = Layer.effect(
             continue
           }
         }
+
+        ensureGristLadderModels(providers)
 
         return {
           models: languages,
@@ -2031,6 +2053,13 @@ const layer = Layer.effect(
       if (cfg.model) return parseModel(cfg.model)
 
       const s = yield* InstanceState.get(state)
+      if (loadInviteConfig()) {
+        const gateway = s.providers[ProviderV2.ID.openrouter]
+        if (gateway) {
+          const [model] = sort(Object.values(gateway.models))
+          if (model) return { providerID: gateway.id, modelID: model.id }
+        }
+      }
       const recent = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(
         Effect.map((x): { providerID: ProviderV2.ID; modelID: ModelV2.ID }[] => {
           if (!isRecord(x) || !Array.isArray(x.recent)) return []

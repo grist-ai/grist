@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { clearInviteConfig, gatewayAuthHeaders, loadInviteConfig, saveInviteConfig } from "./config"
+import { clearInviteConfig, gatewayAuthHeaders, loadInviteConfig, saveAuthConfig, saveInviteConfig } from "./config"
 import { generateApiKeySecret } from "../gateway/codes"
 
 describe("invite config", () => {
@@ -50,6 +50,24 @@ describe("invite config", () => {
     const envOnly = loadInviteConfig()
     expect(envOnly?.gatewayUrl).toBe("https://grist.lol")
     delete process.env.GRIST_API_KEY
+    fs.rmSync(file, { force: true })
+  })
+
+  test("persists an API key in ~/.grist/config.json", () => {
+    const file = path.join(os.tmpdir(), `grist-invite-${crypto.randomUUID()}.json`)
+    process.env.GRIST_CONFIG_PATH = file
+    delete process.env.GRIST_INVITE
+    delete process.env.GRIST_API_KEY
+    delete process.env.GRIST_GATEWAY_URL
+    const secret = generateApiKeySecret()
+    saveAuthConfig({ code: secret, gatewayUrl: "https://grist.lol/" })
+    const loaded = loadInviteConfig()
+    expect(loaded?.kind).toBe("api_key")
+    expect(loaded?.code).toBe(secret)
+    expect(loaded?.gatewayUrl).toBe("https://grist.lol")
+    expect(gatewayAuthHeaders(loaded!)).toEqual({ "X-Grist-Api-Key": secret })
+    clearInviteConfig()
+    delete process.env.GRIST_CONFIG_PATH
     fs.rmSync(file, { force: true })
   })
 })

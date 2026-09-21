@@ -10,7 +10,7 @@ export const UsageCommand = effectCmd({
   handler: Effect.fn("Cli.usage")(function* () {
     const config = loadInviteConfig()
     if (!config) {
-      return yield* fail("Grist needs you signed in. Run `grist auth login --gateway <url>`.")
+      return yield* fail("Grist needs you signed in. Run `grist auth login --provider grist`.")
     }
     const { fetchUsage } = yield* Effect.promise(() => import("@/grist/invite/client"))
     const usage = yield* Effect.tryPromise({
