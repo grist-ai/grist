@@ -1993,6 +1993,16 @@ const layer = Layer.effect(
       const provider = s.providers[providerID]
       if (!provider) return undefined
 
+      if (loadInviteConfig()) {
+        const cheapest = RUNG_MODELS.cheapest
+        if (providerID === ProviderV2.ID.openrouter || providerID === ProviderV2.ID.make(cheapest.providerID)) {
+          const ladder = yield* getModel(ProviderV2.ID.make(cheapest.providerID), ModelV2.ID.make(cheapest.modelID)).pipe(
+            Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
+          )
+          if (ladder) return ladder
+        }
+      }
+
       const experimental = yield* plugin.trigger<"experimental.provider.small_model">(
         "experimental.provider.small_model",
         { provider: toPublicInfo(provider) },
