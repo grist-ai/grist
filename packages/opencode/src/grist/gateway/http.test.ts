@@ -4,6 +4,7 @@ import path from "path"
 import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generateApiKeySecret, generateDeviceUserCode, generateInviteCode } from "./codes"
 import { usdForUsage } from "./prices"
 import { createGateway } from "./http"
+import { openGatewayStore } from "./store"
 
 describe("invite codes", () => {
   test("canonicalizes separators and Crockford folds", () => {
@@ -25,7 +26,25 @@ describe("invite codes", () => {
 describe("metering", () => {
   test("prices Flash tokens in USD", () => {
     expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 0)).toBeCloseTo(0.15)
-    expect(usdForUsage("openai/gpt-5.6-sol", 0, 1_000_000)).toBeCloseTo(10)
+    expect(usdForUsage("moonshotai/kimi-k3", 1_000_000, 1_000_000)).toBeCloseTo(18)
+    expect(usdForUsage("openai/gpt-5.6-sol", 0, 1_000_000)).toBeCloseTo(20)
+  })
+})
+
+describe("api key last_used_at", () => {
+  test("does not write last_used_at on every request", () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite({ capUsd: 5 })
+    const created = store.createApiKey({ inviteCode: invite.code, name: "muse" })
+    expect(created).toBeDefined()
+    const t0 = 1_700_000_000_000
+    store.inviteForApiKey(created!.secret, t0)
+    expect(store.listApiKeys(invite.code)[0]?.last_used_at).toBe(t0)
+    store.inviteForApiKey(created!.secret, t0 + 1_000)
+    expect(store.listApiKeys(invite.code)[0]?.last_used_at).toBe(t0)
+    store.inviteForApiKey(created!.secret, t0 + 60_000)
+    expect(store.listApiKeys(invite.code)[0]?.last_used_at).toBe(t0 + 60_000)
+    store.close()
   })
 })
 
@@ -455,6 +474,45 @@ describe("gateway HTTP", () => {
       body: { text: "hi" },
     })
     expect(after.status).toBe(401)
+  })
+
+  test("logs gateway auth time separately from upstream fetch time", async () => {
+    const lines: string[] = []
+    const orig = console.info
+    console.info = (...args: unknown[]) => {
+      if (typeof args[0] === "string") lines.push(args[0])
+    }
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async () => {
+        await Bun.sleep(25)
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+          }),
+          { status: 200, headers: { "x-openrouter-provider": "DeepSeek" } },
+        )
+      },
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "deepseek/deepseek-v4.1-flash", messages: [], stream: false },
+    })
+    console.info = orig
+    const log = lines.find((line) => line.includes("completions model="))
+    expect(log).toContain("auth_ms=")
+    expect(log).toContain("upstream_ms=")
+    expect(log).toContain("provider=DeepSeek")
+    const upstreamMs = Number(log?.match(/upstream_ms=(\d+)/)?.[1])
+    expect(upstreamMs).toBeGreaterThanOrEqual(20)
   })
 })
 

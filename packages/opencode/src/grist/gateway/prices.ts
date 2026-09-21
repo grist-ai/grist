@@ -1,10 +1,10 @@
 import { RUNG_MODELS, type Rung } from "../rung"
 
-/** USD per 1M tokens for gateway metering (OpenRouter floor / promo, 2026-09-19). */
+/** USD per 1M tokens for gateway metering (first-party / typical OpenRouter, 2026-09-21). */
 export const LADDER_PRICES: Record<string, { input: number; output: number; rung: Rung }> = {
   "deepseek/deepseek-v4.1-flash": { input: 0.15, output: 0.6, rung: "cheapest" },
-  "moonshotai/kimi-k3": { input: 1.7, output: 8.5, rung: "medium" },
-  "openai/gpt-5.6-sol": { input: 2, output: 10, rung: "frontier" },
+  "moonshotai/kimi-k3": { input: 3, output: 15, rung: "medium" },
+  "openai/gpt-5.6-sol": { input: 4, output: 20, rung: "frontier" },
 }
 
 export function ladderModelIDs(): string[] {
