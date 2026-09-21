@@ -57,6 +57,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { sessionAllowsActionFusion } from "@/grist/mechanisms"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -86,6 +87,7 @@ export interface Interface {
     modelID: ModelV2.ID
     agent: Agent.Info
     permission?: PermissionV1.Ruleset
+    sessionID?: string
   }) => Effect.Effect<Tool.Def[]>
 }
 
@@ -309,7 +311,9 @@ const layer = Layer.effect(
         const usePatch =
           input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4")
         if (tool.id === ApplyPatchTool.id) return usePatch
-        if (tool.id === EditTool.id || tool.id === WriteTool.id || tool.id === EditVerifyTool.id) return !usePatch
+        if (tool.id === EditTool.id || tool.id === WriteTool.id) return !usePatch
+        // Action Fusion off-switch: GRIST_MECH=off stores actionFusion=false per session.
+        if (tool.id === EditVerifyTool.id) return !usePatch && sessionAllowsActionFusion(input.sessionID)
 
         return true
       })

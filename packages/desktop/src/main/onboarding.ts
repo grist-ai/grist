@@ -36,7 +36,7 @@ export async function finishFirstLaunchOnboarding(createDefaultProject: boolean)
     return null
   }
 
-  const defaultProject = createDefaultProject ? join(app.getPath("documents"), DEFAULT_PROJECT_DIR) : null
+  const defaultProject = createDefaultProject ? join(app.getPath("userData"), DEFAULT_PROJECT_DIR) : null
   if (defaultProject) await mkdir(defaultProject, { recursive: true })
 
   getStore().set(FIRST_LAUNCH_ONBOARDING_COMPLETE_KEY, true)

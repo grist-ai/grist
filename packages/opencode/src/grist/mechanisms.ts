@@ -101,7 +101,7 @@ export function composeMechanisms(
   }
 }
 
-/** Remember per-session Choice so Tool.wrap / shell can honor ObservationPack. */
+/** Remember per-session Choice so Tool.wrap / shell honor ObservationPack and the registry honors Action Fusion. */
 export function rememberSessionMechanisms(sessionID: string, set: MechanismSet) {
   sessions.set(sessionID, set)
 }

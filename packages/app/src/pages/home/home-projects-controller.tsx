@@ -120,7 +120,6 @@ export function createHomeProjectsController(home: HomeController) {
     },
     utility: {
       settings: openSettings,
-      help: () => platform.openExternal("https://github.com/pranav6226/grist/issues/new"),
     },
   }
 }

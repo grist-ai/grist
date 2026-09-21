@@ -19,7 +19,7 @@ import { pathToFileURL } from "url"
 import { open } from "node:fs/promises"
 import { Effect } from "effect"
 import { UI } from "../ui"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, fail } from "../effect-cmd"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
@@ -261,6 +261,12 @@ export const RunCommand = effectCmd({
         describe: "enable direct interactive demo slash commands; pass one as the message to run it immediately",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
+    const { loadInviteConfig, INVITE_REQUIRED_MESSAGE } = yield* Effect.promise(() => import("@/grist/invite/config"))
+    if (!loadInviteConfig()) {
+      const { ensureSignedIn } = yield* Effect.promise(() => import("./auth"))
+      const signedIn = yield* Effect.promise(() => ensureSignedIn())
+      if (!signedIn) return yield* fail(INVITE_REQUIRED_MESSAGE)
+    }
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))

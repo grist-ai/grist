@@ -37,10 +37,6 @@ test("session settings use the remote server context", async ({ page }) => {
     )
     .toBe(true)
   expect(permissionRequests.every((request) => new URL(request).origin === serverB)).toBe(true)
-
-  await dialog.getByRole("tab", { name: "Models" }).click()
-  await expect(dialog.getByRole("switch", { name: "Server B Model" })).toBeEnabled()
-  await expect(dialog.getByRole("switch", { name: "Server A Model" })).toHaveCount(0)
 })
 
 test("auto-accept responds for an unfocused server session", async ({ page }) => {

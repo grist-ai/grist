@@ -301,6 +301,16 @@ export function createPromptInputV2Controller(input: {
     parts() {
       return draft.state.prompt
     },
+    insertText(text: string) {
+      const spoken = text.trim()
+      if (!spoken) return
+      const existing = draft.state.prompt.map((part) => ("content" in part ? part.content : "")).join("")
+      const cursor = draft.state.cursor ?? existing.length
+      const before = existing.slice(0, cursor)
+      const pad = before && !/\s$/.test(before) ? " " : ""
+      draft.addText(pad + spoken)
+      restoreFocus()
+    },
     addPart,
     contextItem(id: string) {
       return draft.state.context.items.find((item) => item.key === id)

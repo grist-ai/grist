@@ -79,7 +79,7 @@ Pinned SHA: \`${sha}\`
 1. Review \`${ownershipPath}\` — only \`memory remember\` user-approved rows.
 2. Run Graphify vs CRG bake-off (\`docs/code-map.md\`) on this SHA.
 3. Optional map-reduce distillation (~$50–200 frontier) for team profile.
-4. Start shadow burn-in with \`OPENROUTER_API_KEY\` set; report via burn-in tools.
+4. Start shadow burn-in via the invite gateway; report via burn-in tools.
 5. Fill the tech-lead questionnaire for the unresolvable remainder.
 
 Ownership rows mined: **${mined.rows.length}** (since ${mined.since}).

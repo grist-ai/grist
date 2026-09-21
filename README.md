@@ -4,8 +4,10 @@ Confidence-gated coding agent — a rebranded fork of [OpenCode](https://github.
 The agent loop *is* this codebase (chat / IDE / CLI). There is no separate mill wrapper.
 
 A Jev confidence gate routes each task to the **cheapest capable model rung**
-(via OpenRouter: DeepSeek Flash → DeepSeek Pro → frontier), with institutional
+(via OpenRouter: DeepSeek Flash → Kimi K3 → GPT-5.6 Sol), with institutional
 memory mined from the user’s history. Local models are watch-only for now.
+
+Invite-gated public test: [`docs/grist-public-launch-spec.md`](docs/grist-public-launch-spec.md).
 
 **Value prop:** frontier-tier output at a flat price, with memory that survives turnover.
 
@@ -20,13 +22,12 @@ code map, memory, burn-in, eval). Pilot-repo exits are deferred — see
 ```bash
 bun install --ignore-scripts
 bun run --cwd packages/core fix-node-pty
-# In a codebase you want Grist to work on:
-bun run --cwd packages/opencode src/index.ts init
-# optional cold-start (ownership mine + optional Graphify):
-bun run --cwd packages/opencode src/index.ts bootstrap
+# Founder: start the gateway with YOUR OpenRouter key
 export OPENROUTER_API_KEY=sk-or-v1-...
-# optional: export TYPESAFE_API_KEY=...
-# optional: export GRIST_FRONTIER_MODEL=openai/gpt-5.6-sol
+export GRIST_ADMIN_TOKEN=dev
+bun run --cwd packages/opencode src/index.ts gateway
+# Tester (or you dogfooding): opens the site; enter your invite there
+bun run --cwd packages/opencode src/index.ts auth login --gateway http://127.0.0.1:8787
 bun run --cwd packages/opencode test src/grist/
 bun scripts/grist-eval.ts
 bun scripts/burn-in-report.ts
@@ -42,7 +43,8 @@ bun run --cwd packages/desktop dev
 
 ```bash
 cd /path/to/your-repo
-grist init                 # .grist/, opencode.jsonc, .gitignore
+grist auth login --gateway <url>
+grist init
 grist bootstrap            # pin SHA + ownership mine (+ Graphify if installed)
 grist                      # start agent
 ```

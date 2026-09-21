@@ -5,7 +5,7 @@ import { promisify } from "node:util"
 
 import type { Configuration } from "electron-builder"
 
-import { APP_IDS, APP_NAMES, PRODUCT_NAME, PROTOCOL_SCHEME } from "./brand"
+import { APP_IDS, APP_NAMES, PRODUCT_NAME, PRODUCT_VERSION, PROTOCOL_SCHEME, UPDATES } from "./brand"
 
 const execFileAsync = promisify(execFile)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
@@ -26,10 +26,46 @@ async function signWindows(configuration: { path: string }) {
   )
 }
 
+async function stripMacDetritus(appOutDir: string) {
+  if (process.platform !== "darwin") return
+  await execFileAsync("xattr", ["-cr", appOutDir])
+  await execFileAsync("find", [appOutDir, "-name", "._*", "-delete"])
+}
+
+const UNUSED_MAC_PRIVACY_KEYS = [
+  "NSAudioCaptureUsageDescription",
+  "NSBluetoothAlwaysUsageDescription",
+  "NSBluetoothPeripheralUsageDescription",
+  "NSCameraUsageDescription",
+  "NSPhotoLibraryUsageDescription",
+  "NSPhotoLibraryAddUsageDescription",
+  "NSAppleMusicUsageDescription",
+  "NSContactsUsageDescription",
+  "NSCalendarsUsageDescription",
+  "NSRemindersUsageDescription",
+]
+
+async function stripUnusedMacPrivacyKeys(appOutDir: string) {
+  if (process.platform !== "darwin") return
+  const found = await execFileAsync("find", [appOutDir, "-name", "Info.plist"])
+  const plists = found.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+  await Promise.all(plists.flatMap((plist) => UNUSED_MAC_PRIVACY_KEYS.map((key) => deletePlistKey(plist, key))))
+}
+
+function deletePlistKey(plist: string, key: string) {
+  return execFileAsync("plutil", ["-remove", key, plist]).then(
+    () => undefined,
+    () => undefined,
+  )
+}
+
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
-  return "dev"
+  return "prod"
 })()
 
 const getBase = (appId: string): Configuration => ({
@@ -38,12 +74,23 @@ const getBase = (appId: string): Configuration => ({
     output: "dist",
     buildResources: "resources",
   },
+  publish: {
+    provider: "github",
+    owner: UPDATES.owner,
+    repo: UPDATES.repo,
+    releaseType: "release",
+  },
   // Linux launchers are .desktop files, so this is the desktop file name,
   // not just the app id.
   extraMetadata: {
     desktopName: `${appId}.desktop`,
+    version: PRODUCT_VERSION,
   },
   files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*"],
+  afterPack: async (context) => {
+    await stripMacDetritus(context.appOutDir)
+    await stripUnusedMacPrivacyKeys(context.appOutDir)
+  },
   extraResources: [
     ...(channel === "dev"
       ? [
@@ -67,11 +114,14 @@ const getBase = (appId: string): Configuration => ({
     gatekeeperAssess: false,
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
-    notarize: true,
+    notarize: Boolean(process.env.APPLE_ID || process.env.APPLE_API_KEY),
     target: ["dmg", "zip"],
+    extendInfo: {
+      NSMicrophoneUsageDescription: "Grist uses the microphone so you can dictate prompts.",
+    },
   },
   dmg: {
-    sign: true,
+    sign: Boolean(process.env.APPLE_ID || process.env.CSC_LINK || process.env.APPLE_API_KEY),
   },
   protocols: {
     name: PRODUCT_NAME,

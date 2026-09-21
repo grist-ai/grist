@@ -16,6 +16,7 @@ import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
+import { gatewayAuthHeaders, loadInviteConfig } from "@/grist/invite/config"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -475,16 +476,32 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           },
         },
       }),
-    openrouter: () =>
-      Effect.succeed({
+    openrouter: () => {
+      const invite = loadInviteConfig()
+      if (invite) {
+        return Effect.succeed({
+          autoload: true,
+          options: {
+            apiKey: "grist-invite",
+            baseURL: `${invite.gatewayUrl}/v1`,
+            headers: {
+              "HTTP-Referer": "https://github.com/pranav6226/grist",
+              "X-Title": "Grist",
+              ...gatewayAuthHeaders(invite),
+            },
+          },
+        })
+      }
+      return Effect.succeed({
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://github.com/pranav6226/grist",
+            "X-Title": "Grist",
           },
         },
-      }),
+      })
+    },
     nvidia: (provider) =>
       Effect.succeed({
         autoload: provider.source === "config",
@@ -1581,9 +1598,12 @@ const layer = Layer.effect(
 
         // load env
         const envs = yield* env.all()
+        const invite = loadInviteConfig()
         for (const [id, provider] of Object.entries(database)) {
           const providerID = ProviderV2.ID.make(id)
           if (disabled.has(providerID)) continue
+          // Grist CLI testers cannot BYOK OpenRouter; the gateway holds the key.
+          if (providerID === ProviderV2.ID.openrouter && process.env.OPENCODE === "1" && !invite) continue
           const apiKey = provider.env.map((item) => envs[item]).find(Boolean)
           if (!apiKey) continue
           mergeProvider(providerID, {
@@ -1597,6 +1617,7 @@ const layer = Layer.effect(
         for (const [id, provider] of Object.entries(auths)) {
           const providerID = ProviderV2.ID.make(id)
           if (disabled.has(providerID)) continue
+          if (providerID === ProviderV2.ID.openrouter && process.env.OPENCODE === "1" && !invite) continue
           if (provider.type === "api") {
             mergeProvider(providerID, {
               source: "api",

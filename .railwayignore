@@ -1,0 +1,8 @@
+*
+!packages
+!packages/opencode
+!packages/opencode/Dockerfile.gateway
+!packages/opencode/src
+!packages/opencode/src/grist
+!packages/opencode/src/grist/**
+!railway.toml

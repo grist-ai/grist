@@ -43,6 +43,7 @@ const icons = {
   "magnifying-glass": `<path d="M13 13L10.6418 10.6418M11.9552 7.47761C11.9552 9.95053 9.95053 11.9552 7.47761 11.9552C5.0047 11.9552 3 9.95053 3 7.47761C3 5.0047 5.0047 3 7.47761 3C9.95053 3 11.9552 5.0047 11.9552 7.47761Z" stroke="currentColor" stroke-linecap="square" vector-effect="non-scaling-stroke"/>`,
   "plus-small": `<path d="M9.99984 5.41699V10.0003M9.99984 10.0003V14.5837M9.99984 10.0003H5.4165M9.99984 10.0003H14.5832" stroke="currentColor" stroke-linecap="square"/>`,
   plus: `<path d="M9.9987 2.20703V9.9987M9.9987 9.9987V17.7904M9.9987 9.9987H2.20703M9.9987 9.9987H17.7904" stroke="currentColor" stroke-linecap="square"/>`,
+  microphone: `<path d="M10 3.5C8.61929 3.5 7.5 4.61929 7.5 6V10C7.5 11.3807 8.61929 12.5 10 12.5C11.3807 12.5 12.5 11.3807 12.5 10V6C12.5 4.61929 11.3807 3.5 10 3.5Z" stroke="currentColor"/><path d="M5.5 9.5V10C5.5 12.4853 7.51472 14.5 10 14.5C12.4853 14.5 14.5 12.4853 14.5 10V9.5M10 14.5V17.5M6.5 17.5H13.5" stroke="currentColor" stroke-linecap="square"/>`,
   "new-session": `<path d="M12 2H2V18H18V8M6 11.3818V14H8.61818L18 4.61818L15.3818 2L6 11.3818Z" stroke="currentColor"/>`,
   "new-session-active": `<path d="M6 11.3818V14H8.61818L18 4.61818L15.3818 2L6 11.3818Z" fill="currentColor" fill-opacity="0.1"/>
 <path d="M12 2H2V18H18V8M6 11.3818V14H8.61818L18 4.61818L15.3818 2L6 11.3818Z" stroke="currentColor"/>`,

@@ -181,6 +181,23 @@ export function parseAPICallError(input: { providerID: ProviderV2.ID; error: API
   }
 
   const metadata = input.error.url ? { url: input.error.url } : undefined
+  if (input.error.statusCode === 402) {
+    const body = json(input.error.responseBody)
+    const cap =
+      (typeof body?.error === "string" ? body.error : undefined) ||
+      (typeof body?.message === "string" ? body.message : undefined) ||
+      m
+    return {
+      type: "api_error",
+      message: cap.includes("top-up") ? cap : `${cap} Ask the founder for a top-up.`,
+      statusCode: 402,
+      isRetryable: false,
+      responseHeaders: input.error.responseHeaders,
+      responseBody: input.error.responseBody,
+      metadata,
+    }
+  }
+
   return {
     type: "api_error",
     message: m,

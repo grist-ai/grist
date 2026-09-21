@@ -8,15 +8,16 @@ export const PRODUCT_COLOR = "#EC5B2B"
 /** Gate picks models; users never select or see them. */
 export const HIDE_MODEL_UI = true
 
-/** CLI / TUI wordmark rows (glyph dialect: _ ^ ~ ,). Spells GRIST. */
+/** CLI / TUI wordmark rows. Same 5-row pixel geometry as the desktop wordmark. */
 export const WORDMARK = [
-  "                          ",
-  "█▀▀▀ █▀▀█  █  █▀▀▀ ▀▀█▀▀",
-  "█ ▀█ █▀▀  _█_ ▀▀▀█  _█_ ",
-  "▀▀▀▀ █ ▀█ _█_ ▀▀▀▀  _▀_ ",
+  "████  ███  █  ████  ██████",
+  "█     █    █  █       ██  ",
+  "█ ██  █ █  █  ████    ██  ",
+  "█     █ █  █     █    ██  ",
+  "████  █ █  █  ████    ██  ",
 ] as const
 
 export const LOGO = {
-  left: ["      ", "█▀▀▀ █▀▀█", "█ ▀█ █▀▀ ", "▀▀▀▀ █ ▀█"],
-  right: ["              ", " █  █▀▀▀ ▀▀█▀▀", "_█_ ▀▀▀█  _█_ ", "_█_ ▀▀▀▀  _▀_ "],
+  left: ["████  ███", "█     █  ", "█ ██  █ █", "█     █ █", "████  █ █"],
+  right: [" █  ████  ██████", " █  █       ██  ", " █  ████    ██  ", " █     █    ██  ", " █  ████    ██  "],
 } as const
