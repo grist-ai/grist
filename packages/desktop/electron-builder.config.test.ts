@@ -49,6 +49,21 @@ test("declares microphone usage for voice input only", async () => {
   })
 })
 
+test("bundles whisper weights outside the app archive", async () => {
+  const previous = process.env.OPENCODE_CHANNEL
+  process.env.OPENCODE_CHANNEL = "prod"
+  const module = await import("./electron-builder.config.ts?whisper-resource")
+  const config = module.default as Configuration
+  if (previous === undefined) delete process.env.OPENCODE_CHANNEL
+  else process.env.OPENCODE_CHANNEL = previous
+
+  expect(config.files).toContain("!resources/whisper/**")
+  expect(config.extraResources).toContainEqual({
+    from: "resources/whisper",
+    to: "whisper",
+  })
+})
+
 test("mac entitlements request microphone but not camera", async () => {
   const plist = await Bun.file(new URL("./resources/entitlements.plist", import.meta.url)).text()
   expect(plist).toContain("audio-input")
@@ -64,6 +79,7 @@ test("bundles the CLI outside the dev app archive", async () => {
   else process.env.OPENCODE_CHANNEL = previous
 
   expect(config.files).toContain("!resources/opencode-cli*")
+  expect(config.files).toContain("!resources/whisper/**")
   expect(config.extraResources).toContainEqual({
     from: "resources/",
     to: "",
