@@ -28,7 +28,7 @@ async function publish(cwd: string, name: string, version: string) {
   }
   const pkgFile = Bun.file(`${cwd}/package.json`)
   const pkg = await pkgFile.json()
-  pkg.repository = { type: "git", url: `git+https://github.com/${PRODUCT_REPO}.git` }
+  pkg.repository = { type: "git", url: `https://github.com/${PRODUCT_REPO}.git` }
   await pkgFile.write(`${JSON.stringify(pkg, null, 2)}\n`)
   await $`bun pm pack`.cwd(cwd)
   await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(cwd)
@@ -97,7 +97,7 @@ await Bun.file(`${wrapperDir}/package.json`).write(
       license: "MIT",
       repository: {
         type: "git",
-        url: `git+https://github.com/${PRODUCT_REPO}.git`,
+        url: `https://github.com/${PRODUCT_REPO}.git`,
       },
       homepage: `https://github.com/${PRODUCT_REPO}#readme`,
       os: ["darwin", "linux", "win32"],
@@ -109,10 +109,9 @@ await Bun.file(`${wrapperDir}/package.json`).write(
   ),
 )
 
-const tasks = Object.entries(binaries).map(async ([name]) => {
+for (const name of Object.keys(binaries)) {
   await publish(`./dist/${name}`, name, binaries[name])
-})
-await Promise.all(tasks)
+}
 await publish(wrapperDir, PRODUCT_NPM, version)
 
 console.log(`Published ${PRODUCT_NPM}@${version}`)
