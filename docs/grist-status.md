@@ -29,7 +29,7 @@ do not block harness work on an external codebase.
 export OPENROUTER_API_KEY=sk-or-v1-...
 export GRIST_ADMIN_TOKEN=dev
 bun run --cwd packages/opencode src/index.ts gateway
-# Then: grist auth login --gateway http://127.0.0.1:8787
+# Then: grist auth login --provider grist --gateway http://127.0.0.1:8787
 bun run --cwd packages/opencode test src/grist/
 bun scripts/grist-eval.ts
 bun scripts/burn-in-report.ts

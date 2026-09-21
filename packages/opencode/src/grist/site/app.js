@@ -306,7 +306,8 @@ async function loadDashboard() {
   document.getElementById("rungs").innerHTML = ["cheapest", "medium", "frontier"]
     .map((name) => `<div><strong>${name}</strong>$${(rungs[name] ?? 0).toFixed(2)}</div>`)
     .join("")
-  document.getElementById("cli").textContent = `grist auth login --gateway ${window.location.origin}`
+  document.getElementById("cli").textContent =
+    `grist auth login --provider grist --gateway ${window.location.origin}`
 }
 
 function setDashTab(tab) {
