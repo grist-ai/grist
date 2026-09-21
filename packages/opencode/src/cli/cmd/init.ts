@@ -99,7 +99,7 @@ export const InitCommand = effectCmd({
           ? "Next: run " + UI.Style.TEXT_HIGHLIGHT + "grist" + UI.Style.TEXT_NORMAL
           : "Next: " +
               UI.Style.TEXT_HIGHLIGHT +
-              "grist auth login --gateway <url>" +
+              "grist auth login --provider grist" +
               UI.Style.TEXT_NORMAL,
       )
       UI.println(
