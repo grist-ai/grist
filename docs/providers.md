@@ -26,7 +26,7 @@ on the client.
 export OPENROUTER_API_KEY=sk-or-v1-...   # this process only
 export TYPESAFE_API_KEY=...              # optional live Jev
 export GRIST_ADMIN_TOKEN=...
-grist gateway                            # :8787 — mint codes at /admin as pranavmm25@gmail.com
+grist gateway                            # :8787 — mint codes at /admin as admin@grist.lol
 ```
 
 Ladder ids (override with `GRIST_*_MODEL` **on the gateway**):

@@ -189,7 +189,8 @@ describe("gateway HTTP", () => {
     expect(html).not.toContain("Pranav")
     expect(html).not.toContain("pranavmm25")
     expect(html).not.toContain("pranav6226")
-    expect(html).toContain("privacy@grist.lol")
+    expect(html).toContain("admin@grist.lol")
+    expect(html).not.toContain("privacy@grist.lol")
 
     const docs = await gateway.fetch(new Request("http://gateway.test/docs"))
     expect(docs.headers.get("Content-Type")).toContain("text/html")
@@ -347,10 +348,10 @@ describe("gateway HTTP", () => {
     process.env.FIREBASE_PROJECT_ID = "grist-test"
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
     const gateway = createGateway({
-      adminEmail: "pranavmm25@gmail.com",
+      adminEmail: "admin@grist.lol",
       fetch: async (_input, init) => {
         const body = JSON.parse(String(init?.body ?? "{}")) as { idToken?: string }
-        const email = body.idToken === "admin-tok" ? "pranavmm25@gmail.com" : "tester@beta"
+        const email = body.idToken === "admin-tok" ? "admin@grist.lol" : "tester@beta"
         const localId = body.idToken === "admin-tok" ? "uid_admin" : "uid_tester"
         return new Response(JSON.stringify({ users: [{ localId, email }] }), {
           status: 200,
