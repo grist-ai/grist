@@ -80,7 +80,7 @@ export const dict = {
   "command.prompt.mode.shell": "Shell",
   "command.prompt.mode.normal": "Prompt",
   "command.prompt.voice": "Voice input",
-  "command.prompt.voice.description": "Dictate a prompt with on-device Whisper Large V3",
+  "command.prompt.voice.description": "Dictate a prompt with on-device Moonshine",
   "command.permissions.autoaccept.enable": "Auto-accept permissions",
   "command.permissions.autoaccept.disable": "Stop auto-accepting permissions",
   "command.workspace.toggle": "Toggle workspaces",
@@ -320,7 +320,7 @@ export const dict = {
   "prompt.toast.voice.failed.title": "Voice input failed",
   "prompt.toast.voice.failed.description": "Couldn't transcribe speech on this device. Try again.",
   "prompt.toast.voice.download.title": "Loading speech model",
-  "prompt.toast.voice.download.description": "Grist is loading the on-device Whisper model.",
+  "prompt.toast.voice.download.description": "Grist is loading the on-device Moonshine speech model.",
 
   "prompt.toast.pasteUnsupported.title": "Unsupported attachment",
   "prompt.toast.pasteUnsupported.description": "Only images, PDFs, or text files can be attached here.",
