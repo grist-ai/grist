@@ -28,6 +28,9 @@ describe("metering", () => {
     expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 0)).toBeCloseTo(0.15)
     expect(usdForUsage("moonshotai/kimi-k3", 1_000_000, 1_000_000)).toBeCloseTo(18)
     expect(usdForUsage("openai/gpt-5.6-sol", 0, 1_000_000)).toBeCloseTo(20)
+    expect(usdForUsage("cheapest", 1_000_000, 0)).toBeCloseTo(0.15)
+    expect(usdForUsage("medium", 1_000_000, 1_000_000)).toBeCloseTo(18)
+    expect(usdForUsage("openrouter/frontier", 0, 1_000_000)).toBeCloseTo(20)
   })
 })
 
@@ -84,7 +87,8 @@ describe("gateway HTTP", () => {
     expect(route.status).toBe(200)
     const decision = route.json as { rung: string; model: { model_id: string } }
     expect(decision.rung).toBe("cheapest")
-    expect(decision.model.model_id).toBe("deepseek/deepseek-v4.1-flash")
+    expect(decision.model.model_id).toBe("cheapest")
+    expect(JSON.stringify(decision)).not.toContain("deepseek")
 
     const blocked = await call(gateway.fetch, "POST", "/v1/completions", {
       headers: { "X-Grist-Invite": code },
@@ -97,6 +101,8 @@ describe("gateway HTTP", () => {
       body: { model: "deepseek/deepseek-v4.1-flash", messages: [], stream: false },
     })
     expect(ok.status).toBe(200)
+    expect((ok.json as { model: string }).model).toBe("cheapest")
+    expect(JSON.stringify(ok.json)).not.toContain("deepseek")
 
     const usage = await call(gateway.fetch, "GET", "/v1/usage", {
       headers: { "X-Grist-Invite": code },
@@ -174,9 +180,11 @@ describe("gateway HTTP", () => {
     expect(html).toContain("Create key")
     expect(html).toContain("npx skills add grist-ai/grist-skills")
     expect(html).not.toContain("Three steps")
-    expect(html).not.toContain("deepseek")
-    expect(html).not.toContain("kimi")
-    expect(html).not.toContain("gpt-5")
+    expect(html.toLowerCase()).not.toContain("deepseek")
+    expect(html.toLowerCase()).not.toContain("kimi")
+    expect(html.toLowerCase()).not.toContain("moonshot")
+    expect(html.toLowerCase()).not.toContain("openrouter")
+    expect(html.toLowerCase()).not.toContain("gpt-5")
     expect(html).not.toContain("Necora")
     expect(html).not.toContain("Pranav")
     expect(html).not.toContain("pranavmm25")
@@ -216,7 +224,12 @@ describe("gateway HTTP", () => {
 
     const privacy = await gateway.fetch(new Request("http://gateway.test/privacy"))
     expect(privacy.status).toBe(200)
-    expect(await privacy.text()).toContain("What we do not take")
+    const privacyHtml = await privacy.text()
+    expect(privacyHtml).toContain("What we do not take")
+    expect(privacyHtml.toLowerCase()).not.toContain("deepseek")
+    expect(privacyHtml.toLowerCase()).not.toContain("kimi")
+    expect(privacyHtml.toLowerCase()).not.toContain("moonshot")
+    expect(privacyHtml.toLowerCase()).not.toContain("openrouter")
 
     const terms = await gateway.fetch(new Request("http://gateway.test/terms"))
     expect(await terms.text()).toContain("Invite-only beta")
@@ -507,12 +520,47 @@ describe("gateway HTTP", () => {
       body: { model: "deepseek/deepseek-v4.1-flash", messages: [], stream: false },
     })
     console.info = orig
-    const log = lines.find((line) => line.includes("completions model="))
+    const log = lines.find((line) => line.includes("completions rung="))
     expect(log).toContain("auth_ms=")
     expect(log).toContain("upstream_ms=")
-    expect(log).toContain("provider=DeepSeek")
+    expect(log).toContain("rung=cheapest")
+    expect(log).not.toContain("DeepSeek")
+    expect(log).not.toContain("deepseek")
     const upstreamMs = Number(log?.match(/upstream_ms=(\d+)/)?.[1])
     expect(upstreamMs).toBeGreaterThanOrEqual(20)
+  })
+
+  test("strips vendor model ids from streamed completions", async () => {
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async () =>
+        new Response(
+          [
+            `data: ${JSON.stringify({ model: "deepseek/deepseek-v4.1-flash", choices: [{ delta: { content: "hi" } }] })}\n\n`,
+            `data: ${JSON.stringify({ model: "deepseek/deepseek-v4.1-flash", usage: { prompt_tokens: 10, completion_tokens: 5 } })}\n\n`,
+            "data: [DONE]\n\n",
+          ].join(""),
+          { status: 200, headers: { "Content-Type": "text/event-stream" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const response = await gateway.fetch(
+      new Request("http://gateway.test/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Grist-Invite": code },
+        body: JSON.stringify({ model: "cheapest", messages: [], stream: true }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    const text = await response.text()
+    expect(text.toLowerCase()).not.toContain("deepseek")
+    expect(text).toContain("cheapest")
   })
 })
 

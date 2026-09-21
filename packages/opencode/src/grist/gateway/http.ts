@@ -2,11 +2,11 @@ import path from "path"
 import { createHash } from "node:crypto"
 import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
-import { RUNG_MODELS } from "../rung"
+import { publicModelRef } from "../rung"
 import { typesafeKey } from "../jev-client"
 import type { OperatingMode } from "../mode"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase"
-import { isLadderModel, normalizeLadderModel, priceForModel, usdForUsage } from "./prices"
+import { isLadderModel, publicLadderID, upstreamLadderID, priceForModel, usdForUsage } from "./prices"
 import { openGatewayStore, type GatewayStore, type InviteRow } from "./store"
 import { canonicalApiKey } from "./codes"
 
@@ -238,7 +238,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const { scores, provider } = await scoreTask(text, opts.typesafeKey ?? typesafeKey())
     const mode = store.getMode()
     const { rung, reasons } = composeRung(scores, undefined, mode)
-    const model = RUNG_MODELS[rung]
+    const model = publicModelRef(rung)
     const mechanisms = composeMechanisms(text, loadMechanismProfile())
     const decision = {
       rung,
@@ -276,8 +276,9 @@ export function createGateway(opts: GatewayOptions = {}) {
 
     const body = await readJson(req)
     const rawModel = typeof body?.model === "string" ? body.model : ""
-    const model = normalizeLadderModel(rawModel)
-    if (!isLadderModel(model)) {
+    const publicID = publicLadderID(rawModel)
+    const upstreamModel = upstreamLadderID(rawModel)
+    if (!publicID || !upstreamModel || !isLadderModel(rawModel)) {
       return json(400, { error: "model not on ladder" })
     }
     if (!openrouterKey) {
@@ -287,7 +288,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const stream = Boolean(body?.stream)
     const payload = {
       ...body,
-      model,
+      model: upstreamModel,
       ...(stream ? { stream_options: { include_usage: true } } : {}),
     }
     const upstreamStarted = now()
@@ -302,19 +303,18 @@ export function createGateway(opts: GatewayOptions = {}) {
       body: JSON.stringify(payload),
     })
     const upstreamMs = now() - upstreamStarted
-    const provider = upstream.headers.get("x-openrouter-provider") ?? upstream.headers.get("x-provider") ?? ""
     console.info(
-      `[grist-gateway] completions model=${model} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs}${provider ? ` provider=${provider}` : ""}`,
+      `[grist-gateway] completions rung=${publicID} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs}`,
     )
 
     if (!stream) {
       const data = (await upstream.json()) as Record<string, unknown>
-      meterFromUsage(store, invite, model, usageFromUnknown(data.usage), alert, globalBudget, now)
-      return json(upstream.status, data)
+      meterFromUsage(store, invite, upstreamModel, usageFromUnknown(data.usage), alert, globalBudget, now)
+      return json(upstream.status, redactCompletion(data, publicID))
     }
 
     if (!upstream.body) return new Response(null, { status: upstream.status })
-    return new Response(meteredSse(upstream.body, store, invite, model, alert, globalBudget, now), {
+    return new Response(meteredSse(upstream.body, store, invite, upstreamModel, publicID, alert, globalBudget, now), {
       status: upstream.status,
       headers: {
         "Content-Type": upstream.headers.get("Content-Type") ?? "text/event-stream",
@@ -597,18 +597,25 @@ function meteredSse(
   store: GatewayStore,
   invite: InviteRow,
   model: string,
+  publicID: string,
   alert: (message: string) => void,
   globalBudget: number,
   now: () => number,
 ): ReadableStream<Uint8Array> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
   let leftover = ""
   let usage: { input: number; output: number } | undefined
   return new ReadableStream({
     async pull(controller) {
       const chunk = await reader.read()
       if (chunk.done) {
+        if (leftover) {
+          const parsed = usageFromSse(leftover)
+          if (parsed) usage = parsed
+          controller.enqueue(encoder.encode(`${redactSseLine(leftover, publicID)}\n`))
+        }
         meterFromUsage(store, invite, model, usage, alert, globalBudget, now)
         controller.close()
         return
@@ -616,13 +623,34 @@ function meteredSse(
       leftover += decoder.decode(chunk.value, { stream: true })
       const lines = leftover.split("\n")
       leftover = lines.pop() ?? ""
+      if (lines.length === 0) return
+      const out: string[] = []
       for (const line of lines) {
         const parsed = usageFromSse(line)
         if (parsed) usage = parsed
+        out.push(redactSseLine(line, publicID))
       }
-      controller.enqueue(chunk.value)
+      controller.enqueue(encoder.encode(`${out.join("\n")}\n`))
     },
   })
+}
+
+function redactCompletion(data: Record<string, unknown>, publicID: string) {
+  const next = { ...data, model: publicID }
+  delete next.provider
+  return next
+}
+
+function redactSseLine(line: string, publicID: string) {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith("data:")) return line
+  const payload = trimmed.slice(5).trim()
+  if (!payload || payload === "[DONE]") return line
+  try {
+    return `data: ${JSON.stringify(redactCompletion(JSON.parse(payload) as Record<string, unknown>, publicID))}`
+  } catch {
+    return line
+  }
 }
 
 function usageFromSse(line: string) {

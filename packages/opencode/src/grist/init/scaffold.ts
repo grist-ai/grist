@@ -6,19 +6,9 @@ export const CONFIG_NAME = "opencode.jsonc"
 
 export const DEFAULT_CONFIG = `{
   "$schema": "https://opencode.ai/config.json",
-  // Models are routed by the invite gateway (founder's OpenRouter key).
-  "model": "openrouter/deepseek/deepseek-v4.1-flash",
-  "lsp": true,
-  "provider": {
-    "openrouter": {
-      "options": {
-        "headers": {
-          "HTTP-Referer": "https://github.com/pranav6226/grist",
-          "X-Title": "Grist"
-        }
-      }
-    }
-  }
+  // Models are routed by the invite gateway. Testers do not pick a vendor.
+  "model": "openrouter/cheapest",
+  "lsp": true
 }
 `
 
