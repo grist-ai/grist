@@ -153,7 +153,7 @@ describe("gateway HTTP", () => {
     expect(html).toContain("view-docs")
     expect(html).toContain("view-docs-skills")
     expect(html).toContain("Create key")
-    expect(html).toContain("Agent skills")
+    expect(html).toContain("npx skills add grist-ai/grist-skills")
     expect(html).not.toContain("Three steps")
     expect(html).not.toContain("deepseek")
     expect(html).not.toContain("kimi")
@@ -161,14 +161,33 @@ describe("gateway HTTP", () => {
 
     const docs = await gateway.fetch(new Request("http://gateway.test/docs"))
     expect(docs.headers.get("Content-Type")).toContain("text/html")
-    expect(await docs.text()).toContain("grist auth login")
+    const docsHtml = await docs.text()
+    expect(docsHtml).toContain("grist auth login")
+    expect(docsHtml).toContain("npx skills add grist-ai/grist-skills")
+    expect(docsHtml).toContain("id=\"agents\"")
 
     const skills = await gateway.fetch(new Request("http://gateway.test/docs/skills"))
     expect(await skills.text()).toContain("When to reach for Grist")
 
     const skillFile = await gateway.fetch(new Request("http://gateway.test/grist-skill.md"))
     expect(skillFile.headers.get("Content-Type")).toContain("text/markdown")
-    expect(await skillFile.text()).toContain("Never run Grist on Necora")
+    const skillText = await skillFile.text()
+    expect(skillText).toContain("Never run Grist on Necora")
+
+    const wellKnown = await gateway.fetch(
+      new Request("http://gateway.test/.well-known/agent-skills/grist/SKILL.md"),
+    )
+    expect(await wellKnown.text()).toBe(skillText)
+
+    const index = await gateway.fetch(new Request("http://gateway.test/.well-known/agent-skills/index.json"))
+    expect(index.headers.get("Content-Type")).toContain("application/json")
+    const catalog = (await index.json()) as {
+      skills: { name: string; type: string; url: string; digest: string }[]
+    }
+    expect(catalog.skills[0]?.name).toBe("grist")
+    expect(catalog.skills[0]?.type).toBe("skill-md")
+    expect(catalog.skills[0]?.url).toBe("/.well-known/agent-skills/grist/SKILL.md")
+    expect(catalog.skills[0]?.digest).toMatch(/^sha256:[0-9a-f]{64}$/)
 
     const privacy = await gateway.fetch(new Request("http://gateway.test/privacy"))
     expect(privacy.status).toBe(200)

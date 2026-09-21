@@ -391,6 +391,7 @@ grist</pre>
           <a href="/docs#memory">Memory</a>
           <a href="/docs#sol-pi">SoL-Pi</a>
           <a href="/docs#spend">Spend</a>
+          <a href="/docs#agents">Agents</a>
         </nav>
 
         <h2 id="install">Install</h2>
@@ -476,6 +477,21 @@ GRIST_OBS_PACK=off       # pack only</pre>
           Agent API keys spend against the same cap. We hold the inference key.
           You never paste an OpenRouter key. We do not train on tester repos.
         </p>
+
+        <h2 id="agents">Agents</h2>
+        <p>
+          An agent on a VM (Muse, Cursor, and the like) can run Grist billed to
+          your account. Mint a key on the <a href="/dashboard/api">API keys</a>
+          tab. Store it in a vault as <code>GRIST_API_KEY</code> — never in chat
+          and never in the skill file. Then on the VM:
+        </p>
+        <pre>npm install -g grist-ai
+npx skills add grist-ai/grist-skills</pre>
+        <p>
+          The skill tells the agent when to delegate, how to invoke
+          <code>grist run</code>, and what to report back. Full text:
+          <a href="/docs/skills">Agent skills</a>.
+        </p>
       </article>
     </main>
 
@@ -492,7 +508,16 @@ GRIST_OBS_PACK=off       # pack only</pre>
           <a href="/docs">Using Grist</a>
           <a href="/docs/skills" class="is-on">Agent skills</a>
         </nav>
+
+        <h2 id="install-skill">Install</h2>
         <p>
+          Install it with the skills CLI. That drops it into Cursor, Claude,
+          OpenCode, and other agents the CLI detects. The API key still stays
+          in a vault — never in the skill.
+        </p>
+        <pre>npx skills add grist-ai/grist-skills</pre>
+        <p>
+          <button type="button" class="btn btn-ghost" data-copy="skills">Copy install</button>
           <button type="button" class="btn btn-ghost" id="copy-skill">Copy skill</button>
           <a href="/grist-skill.md">Download SKILL.md</a>
         </p>
@@ -668,6 +693,14 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           Keys let agents like Muse run Grist on a VM, billed to this account.
           Store the secret in a vault. Never in chat, never in a skill file.
         </p>
+        <section class="install">
+          <h2>On the agent VM</h2>
+          <pre>npx skills add grist-ai/grist-skills</pre>
+          <p class="muted">
+            Then set <code>GRIST_API_KEY</code> from the vault.
+            <a href="/docs/skills">Agent skills</a>.
+          </p>
+        </section>
         <form id="key-form" class="key-form">
           <div>
             <label for="key-name">Label</label>

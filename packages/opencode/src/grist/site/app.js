@@ -319,9 +319,13 @@ function setDashTab(tab) {
   }
 }
 
+let apiKeysLoad = 0
+
 async function loadApiKeys() {
+  const gen = ++apiKeysLoad
   const error = document.getElementById("dash-error")
   const response = await fetch("/v1/api-keys", { headers: await headers() })
+  if (gen !== apiKeysLoad) return
   if (response.status !== 200) {
     fail(error, "Couldn’t load API keys. Sign in again.")
     return
@@ -570,8 +574,11 @@ document.getElementById("switch-account")?.addEventListener("click", async () =>
 
 const NPM_INSTALL = "npm install -g grist-ai\ngrist"
 
+const SKILLS_INSTALL = "npx skills add grist-ai/grist-skills"
+
 const COPIES = {
   npm: NPM_INSTALL,
+  skills: SKILLS_INSTALL,
 }
 
 for (const node of document.querySelectorAll("[data-copy]")) {
