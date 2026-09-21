@@ -21,6 +21,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import type { Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
+import { clearSessionMechanisms, composeMechanisms, rememberSessionMechanisms } from "@/grist/mechanisms"
 
 const configLayer = TestConfig.layer({
   directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
@@ -147,6 +148,42 @@ describe("tool.registry", () => {
       })
 
       expect(tools.map((tool) => tool.id)).not.toContain("execute")
+    }),
+  )
+
+  it.instance("hides edit_verify when session fusion is off", () =>
+    Effect.gen(function* () {
+      const sessionID = "sess-fusion-off"
+      rememberSessionMechanisms(sessionID, composeMechanisms("anything", "off"))
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: yield* agents.defaultInfo(),
+        sessionID,
+      })
+      const ids = tools.map((tool) => tool.id)
+      expect(ids).not.toContain("edit_verify")
+      expect(ids).toContain("edit")
+      clearSessionMechanisms(sessionID)
+    }),
+  )
+
+  it.instance("keeps edit_verify when session fusion is on", () =>
+    Effect.gen(function* () {
+      const sessionID = "sess-fusion-on"
+      rememberSessionMechanisms(sessionID, composeMechanisms("run the tests", "efficiency"))
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: yield* agents.defaultInfo(),
+        sessionID,
+      })
+      expect(tools.map((tool) => tool.id)).toContain("edit_verify")
+      clearSessionMechanisms(sessionID)
     }),
   )
 

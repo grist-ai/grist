@@ -44,6 +44,8 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SessionMessage } from "@opencode-ai/schema/session-message"
+import { clearSessionMechanisms } from "@/grist/mechanisms"
+import { clearObservationPack } from "@/grist/observation-pack"
 
 const parentTitlePrefix = "New session - "
 const childTitlePrefix = "Child session - "
@@ -604,6 +606,8 @@ const layer: Layer.Layer<
     })
 
     const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
+      clearSessionMechanisms(sessionID)
+      clearObservationPack(sessionID)
       const session = yield* get(sessionID)
       try {
         // `remove` needs to work in all cases, such as broken sessions that

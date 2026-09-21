@@ -1,11 +1,12 @@
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { canonicalInviteCode } from "../gateway/codes"
+import { canonicalApiKey, canonicalInviteCode } from "../gateway/codes"
 
 export type InviteConfig = {
   code: string
   gatewayUrl: string
+  kind: "invite" | "api_key"
 }
 
 export const DEFAULT_GATEWAY_URL = "https://grist.lol"
@@ -17,16 +18,35 @@ export function inviteConfigPath() {
 export const INVITE_REQUIRED_MESSAGE = "Grist needs you signed in. Run: grist auth login"
 
 export function loadInviteConfig(): InviteConfig | undefined {
-  const envCode = process.env.GRIST_INVITE?.trim()
   const envUrl = process.env.GRIST_GATEWAY_URL?.trim()
   const file = readConfigFile()
-  const code = canonicalInviteCode(envCode || file?.code || "")
-  const gatewayUrl = stripSlash(envUrl || file?.gatewayUrl || "")
+  const gatewayFromEnvOrFile = stripSlash(envUrl || file?.gatewayUrl || "")
+
+  const envKey = canonicalApiKey(process.env.GRIST_API_KEY ?? "")
+  if (envKey) {
+    return { code: envKey, gatewayUrl: gatewayFromEnvOrFile || DEFAULT_GATEWAY_URL, kind: "api_key" }
+  }
+
+  const code = canonicalInviteCode(process.env.GRIST_INVITE?.trim() || file?.code || "")
+  const gatewayUrl = gatewayFromEnvOrFile
   if (!code || !gatewayUrl) return
-  return { code, gatewayUrl }
+  return { code, gatewayUrl, kind: "invite" }
 }
 
-export function saveInviteConfig(config: InviteConfig) {
+export function gatewayAuthHeaders(config: InviteConfig): Record<string, string> {
+  switch (config.kind) {
+    case "api_key":
+      return { "X-Grist-Api-Key": config.code }
+    case "invite":
+      return { "X-Grist-Invite": config.code }
+    default: {
+      const exhaustive: never = config.kind
+      throw new Error(`unhandled auth kind: ${exhaustive}`)
+    }
+  }
+}
+
+export function saveInviteConfig(config: { code: string; gatewayUrl: string }) {
   const code = canonicalInviteCode(config.code)
   if (!code) throw new Error("invalid invite code")
   const gatewayUrl = stripSlash(config.gatewayUrl)

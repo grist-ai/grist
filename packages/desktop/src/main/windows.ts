@@ -24,7 +24,14 @@ const rendererProtocol = "oc"
 const rendererHost = "renderer"
 const clipboardWritePermission = "clipboard-sanitized-write"
 const notificationPermission = "notifications"
-const rendererPermissions = new Set([clipboardWritePermission, notificationPermission])
+const mediaPermission = "media"
+const microphonePermission = "microphone"
+const rendererPermissions = new Set([
+  clipboardWritePermission,
+  notificationPermission,
+  mediaPermission,
+  microphonePermission,
+])
 const orngTheme = orngThemeJson as DesktopTheme
 const orngBackground = {
   light: resolveThemeVariant(orngTheme.light, false)["background-base"],
@@ -483,15 +490,16 @@ function allowRendererPermissions(win: BrowserWindow) {
   const webContentsId = win.webContents.id
 
   win.webContents.session.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    callback(
-      rendererPermissions.has(permission) &&
-        isTrustedRendererUrl(details.requestingUrl) &&
-        webContents.id === webContentsId,
-    )
+    if (!rendererPermissions.has(permission) || webContents.id !== webContentsId) {
+      callback(false)
+      return
+    }
+    callback(!details.requestingUrl || isTrustedRendererUrl(details.requestingUrl))
   })
   win.webContents.session.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
     if (!rendererPermissions.has(permission)) return false
     if (webContents && webContents.id !== webContentsId) return false
+    if (!details.requestingUrl && !requestingOrigin) return true
     return isTrustedRendererUrl(details.requestingUrl) || isTrustedRendererUrl(requestingOrigin)
   })
 }

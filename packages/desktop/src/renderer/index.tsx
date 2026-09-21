@@ -227,6 +227,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     async revealPath(path: string) {
       return window.api.revealPath(path)
     },
+    ensureMicrophoneAccess: () => window.api.ensureMicrophoneAccess(),
 
     storage,
     draftStore: createDraftStore({

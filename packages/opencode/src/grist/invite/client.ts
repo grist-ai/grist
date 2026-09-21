@@ -1,4 +1,4 @@
-import { loadInviteConfig, type InviteConfig } from "./config"
+import { gatewayAuthHeaders, loadInviteConfig, type InviteConfig } from "./config"
 
 export class GatewayHttpError extends Error {
   readonly status: number
@@ -92,7 +92,7 @@ async function gatewayJson<T>(config: InviteConfig, path: string, init: RequestI
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "X-Grist-Invite": config.code,
+      ...gatewayAuthHeaders(config),
       ...init.headers,
     },
   })

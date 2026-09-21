@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync } from "node:fs"
 import * as http from "node:http"
 import { createServer } from "node:net"
-import { homedir, tmpdir } from "node:os"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
@@ -50,6 +50,12 @@ import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
 import { APP_IDS, APP_NAMES, PROTOCOL_SCHEME } from "../../brand"
+
+// Linux: skip libsecret/kwallet. macOS ignores this switch and still uses
+// Keychain ("Grist Safe Storage") unless the mock keychain is forced.
+app.commandLine.appendSwitch("password-store", "basic")
+if (process.platform === "darwin") app.commandLine.appendSwitch("use-mock-keychain")
+
 const TEST_ONBOARDING = process.env.OPENCODE_TEST_ONBOARDING === "1"
 const SIDECAR_VERSION = process.env.OPENCODE_SIDECAR_V2 === "1" ? "v2" : "v1"
 const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
@@ -105,11 +111,6 @@ function ensureLoopbackNoProxy() {
 const main = Effect.gen(function* () {
   contextMenu({ showSaveImageAs: true, showLookUpSelection: false, showSearchWithGoogle: false })
 
-  // on macOS apps run in `/` which can cause issues with ripgrep
-  try {
-    process.chdir(homedir())
-  } catch {}
-
   process.env.OPENCODE_DISABLE_EMBEDDED_WEB_UI = "true"
 
   const appId = app.isPackaged ? APP_IDS[CHANNEL] : APP_IDS.dev
@@ -135,6 +136,9 @@ const main = Effect.gen(function* () {
     onboardingTestRoot ? join(onboardingTestRoot, "desktop") : join(app.getPath("appData"), appId),
   )
   if (onboardingTestRoot) app.setPath("sessionData", join(onboardingTestRoot, "session"))
+  // Packaged Mac apps start in `/`. Stay in app data so launch never walks the
+  // home folder (Photos, Music, Documents TCC prompts).
+  process.chdir(app.getPath("userData"))
   initializeOldLayoutEligibility(app.getPath("userData"))
   logger = initLogging()
   initCrashReporter()
@@ -183,6 +187,9 @@ const main = Effect.gen(function* () {
   app.commandLine.appendSwitch("proxy-bypass-list", "<-loopback>")
   const features = app.commandLine.getSwitchValue("enable-features")
   app.commandLine.appendSwitch("enable-features", features ? `${jsCallStackFeature},${features}` : jsCallStackFeature)
+  const disabled = app.commandLine.getSwitchValue("disable-features")
+  const mediaFeatures = "MediaSessionService,HardwareMediaKeyHandling"
+  app.commandLine.appendSwitch("disable-features", disabled ? `${mediaFeatures},${disabled}` : mediaFeatures)
   if (!app.isPackaged) app.commandLine.appendSwitch("remote-debugging-port", "9222")
 
   if (!app.requestSingleInstanceLock()) {
@@ -302,8 +309,8 @@ const main = Effect.gen(function* () {
     },
   })
   registerWslIpcHandlers(wslServers)
-  void updater.start()
-  const updateTimer = setInterval(() => void updater.check(), 10 * 60 * 1000)
+  void updater.start().then(() => showUpdaterDialog(updater, false))
+  const updateTimer = setInterval(() => void showUpdaterDialog(updater, false), 10 * 60 * 1000)
   updateTimer.unref()
   app.once("will-quit", () => clearInterval(updateTimer))
   yield* Effect.promise(() => startNetLog()).pipe(

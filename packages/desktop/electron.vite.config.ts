@@ -2,8 +2,14 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const OPENCODE_SERVER_DIST = "../opencode/dist/node"
+const transformersWeb = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../app/node_modules/@huggingface/transformers/dist/transformers.web.js",
+)
 
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
@@ -94,12 +100,21 @@ const require = __cjs_mod__.createRequire(import.meta.url);
     plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
+    resolve: {
+      alias: {
+        "@huggingface/transformers": transformersWeb,
+      },
+    },
+    optimizeDeps: {
+      exclude: ["@huggingface/transformers"],
+    },
     build: {
       sourcemap: true,
       rollupOptions: {
         input: {
           main: "src/renderer/index.html",
         },
+        external: ["onnxruntime-node", "sharp"],
       },
     },
   },

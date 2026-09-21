@@ -6,7 +6,7 @@ import { FileComponentProvider } from "@opencode-ai/ui/context/file"
 import { File } from "@opencode-ai/session-ui/file"
 import { Font } from "@opencode-ai/ui/font"
 import { Splash } from "@opencode-ai/ui/logo"
-import { PRODUCT_THEME } from "@/product"
+import { PRODUCT_COLOR, PRODUCT_THEME } from "@/product"
 import { ThemeProvider } from "@opencode-ai/ui/theme/context"
 import { MetaProvider } from "@solidjs/meta"
 import {
@@ -490,7 +490,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean; start
       </Show>
       <Show when={loading()}>
         <div class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background-base">
-          <Splash class="w-40 h-11 opacity-60 animate-pulse text-icon-strong-base" />
+          <Splash class="w-40 h-11 opacity-60 animate-pulse" style={{ color: PRODUCT_COLOR }} />
         </div>
       </Show>
     </>
@@ -511,7 +511,7 @@ function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key:
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6 p-6">
       <div class="flex flex-col items-center max-w-md text-center">
-        <Splash class="w-32 h-9 mb-4 text-icon-strong-base" />
+        <Splash class="w-32 h-9 mb-4" style={{ color: PRODUCT_COLOR }} />
         <p class="text-14-regular text-text-base">
           {unreachable()[0]}
           <span class="text-text-strong font-medium">{name()}</span>

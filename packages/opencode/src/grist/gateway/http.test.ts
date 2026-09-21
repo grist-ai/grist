@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import os from "os"
 import path from "path"
-import { canonicalDeviceUserCode, canonicalInviteCode, generateDeviceUserCode, generateInviteCode } from "./codes"
+import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generateApiKeySecret, generateDeviceUserCode, generateInviteCode } from "./codes"
 import { usdForUsage } from "./prices"
 import { createGateway } from "./http"
 
@@ -15,6 +15,10 @@ describe("invite codes", () => {
     const user = generateDeviceUserCode()
     expect(user).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/)
     expect(canonicalDeviceUserCode(user.toLowerCase())).toBe(user)
+    const key = generateApiKeySecret()
+    expect(key).toMatch(/^grist_sk_[0-9a-f]{64}$/)
+    expect(canonicalApiKey(key.toUpperCase())).toBe(key)
+    expect(canonicalApiKey("grist-ABCD-2345")).toBeUndefined()
   })
 })
 
@@ -133,6 +137,11 @@ describe("gateway HTTP", () => {
     expect(html).toContain("Download for macOS")
     expect(html).toContain("tally.so/embed/QKGWYG")
     expect(html).toContain("Request access")
+    expect(html).toContain('href="/privacy"')
+    expect(html).toContain("Privacy Policy")
+    expect(html).toContain("Terms of Use")
+    expect(html).toContain("Acceptable Use Policy")
+    expect(html).toContain("Cookie Policy")
     expect(html).toContain("learns your codebase")
     expect(html).toContain("SoL-Pi")
     expect(html).toContain("self-improves")
@@ -142,6 +151,9 @@ describe("gateway HTTP", () => {
     expect(html).not.toContain("Apple Silicon")
     expect(html).not.toContain("Intel")
     expect(html).toContain("view-docs")
+    expect(html).toContain("view-docs-skills")
+    expect(html).toContain("Create key")
+    expect(html).toContain("Agent skills")
     expect(html).not.toContain("Three steps")
     expect(html).not.toContain("deepseek")
     expect(html).not.toContain("kimi")
@@ -150,6 +162,26 @@ describe("gateway HTTP", () => {
     const docs = await gateway.fetch(new Request("http://gateway.test/docs"))
     expect(docs.headers.get("Content-Type")).toContain("text/html")
     expect(await docs.text()).toContain("grist auth login")
+
+    const skills = await gateway.fetch(new Request("http://gateway.test/docs/skills"))
+    expect(await skills.text()).toContain("When to reach for Grist")
+
+    const skillFile = await gateway.fetch(new Request("http://gateway.test/grist-skill.md"))
+    expect(skillFile.headers.get("Content-Type")).toContain("text/markdown")
+    expect(await skillFile.text()).toContain("Never run Grist on Necora")
+
+    const privacy = await gateway.fetch(new Request("http://gateway.test/privacy"))
+    expect(privacy.status).toBe(200)
+    expect(await privacy.text()).toContain("What we do not take")
+
+    const terms = await gateway.fetch(new Request("http://gateway.test/terms"))
+    expect(await terms.text()).toContain("Invite-only beta")
+
+    const aup = await gateway.fetch(new Request("http://gateway.test/acceptable-use"))
+    expect(await aup.text()).toContain("Local execution")
+
+    const cookies = await gateway.fetch(new Request("http://gateway.test/cookies"))
+    expect(await cookies.text()).toContain("grist_invite")
 
     const login = await gateway.fetch(new Request("http://gateway.test/login"))
     expect(await login.text()).toContain("Sign in")
@@ -327,6 +359,77 @@ describe("gateway HTTP", () => {
     )
     expect(redirect.status).toBe(302)
     expect(redirect.headers.get("location")).toContain("grist-downloads")
+  })
+
+  test("mints agent API keys that spend against the invite", async () => {
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 1000, completion_tokens: 500 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5, note: "keys" },
+    })
+    const code = (minted.json as { code: string }).code
+
+    const denied = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      body: { name: "muse-vm" },
+    })
+    expect(denied.status).toBe(401)
+
+    const created = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      headers: { "X-Grist-Invite": code },
+      body: { name: "muse-vm" },
+    })
+    expect(created.status).toBe(200)
+    const createdBody = created.json as { key: string; id: string; prefix: string; name: string }
+    expect(createdBody.name).toBe("muse-vm")
+    expect(createdBody.key).toMatch(/^grist_sk_[0-9a-f]{64}$/)
+    expect(createdBody.prefix).toBe(`${createdBody.key.slice(0, 16)}…`)
+
+    const listed = await call(gateway.fetch, "GET", "/v1/api-keys", {
+      headers: { "X-Grist-Invite": code },
+    })
+    expect((listed.json as { keys: { id: string }[] }).keys.some((row) => row.id === createdBody.id)).toBe(true)
+    expect(JSON.stringify(listed.json)).not.toContain(createdBody.key)
+
+    const viaHeader = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Api-Key": createdBody.key },
+      body: { model: "deepseek/deepseek-v4.1-flash", messages: [], stream: false },
+    })
+    expect(viaHeader.status).toBe(200)
+
+    const viaBearer = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { Authorization: `Bearer ${createdBody.key}` },
+    })
+    expect(viaBearer.status).toBe(200)
+    expect((viaBearer.json as { spent_usd: number }).spent_usd).toBeGreaterThan(0)
+
+    const mintWithKey = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      headers: { "X-Grist-Api-Key": createdBody.key },
+      body: { name: "nope" },
+    })
+    expect(mintWithKey.status).toBe(401)
+
+    const revoked = await call(gateway.fetch, "DELETE", `/v1/api-keys/${createdBody.id}`, {
+      headers: { "X-Grist-Invite": code },
+    })
+    expect(revoked.status).toBe(200)
+
+    const after = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      headers: { "X-Grist-Api-Key": createdBody.key },
+      body: { text: "hi" },
+    })
+    expect(after.status).toBe(401)
   })
 })
 

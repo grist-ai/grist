@@ -1,5 +1,6 @@
 import { app, dialog } from "electron"
 import pkg from "electron-updater"
+import { UPDATES } from "../../brand"
 import { UPDATER_ENABLED } from "./constants"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
 import { getLogger } from "./logging"
@@ -9,17 +10,26 @@ import { nativeT } from "./native-translations"
 
 const { autoUpdater } = pkg
 const key = "ready"
+let promptedVersion: string | undefined
+let prompting = false
 
 export function setupAutoUpdater(stop: () => Promise<void>) {
   const logger = getLogger()
   autoUpdater.logger = logger
+  autoUpdater.setFeedURL({
+    provider: "github",
+    owner: UPDATES.owner,
+    repo: UPDATES.repo,
+  })
   autoUpdater.channel = "latest"
   autoUpdater.allowPrerelease = false
-  autoUpdater.allowDowngrade = true
+  autoUpdater.allowDowngrade = false
   autoUpdater.autoDownload = false
-  autoUpdater.autoInstallOnAppQuit = false
+  autoUpdater.autoInstallOnAppQuit = true
   logger.log("auto updater configured", {
     channel: autoUpdater.channel,
+    owner: UPDATES.owner,
+    repo: UPDATES.repo,
     allowPrerelease: autoUpdater.allowPrerelease,
     allowDowngrade: autoUpdater.allowDowngrade,
     currentVersion: app.getVersion(),
@@ -81,6 +91,10 @@ export async function showUpdaterDialog(controller: ReturnType<typeof setupAutoU
     return
   }
   if (state.status !== "ready") return
+  if (!alertOnFail && promptedVersion === state.version) return
+  if (prompting) return
+  prompting = true
+  promptedVersion = state.version
 
   const response = await dialog.showMessageBox({
     type: "info",
@@ -90,5 +104,6 @@ export async function showUpdaterDialog(controller: ReturnType<typeof setupAutoU
     defaultId: 0,
     cancelId: 1,
   })
+  prompting = false
   if (response.response === 0) await controller.install()
 }

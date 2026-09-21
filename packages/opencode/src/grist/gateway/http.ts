@@ -7,6 +7,7 @@ import type { OperatingMode } from "../mode"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase"
 import { isLadderModel, normalizeLadderModel, priceForModel, usdForUsage } from "./prices"
 import { openGatewayStore, type GatewayStore, type InviteRow } from "./store"
+import { canonicalApiKey } from "./codes"
 
 export type GatewayOptions = {
   store?: GatewayStore
@@ -25,7 +26,20 @@ export type GatewayOptions = {
 export const DEFAULT_ADMIN_EMAIL = "pranavmm25@gmail.com"
 
 const SITE_ROOT = path.join(import.meta.dir, "..", "site")
-const SITE_PAGES = new Set(["/", "/login", "/dashboard", "/plans", "/admin", "/docs"])
+const SITE_PAGES = new Set([
+  "/",
+  "/login",
+  "/dashboard",
+  "/dashboard/api",
+  "/plans",
+  "/admin",
+  "/docs",
+  "/docs/skills",
+  "/privacy",
+  "/terms",
+  "/acceptable-use",
+  "/cookies",
+])
 const SITE_FILES: Record<string, string> = {
   "index.html": "text/html; charset=utf-8",
   "styles.css": "text/css; charset=utf-8",
@@ -33,6 +47,7 @@ const SITE_FILES: Record<string, string> = {
   "favicon.svg": "image/svg+xml",
   "favicon-32.png": "image/png",
   "apple-touch-icon.png": "image/png",
+  "grist-skill.md": "text/markdown; charset=utf-8",
 }
 const MAC_DMG = /^\/download\/(grist-desktop-mac-(arm64|x64)\.dmg)$/
 const PUBLIC_MAC_DMGS: Record<string, string> = {
@@ -107,6 +122,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (req.method === "GET" && pathname === "/v1/usage") {
       return usage(req)
+    }
+    if (pathname === "/v1/api-keys" || pathname.startsWith("/v1/api-keys/")) {
+      return apiKeys(req, pathname)
     }
     if (pathname.startsWith("/v1/admin/")) {
       return admin(req, pathname)
@@ -313,6 +331,32 @@ export function createGateway(opts: GatewayOptions = {}) {
     })
   }
 
+  async function apiKeys(req: Request, pathname: string): Promise<Response> {
+    const invite = await requireAccount(req)
+    if (invite instanceof Response) return invite
+
+    if (req.method === "GET" && pathname === "/v1/api-keys") {
+      return json(200, { keys: store.listApiKeys(invite.code).map(serializeApiKey) })
+    }
+
+    if (req.method === "POST" && pathname === "/v1/api-keys") {
+      const body = await readJson(req)
+      const name = typeof body?.name === "string" ? body.name : undefined
+      const created = store.createApiKey({ inviteCode: invite.code, name })
+      if (!created) return json(400, { error: "key limit reached" })
+      return json(200, { key: created.secret, ...serializeApiKey(created.key) })
+    }
+
+    if (req.method === "DELETE" && pathname.startsWith("/v1/api-keys/")) {
+      const id = decodeURIComponent(pathname.slice("/v1/api-keys/".length))
+      const ok = store.revokeApiKey({ inviteCode: invite.code, id })
+      if (!ok) return json(404, { error: "not found" })
+      return json(200, { revoked: true })
+    }
+
+    return json(404, { error: "not found" })
+  }
+
   async function admin(req: Request, pathname: string): Promise<Response> {
     const denied = await requireAdmin(req)
     if (denied) return denied
@@ -379,6 +423,12 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   async function resolveInvite(req: Request): Promise<InviteRow | Response> {
+    const apiKey = req.headers.get("X-Grist-Api-Key") ?? bearerApiKey(req)
+    if (apiKey) {
+      const invite = store.inviteForApiKey(apiKey, now())
+      if (!invite || !inviteUsable(invite, now())) return json(401, { error: "unauthorized" })
+      return invite
+    }
     const raw = req.headers.get("X-Grist-Invite") ?? ""
     if (raw) {
       const invite = store.getInvite(raw)
@@ -394,6 +444,13 @@ export function createGateway(opts: GatewayOptions = {}) {
     const invite = store.getInvite(account.invite_code)
     if (!invite || !inviteUsable(invite, now())) return json(401, { error: "unauthorized" })
     return invite
+  }
+
+  async function requireAccount(req: Request): Promise<InviteRow | Response> {
+    if (req.headers.get("X-Grist-Api-Key") || bearerApiKey(req)) {
+      return json(401, { error: "unauthorized" })
+    }
+    return resolveInvite(req)
   }
 
   async function requireAdmin(req: Request): Promise<Response | undefined> {
@@ -630,4 +687,29 @@ function clientIp(req: Request): string {
 
 function roundUsd(n: number) {
   return Math.round(n * 1e6) / 1e6
+}
+
+function bearerApiKey(req: Request) {
+  const bearer = req.headers.get("Authorization") ?? ""
+  if (!bearer.startsWith("Bearer ")) return ""
+  const token = bearer.slice(7).trim()
+  return canonicalApiKey(token) ? token : ""
+}
+
+function serializeApiKey(row: {
+  id: string
+  name: string
+  prefix: string
+  created_at: number
+  last_used_at: number | null
+  revoked: boolean
+}) {
+  return {
+    id: row.id,
+    name: row.name,
+    prefix: row.prefix,
+    created_at: new Date(row.created_at).toISOString(),
+    last_used_at: row.last_used_at ? new Date(row.last_used_at).toISOString() : null,
+    revoked: row.revoked,
+  }
 }

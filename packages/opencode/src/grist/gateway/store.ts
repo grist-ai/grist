@@ -2,11 +2,16 @@ import { Database } from "bun:sqlite"
 import type { OperatingMode } from "../mode"
 import type { Rung } from "../rung"
 import {
+  apiKeyPrefix,
+  canonicalApiKey,
   canonicalDeviceUserCode,
   canonicalInviteCode,
+  generateApiKeyId,
+  generateApiKeySecret,
   generateDeviceSecret,
   generateDeviceUserCode,
   generateInviteCode,
+  hashApiKey,
 } from "./codes"
 
 export type AccountRow = {
@@ -44,8 +49,29 @@ export type UsageRow = {
   usd: number
 }
 
+export type ApiKeyRow = {
+  id: string
+  invite_code: string
+  hash: string
+  prefix: string
+  name: string
+  created_at: number
+  last_used_at: number | null
+  revoked: number
+}
+
+export type PublicApiKey = {
+  id: string
+  name: string
+  prefix: string
+  created_at: number
+  last_used_at: number | null
+  revoked: boolean
+}
+
 const DEFAULT_CAP = 5
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const MAX_API_KEYS = 20
 
 export function openGatewayStore(filePath = ":memory:") {
   const db = new Database(filePath)
@@ -91,6 +117,17 @@ export function openGatewayStore(filePath = ":memory:") {
       email TEXT,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      invite_code TEXT NOT NULL,
+      hash TEXT NOT NULL UNIQUE,
+      prefix TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER,
+      revoked INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS api_keys_invite ON api_keys(invite_code);
   `)
 
   const insertInvite = db.prepare(
@@ -131,6 +168,20 @@ export function openGatewayStore(filePath = ":memory:") {
   const selectAccount = db.prepare(`SELECT * FROM accounts WHERE firebase_uid = ?`)
   const selectAccountByInvite = db.prepare(`SELECT * FROM accounts WHERE invite_code = ?`)
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
+  const insertApiKey = db.prepare(
+    `INSERT INTO api_keys (id, invite_code, hash, prefix, name, created_at, last_used_at, revoked)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, 0)`,
+  )
+  const selectApiKey = db.prepare(`SELECT * FROM api_keys WHERE id = ?`)
+  const selectApiKeyByHash = db.prepare(`SELECT * FROM api_keys WHERE hash = ?`)
+  const selectApiKeysForInvite = db.prepare(`SELECT * FROM api_keys WHERE invite_code = ? ORDER BY created_at DESC`)
+  const countActiveApiKeys = db.prepare(
+    `SELECT COUNT(*) AS n FROM api_keys WHERE invite_code = ? AND revoked = 0`,
+  )
+  const markApiKeyRevoked = db.prepare(
+    `UPDATE api_keys SET revoked = 1 WHERE id = ? AND invite_code = ? AND revoked = 0`,
+  )
+  const touchApiKey = db.prepare(`UPDATE api_keys SET last_used_at = ? WHERE id = ?`)
 
   function lookup(raw: string): InviteRow | undefined {
     const code = canonicalInviteCode(raw)
@@ -278,6 +329,43 @@ export function openGatewayStore(filePath = ":memory:") {
       return selectAccount.get(input.uid) as AccountRow
     },
 
+    createApiKey(input: { inviteCode: string; name?: string }): { secret: string; key: PublicApiKey } | undefined {
+      const invite = lookup(input.inviteCode)
+      if (!invite) return
+      const active = (countActiveApiKeys.get(invite.code) as { n: number }).n
+      if (active >= MAX_API_KEYS) return
+      const secret = generateApiKeySecret()
+      const created_at = Date.now()
+      let id = generateApiKeyId()
+      while (selectApiKey.get(id)) id = generateApiKeyId()
+      const name = sanitizeKeyName(input.name)
+      insertApiKey.run(id, invite.code, hashApiKey(secret), apiKeyPrefix(secret), name, created_at)
+      return { secret, key: publicApiKey(selectApiKey.get(id) as ApiKeyRow) }
+    },
+
+    listApiKeys(raw: string): PublicApiKey[] {
+      const invite = lookup(raw)
+      if (!invite) return []
+      return (selectApiKeysForInvite.all(invite.code) as ApiKeyRow[]).map(publicApiKey)
+    },
+
+    revokeApiKey(input: { inviteCode: string; id: string }): boolean {
+      const invite = lookup(input.inviteCode)
+      if (!invite) return false
+      return markApiKeyRevoked.run(input.id, invite.code).changes > 0
+    },
+
+    inviteForApiKey(raw: string, now: number): InviteRow | undefined {
+      const secret = canonicalApiKey(raw)
+      if (!secret) return
+      const key = selectApiKeyByHash.get(hashApiKey(secret)) as ApiKeyRow | undefined
+      if (!key || key.revoked) return
+      const invite = selectInvite.get(key.invite_code) as InviteRow | undefined
+      if (!invite || invite.revoked || invite.expires_at <= now) return
+      touchApiKey.run(now, key.id)
+      return invite
+    },
+
     close() {
       db.close()
     },
@@ -285,3 +373,20 @@ export function openGatewayStore(filePath = ":memory:") {
 }
 
 export type GatewayStore = ReturnType<typeof openGatewayStore>
+
+function publicApiKey(row: ApiKeyRow): PublicApiKey {
+  return {
+    id: row.id,
+    name: row.name,
+    prefix: row.prefix,
+    created_at: row.created_at,
+    last_used_at: row.last_used_at,
+    revoked: Boolean(row.revoked),
+  }
+}
+
+function sanitizeKeyName(raw?: string) {
+  const name = raw?.trim() ?? ""
+  if (!name) return "Agent"
+  return name.slice(0, 64)
+}

@@ -275,26 +275,6 @@ export const DESKTOP_MENU: DesktopMenu[] = [
       { type: "item", labelKey: "desktop.menu.closeWindow", action: "window.close" },
     ],
   },
-  {
-    id: "help",
-    labelKey: "desktop.menu.help",
-    items: [
-      { type: "item", labelKey: "desktop.menu.documentation", href: "https://github.com/pranav6226/grist#readme" },
-      { type: "item", labelKey: "desktop.menu.supportForum", href: "https://github.com/pranav6226/grist/issues" },
-      { type: "item", labelKey: "desktop.menu.exportLogs", command: "logs.export" },
-      { type: "separator" },
-      {
-        type: "item",
-        labelKey: "desktop.menu.shareFeedback",
-        href: "https://github.com/pranav6226/grist/issues/new",
-      },
-      {
-        type: "item",
-        labelKey: "desktop.menu.reportBug",
-        href: "https://github.com/pranav6226/grist/issues/new",
-      },
-    ],
-  },
 ]
 
 export function desktopMenuVisible(item: { platforms?: DesktopMenuPlatform[] }, platform: DesktopMenuPlatform) {

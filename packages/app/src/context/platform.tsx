@@ -113,6 +113,9 @@ type PlatformBase = {
   /** Read image from clipboard (desktop only) */
   readClipboardImage?(): Promise<File | null>
 
+  /** Ask macOS for microphone access, or open System Settings if already denied (desktop only) */
+  ensureMicrophoneAccess?(): Promise<boolean>
+
   /** Export collected diagnostic logs (desktop only) */
   exportDebugLogs?(): Promise<string>
 

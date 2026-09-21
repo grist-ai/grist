@@ -25,6 +25,7 @@ import { createUpdaterSubscriptions } from "./updater-subscriptions"
 import { createDesktopDraftStore } from "./draft-store"
 import { nativeT } from "./native-translations"
 import { cancelLogin, fetchUsage, logout, plansUrl, accountStatus, startLogin, waitLogin } from "./invite"
+import { ensureMicrophoneAccessNative } from "./microphone-native"
 
 const pickerFilters = (ext?: string[]) => {
   if (!ext || ext.length === 0) return undefined
@@ -252,6 +253,8 @@ export function registerIpcHandlers(deps: Deps) {
     const size = image.getSize()
     return { buffer, width: size.width, height: size.height }
   })
+
+  ipcMain.handle("ensure-microphone-access", () => ensureMicrophoneAccessNative())
 
   ipcMain.handle("get-window-id", (event: IpcMainInvokeEvent) => {
     const win = BrowserWindow.fromWebContents(event.sender)

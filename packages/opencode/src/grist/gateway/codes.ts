@@ -1,9 +1,34 @@
+import { createHash } from "node:crypto"
+
 /** Crockford base32 without I, L, O, U. */
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 function randomCrockford(n: number) {
   const bytes = crypto.getRandomValues(new Uint8Array(n))
   return Array.from(bytes, (b) => ALPHABET[b! % 32]!).join("")
+}
+
+/** Agent API keys look like `grist_sk_` plus 64 hex chars. */
+export function generateApiKeySecret(): string {
+  return `grist_sk_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex")}`
+}
+
+export function generateApiKeyId(): string {
+  return `gsk_${randomCrockford(12)}`
+}
+
+export function canonicalApiKey(raw: string): string | undefined {
+  const value = raw.trim().toLowerCase()
+  if (!/^grist_sk_[0-9a-f]{64}$/.test(value)) return
+  return value
+}
+
+export function apiKeyPrefix(secret: string): string {
+  return `${secret.slice(0, 16)}…`
+}
+
+export function hashApiKey(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex")
 }
 
 /** Invite codes look like `grist-XXXX-XXXX`. */
