@@ -16,6 +16,8 @@ import { PRODUCT_BIN, PRODUCT_DESCRIPTION, PRODUCT_NPM, PRODUCT_PREFIX, PRODUCT_
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
+const prepareOnly = Boolean(process.env.GRIST_PREPARE_ONLY)
+
 async function published(name: string, version: string) {
   return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
 }
@@ -30,8 +32,17 @@ async function publish(cwd: string, name: string, version: string) {
   const pkg = await pkgFile.json()
   pkg.repository = { type: "git", url: `https://github.com/${PRODUCT_REPO}.git` }
   await pkgFile.write(`${JSON.stringify(pkg, null, 2)}\n`)
-  await $`bun pm pack`.cwd(cwd)
-  await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(cwd)
+  if (prepareOnly) {
+    console.log(`prepared ${name}@${version}`)
+    return
+  }
+  const result = Bun.spawnSync(["npm", "publish", "--access", "public", "--tag", Script.channel], {
+    cwd,
+    env: process.env,
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  if (result.exitCode !== 0) throw new Error(`npm publish failed for ${name}@${version}`)
 }
 
 const binaries: Record<string, string> = {}
