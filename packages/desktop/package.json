@@ -7,7 +7,7 @@
   "homepage": "https://github.com/pranav6226/grist",
   "author": {
     "name": "Grist",
-    "email": "pranavmm25@gmail.com"
+    "email": "admin@grist.lol"
   },
   "scripts": {
     "typecheck": "tsgo -b",
