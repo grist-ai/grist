@@ -10,13 +10,15 @@ See [`grist-public-launch-spec.md`](grist-public-launch-spec.md).
 ## Testers
 
 ```bash
-grist auth login --gateway https://grist-gateway.example
+grist auth login --provider grist
+# or a dashboard key: grist auth login --provider grist --api-key grist_sk_…
 grist usage
 grist
 ```
 
-The code is stored in `~/.grist/config.json` (0600). `GRIST_INVITE` /
-`GRIST_GATEWAY_URL` override the file. No `OPENROUTER_API_KEY` on the client.
+Invite or `grist_sk_...` is stored in `~/.grist/config.json` (0600). `GRIST_API_KEY` /
+`GRIST_INVITE` / `GRIST_GATEWAY_URL` override the file. No `OPENROUTER_API_KEY`
+on the client.
 
 ## Founder gateway
 
