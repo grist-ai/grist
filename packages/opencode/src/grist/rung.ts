@@ -8,9 +8,9 @@ export type ModelRef = {
 }
 
 /**
- * Default ladder goes through OpenRouter so one `OPENROUTER_API_KEY` covers
- * every rung. Override any slot with `GRIST_<RUNG>_PROVIDER` / `GRIST_<RUNG>_MODEL`
- * (e.g. pin frontier to native Anthropic while keeping cheap/medium on OpenRouter).
+ * Ladder ids go through OpenRouter on the **gateway** (founder `OPENROUTER_API_KEY`).
+ * Testers hold an invite code only — never a model key. Override any slot with
+ * `GRIST_<RUNG>_PROVIDER` / `GRIST_<RUNG>_MODEL` on the gateway process.
  *
  * OpenRouter model ids keep their org/model slash (provider is still `openrouter`).
  */
@@ -22,10 +22,10 @@ export const RUNG_MODELS: Record<Rung, ModelRef> = {
   },
   medium: {
     providerID: process.env.GRIST_MEDIUM_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_MEDIUM_MODEL ?? "deepseek/deepseek-v4-pro",
+    modelID: process.env.GRIST_MEDIUM_MODEL ?? "moonshotai/kimi-k3",
   },
   frontier: {
     providerID: process.env.GRIST_FRONTIER_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_FRONTIER_MODEL ?? "anthropic/claude-opus-4.6",
+    modelID: process.env.GRIST_FRONTIER_MODEL ?? "openai/gpt-5.6-sol",
   },
 }

@@ -26,6 +26,12 @@ async function signWindows(configuration: { path: string }) {
   )
 }
 
+async function stripMacDetritus(appOutDir: string) {
+  if (process.platform !== "darwin") return
+  await execFileAsync("xattr", ["-cr", appOutDir])
+  await execFileAsync("find", [appOutDir, "-name", "._*", "-delete"])
+}
+
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
@@ -44,6 +50,7 @@ const getBase = (appId: string): Configuration => ({
     desktopName: `${appId}.desktop`,
   },
   files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*"],
+  afterPack: (context) => stripMacDetritus(context.appOutDir),
   extraResources: [
     ...(channel === "dev"
       ? [
@@ -67,11 +74,11 @@ const getBase = (appId: string): Configuration => ({
     gatekeeperAssess: false,
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
-    notarize: true,
+    notarize: Boolean(process.env.APPLE_ID || process.env.APPLE_API_KEY),
     target: ["dmg", "zip"],
   },
   dmg: {
-    sign: true,
+    sign: Boolean(process.env.APPLE_ID || process.env.CSC_LINK || process.env.APPLE_API_KEY),
   },
   protocols: {
     name: PRODUCT_NAME,

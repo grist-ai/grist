@@ -3,9 +3,8 @@
 Every user prompt hits `routeTask` in `SessionPrompt.createUserMessage`
 (`packages/opencode/src/grist/jev-gate.ts`) before the model is stamped.
 
-- **Live Jev** when `TYPESAFE_API_KEY` is set (`jev-latest` Score difficulty +
-  sensitivity, Noul underspecified).
-- **Shadow** heuristics otherwise (same compose rules).
+- **Live Jev** on the **gateway** when `TYPESAFE_API_KEY` is set there.
+- **Shadow** heuristics on the gateway if Jev is unset (same compose rules).
 - **Compose:** difficulty picks cheapest/medium/frontier; sensitivity caps the
   max rung; underspecified forces **cheapest** (no ask-human rung).
 - **Passthrough:** `GRIST_GATE=off`, or explicit user/agent model pin.
@@ -52,7 +51,9 @@ Rung → model defaults (override with env):
 | Rung | Env | Default (OpenRouter) |
 | --- | --- | --- |
 | cheapest | `GRIST_CHEAPEST_*` | `openrouter` / `deepseek/deepseek-v4.1-flash` |
-| medium | `GRIST_MEDIUM_*` | `openrouter` / `deepseek/deepseek-v4-pro` |
-| frontier | `GRIST_FRONTIER_*` | `openrouter` / `anthropic/claude-opus-4.6` |
+| medium | `GRIST_MEDIUM_*` | `openrouter` / `moonshotai/kimi-k3` |
+| frontier | `GRIST_FRONTIER_*` | `openrouter` / `openai/gpt-5.6-sol` |
 
-One key: `OPENROUTER_API_KEY`. See [`providers.md`](providers.md).
+One path: invite code against the gateway. The founder `OPENROUTER_API_KEY`
+never ships in the client. See [`providers.md`](providers.md) and
+[`grist-public-launch-spec.md`](grist-public-launch-spec.md).

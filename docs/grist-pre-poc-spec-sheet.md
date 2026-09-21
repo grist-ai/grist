@@ -1,6 +1,7 @@
 # Grist — Pre-POC Spec Sheet
 
 > Consolidated build/test/evaluate reference. Status: pre-POC.
+> Public launch (invite-gated npm test): [`grist-public-launch-spec.md`](grist-public-launch-spec.md).
 > Every commercial number is a hypothesis until the POC measures it.
 > Personal project — never Necora code, repos, or infrastructure. Pilot repo: Prosh.
 
@@ -39,8 +40,8 @@ CONFIDENCE GATE — Jev (TypeSafe System One)
   route ∈ { cheapest, medium, frontier }
   Context minimized on escalation (subgraph, not repo)
    ├──► CHEAPEST: DeepSeek V4.1 Flash     (default)
-   ├──► MEDIUM:   DeepSeek V4 Pro          (pre-frontier step)
-   └──► FRONTIER: Claude Opus 5            (exception only; GPT-5.6 Sol backup)
+   ├──► MEDIUM:   Kimi K3                  (pre-frontier step)
+   └──► FRONTIER: GPT-5.6 Sol              (exception only)
    │ tools + retrieval (all tiers)
    ▼
 KNOWLEDGE LAYER — code map (bake-off open) · Supermemory (self-hosted)
@@ -56,12 +57,11 @@ OBSERVABILITY — Langfuse (traces, $/task) · inspect_ai (gate precision, evals
 | Tier | Model | Coding evidence | Price/1M tok (in/out, off-peak) | Role |
 |------|-------|-----------------|------------------------------|------|
 | Cheapest | **DeepSeek V4.1 Flash** (`deepseek-flash` / OpenRouter `deepseek/deepseek-v4.1-flash`, 1M ctx) | 88.8% SWE-bench Verified (independent, vals.ai) — treat as Flash-class | ~$0.15 / $0.60 (peak 2×) | Default for everything |
-| Medium | **DeepSeek V4 Pro** (0813) | 96.4% SWE-bench Verified (independent) — frontier-class | ~$0.66 / $1.98 (peak 2×); promo ~$0.44/$0.87 is stale | Pre-frontier step |
-| Frontier | **Claude Opus 5** (1M ctx; backup: GPT-5.6 Sol) | 97.0% / 96.2% SWE-bench Verified (independent) | $5 / $25 flat (Sol: $4/$20 promo) | Exception only |
+| Medium | **Kimi K3** (OpenRouter `moonshotai/kimi-k3`, 1M ctx) | DeepSWE 69%; Terminal-Bench 2.1 88.3%; FrontierSWE 81.2% — SWE-bench Verified not independently submitted | ~$1.70 / $8.50 (OpenRouter floor) | Pre-frontier step |
+| Frontier | **GPT-5.6 Sol** (OpenRouter `openai/gpt-5.6-sol`, 1.1M ctx) | DeepSWE 73%; Terminal-Bench 2.1 88.8%; SWE-bench Pro 64.6%; SWE-bench Verified 96.2% (reported) | $4 / $20 list; OpenRouter 50% off ≈ $2 / $10 | Exception only |
 
-- Router seam stays **provider-agnostic**. DeepSeek carries two tiers =
-  concentration risk: a backup cheap tier (Kimi K2.6-class / GPT mini-class)
-  must be one config change away. Recheck DeepSeek pricing at
+- Router seam stays **provider-agnostic**. Three vendors (DeepSeek / Moonshot /
+  OpenAI) so a rung swap is one env change. Recheck DeepSeek cheap-tier pricing at
   [api-docs.deepseek.com](https://api-docs.deepseek.com/quick_start/pricing) —
   it moves; see [`providers.md`](providers.md).
 - Benchmark caveat: SWE-bench Verified is saturated at the top; treat sub-2pt
@@ -219,11 +219,12 @@ Post-POC: Evidence-Preserving Reducer, Online Context Compact, discovery loop.
 
 ### Grist in-tree (build complete when checked)
 
-- [x] OpenRouter ladder — one `OPENROUTER_API_KEY` covers cheapest/medium/frontier
+- [x] OpenRouter ladder on the invite gateway — founder `OPENROUTER_API_KEY` only
 - [x] Operating modes — `GRIST_MODE=normal|capped|cheapest` (§10)
 - [x] SoL-Pi mechanism Choice — `GRIST_MECH=auto|efficiency|performance|off` (§5)
-- [x] DeepSeek pricing recheck (2026-09-19) — Flash $0.15/$0.60 off-peak; Pro $0.66/$1.98;
-  OpenRouter default cheap → `deepseek/deepseek-v4.1-flash`
+- [x] DeepSeek pricing recheck (2026-09-19) — Flash $0.15/$0.60 off-peak;
+  OpenRouter defaults: cheap `deepseek/deepseek-v4.1-flash` → medium
+  `moonshotai/kimi-k3` → frontier `openai/gpt-5.6-sol`
 - [x] Escalation context minimization — code-map subgraph on medium/frontier
 - [x] Doctrine enforcement — multi-file plan text + diff audit on edit/write
 - [x] Langfuse events for mode-cap / diff-audit (`recordGristEvent`)

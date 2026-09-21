@@ -31,6 +31,9 @@ import { PluginCommand } from "./cli/cmd/plug"
 import { Heap } from "./cli/heap"
 import { InitCommand } from "./cli/cmd/init"
 import { BootstrapCommand } from "./cli/cmd/bootstrap"
+import { GatewayCommand } from "./cli/cmd/gateway"
+import { UsageCommand } from "./cli/cmd/usage"
+import { AuthCommand } from "./cli/cmd/auth"
 
 const args = hideBin(process.argv)
 
@@ -77,13 +80,24 @@ const cli = yargs(args)
     process.env.AGENT = "1"
     process.env.OPENCODE = "1"
     process.env.OPENCODE_PID = String(process.pid)
+
+    // Testers never bring their own model keys. Only `grist gateway` may hold
+    // OPENROUTER_API_KEY / TYPESAFE_API_KEY (founder's credits).
+    const command = String(opts._?.[0] ?? "")
+    if (command !== "gateway") {
+      delete process.env.OPENROUTER_API_KEY
+      delete process.env.TYPESAFE_API_KEY
+    }
   })
   .usage("")
   .completion("completion", "generate shell completion script")
   .command(AcpCommand)
   .command(McpCommand)
   .command(InitCommand)
+  .command(AuthCommand)
   .command(BootstrapCommand)
+  .command(GatewayCommand)
+  .command(UsageCommand)
   .command(TuiThreadCommand)
   .command(AttachCommand)
   .command(RunCommand)

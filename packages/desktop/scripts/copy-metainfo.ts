@@ -24,7 +24,7 @@ const xml = `<?xml version="1.0" encoding="UTF-8"?>
 
   <description>
     <p>
-      ${PRODUCT_NAME} is a confidence-gated coding agent that routes tasks to the cheapest capable model.
+      ${PRODUCT_NAME} is a coding agent that learns your repo, gates hard work, and stays local.
     </p>
   </description>
 
@@ -32,14 +32,8 @@ const xml = `<?xml version="1.0" encoding="UTF-8"?>
 
   <content_rating type="oars-1.1" />
 
-  <url type="homepage">https://github.com/anomalyco/opencode</url>
-  <url type="vcs-browser">https://github.com/anomalyco/opencode</url>
-
-  <screenshots>
-    <screenshot type="default">
-      <image>https://raw.githubusercontent.com/anomalyco/opencode/b75d4d1c5ec449585d515c756fc81f080a157a9a/packages/web/src/assets/lander/screenshot.png</image>
-    </screenshot>
-  </screenshots>
+  <url type="homepage">https://github.com/pranav6226/grist</url>
+  <url type="vcs-browser">https://github.com/pranav6226/grist</url>
 </component>
 `
 

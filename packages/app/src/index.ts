@@ -1,4 +1,5 @@
 export { AppBaseProviders, AppInterface } from "./app"
+export { GristLoginScreen } from "./components/grist-login"
 export { useLayout } from "./context/layout"
 export { useServerSDK } from "./context/server-sdk"
 export { useServerSync } from "./context/server-sync"
@@ -10,7 +11,7 @@ export { ACCEPTED_FILE_EXTENSIONS, ACCEPTED_FILE_TYPES, filePickerFilters } from
 export { useCommand } from "./context/command"
 export { loadLocaleDict, normalizeLocale, type Locale, useLanguage } from "./context/language"
 export { useWslServers } from "./wsl/context"
-export { type DisplayBackend, type FatalRendererErrorLog, type Platform, PlatformProvider } from "./context/platform"
+export { type DisplayBackend, type FatalRendererErrorLog, type Platform, type AccountLoginResult, type AccountLoginStart, type AccountPlatform, type AccountStatus, type AccountUsage, PlatformProvider } from "./context/platform"
 export { type UpdaterPlatform, type UpdaterState } from "./updater"
 export {
   type WslDistroProbe,

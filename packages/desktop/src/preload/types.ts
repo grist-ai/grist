@@ -42,6 +42,26 @@ export type FatalRendererError = {
   os?: string
 }
 
+export type AccountStatus = {
+  signedIn: boolean
+  gatewayUrl: string
+}
+
+export type AccountUsage = {
+  spent_usd: number
+  cap_usd: number
+  remaining_usd: number
+  plan: string
+  expires_at: string
+  by_rung: { cheapest: number; medium: number; frontier: number }
+}
+
+export type AccountLoginStart = {
+  userCode: string
+}
+
+export type AccountLoginResult = { ok: true } | { ok: false; reason: "expired" | "unreachable" | "cancelled" }
+
 export type ElectronAPI = {
   killSidecar: () => Promise<void>
   installCli: () => Promise<string>
@@ -113,4 +133,11 @@ export type ElectronAPI = {
   setForceFocus: (enabled: boolean) => Promise<void>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   setNativeTranslations: (bundle: DesktopNativeBundle) => Promise<void>
+  inviteStatus: () => Promise<AccountStatus>
+  inviteStartLogin: () => Promise<AccountLoginStart>
+  inviteWaitLogin: () => Promise<AccountLoginResult>
+  inviteCancelLogin: () => Promise<void>
+  inviteLogout: () => Promise<void>
+  inviteUsage: () => Promise<AccountUsage>
+  inviteOpenPlans: () => Promise<void>
 }

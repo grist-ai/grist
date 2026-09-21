@@ -1,0 +1,7 @@
+FROM oven/bun:1.2-alpine
+WORKDIR /app
+COPY packages/opencode/src/grist ./src/grist
+ENV NODE_ENV=production
+ENV GRIST_GATEWAY_DB=/data/grist-gateway.sqlite
+EXPOSE 8787
+CMD ["bun", "src/grist/gateway/entry.ts"]

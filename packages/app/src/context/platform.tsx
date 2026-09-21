@@ -121,6 +121,39 @@ type PlatformBase = {
 
   /** Record a fatal renderer error in platform logs (desktop only) */
   recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
+
+  /** Invite-gateway account (desktop Grist login, usage, plan) */
+  account?: AccountPlatform
+}
+
+export type AccountStatus = {
+  signedIn: boolean
+  gatewayUrl: string
+}
+
+export type AccountUsage = {
+  spent_usd: number
+  cap_usd: number
+  remaining_usd: number
+  plan: string
+  expires_at: string
+  by_rung: { cheapest: number; medium: number; frontier: number }
+}
+
+export type AccountLoginStart = {
+  userCode: string
+}
+
+export type AccountLoginResult = { ok: true } | { ok: false; reason: "expired" | "unreachable" | "cancelled" }
+
+export type AccountPlatform = {
+  status(): Promise<AccountStatus>
+  startLogin(): Promise<AccountLoginStart>
+  waitLogin(): Promise<AccountLoginResult>
+  cancelLogin(): Promise<void>
+  logout(): Promise<void>
+  usage(): Promise<AccountUsage>
+  openPlans(): void
 }
 
 export type Platform = PlatformBase &

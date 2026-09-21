@@ -133,6 +133,13 @@ const api: ElectronAPI = {
   setForceFocus: (enabled) => ipcRenderer.invoke("set-force-focus", enabled),
   recordFatalRendererError: (error) => ipcRenderer.invoke("record-fatal-renderer-error", error),
   setNativeTranslations: (bundle) => ipcRenderer.invoke("set-native-translations", bundle),
+  inviteStatus: () => ipcRenderer.invoke("invite-status"),
+  inviteStartLogin: () => ipcRenderer.invoke("invite-start-login"),
+  inviteWaitLogin: () => ipcRenderer.invoke("invite-wait-login"),
+  inviteCancelLogin: () => ipcRenderer.invoke("invite-cancel-login"),
+  inviteLogout: () => ipcRenderer.invoke("invite-logout"),
+  inviteUsage: () => ipcRenderer.invoke("invite-usage"),
+  inviteOpenPlans: () => ipcRenderer.invoke("invite-open-plans"),
 }
 
 contextBridge.exposeInMainWorld("api", api)

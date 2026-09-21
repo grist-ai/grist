@@ -7,7 +7,7 @@
   "homepage": "https://github.com/pranav6226/grist",
   "author": {
     "name": "Grist",
-    "email": "hello@opencode.ai"
+    "email": "pranavmm25@gmail.com"
   },
   "scripts": {
     "typecheck": "tsgo -b",
