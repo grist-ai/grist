@@ -82,7 +82,7 @@ import { promptPlaceholder } from "./prompt-input/placeholder"
 import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { joinPromptText } from "@/utils/voice-input"
-import { useVoiceInput } from "@/components/voice-input-button"
+import { useVoiceInput, VoiceActivityBars } from "@/components/voice-input-button"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
 
@@ -1650,7 +1650,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               <TooltipKeybind
                 placement="top"
                 title={
-                  voice.state() === "recording"
+                  voice.state() === "recording" || voice.stopping()
                     ? language.t("prompt.action.voice.stop")
                     : voice.state() === "busy"
                       ? language.t("prompt.action.voice.transcribing")
@@ -1658,24 +1658,33 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 }
                 keybind={command.keybind("prompt.voice")}
               >
-                <Button
-                  data-action="prompt-voice"
-                  type="button"
-                  variant="ghost"
-                  class="size-8 p-0"
-                  style={buttons()}
-                  onClick={() => void voice.toggle()}
-                  disabled={store.mode !== "normal" || voice.state() === "busy"}
-                  tabIndex={store.mode === "normal" ? undefined : -1}
-                  aria-label={
-                    voice.state() === "recording"
-                      ? language.t("prompt.action.voice.stop")
-                      : language.t("prompt.action.voice")
-                  }
-                  aria-pressed={voice.state() === "recording"}
-                >
-                  <Icon name="microphone" class="size-4.5" classList={{ "text-icon-critical-base": voice.state() === "recording" }} />
-                </Button>
+                <div class="inline-flex items-center gap-1">
+                  <Show when={voice.state() === "recording"}>
+                    <VoiceActivityBars levels={voice.levels()} class="text-icon-critical-base" />
+                  </Show>
+                  <Button
+                    data-action="prompt-voice"
+                    type="button"
+                    variant="ghost"
+                    class="size-8 p-0"
+                    style={buttons()}
+                    onClick={() => void voice.toggle()}
+                    disabled={store.mode !== "normal" || voice.state() === "busy" || voice.stopping()}
+                    tabIndex={store.mode === "normal" ? undefined : -1}
+                    aria-label={
+                      voice.state() === "recording" || voice.stopping()
+                        ? language.t("prompt.action.voice.stop")
+                        : language.t("prompt.action.voice")
+                    }
+                    aria-pressed={voice.state() === "recording" || voice.stopping()}
+                  >
+                    <Icon
+                      name={voice.state() === "recording" || voice.stopping() ? "stop" : "microphone"}
+                      class="size-4.5"
+                      classList={{ "text-icon-critical-base": voice.state() === "recording" || voice.stopping() }}
+                    />
+                  </Button>
+                </div>
               </TooltipKeybind>
             </div>
           </div>
