@@ -42,7 +42,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Use npm with OIDC trusted publishing
         run: npm install -g npm@11.15.0
@@ -64,8 +63,8 @@ jobs:
           OPENCODE_VERSION: ${{ inputs.version }}
           OPENCODE_CHANNEL: ${{ inputs.channel }}
 
-      # Do not set NODE_AUTH_TOKEN. An npm token overrides OIDC and currently
-      # fails with EOTP because 2FA-bypass tokens can no longer publish.
+      # Do not set NODE_AUTH_TOKEN or setup-node registry-url. An empty
+      # _authToken line stops npm from doing the OIDC exchange.
       - name: Publish to npm
         run: bun run --cwd packages/opencode script/publish.ts
         env:
