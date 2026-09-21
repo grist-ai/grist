@@ -106,7 +106,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       },
     },
     optimizeDeps: {
-      exclude: ["@huggingface/transformers"],
+      exclude: ["@huggingface/transformers", "@moonshine-ai/moonshine-wasm"],
     },
     build: {
       sourcemap: true,

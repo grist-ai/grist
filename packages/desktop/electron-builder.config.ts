@@ -86,7 +86,7 @@ const getBase = (appId: string): Configuration => ({
     desktopName: `${appId}.desktop`,
     version: PRODUCT_VERSION,
   },
-  files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*", "!resources/whisper/**"],
+  files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*", "!resources/moonshine/**"],
   afterPack: async (context) => {
     await stripMacDetritus(context.appOutDir)
     await stripUnusedMacPrivacyKeys(context.appOutDir)
@@ -107,8 +107,8 @@ const getBase = (appId: string): Configuration => ({
       filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
     },
     {
-      from: "resources/whisper",
-      to: "whisper",
+      from: "resources/moonshine",
+      to: "moonshine",
     },
   ],
   mac: {

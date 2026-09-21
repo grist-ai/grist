@@ -66,7 +66,7 @@ export const dict = {
   "command.prompt.mode.shell": "셸",
   "command.prompt.mode.normal": "프롬프트",
   "command.prompt.voice": "Voice input",
-  "command.prompt.voice.description": "Dictate a prompt with on-device Whisper Large V3",
+  "command.prompt.voice.description": "Dictate a prompt with on-device Moonshine",
   "command.permissions.autoaccept.enable": "권한 자동 수락",
   "command.permissions.autoaccept.disable": "권한 자동 수락 중지",
   "command.workspace.toggle": "작업 공간 전환",
@@ -283,7 +283,7 @@ export const dict = {
   "prompt.toast.voice.empty.description": "Try speaking again after clicking the microphone.",
   "prompt.toast.voice.failed.title": "Voice input failed",
   "prompt.toast.voice.failed.description": "Couldn't transcribe speech on this device. Try again.",
-  "prompt.toast.voice.download.title": "Downloading Whisper Large V3",
+  "prompt.toast.voice.download.title": "Loading speech model",
   "prompt.toast.voice.download.description": "First use downloads the local speech model. It stays on this machine.",
 
   "prompt.toast.pasteUnsupported.title": "지원되지 않는 첨부 파일",

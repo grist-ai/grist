@@ -164,7 +164,7 @@ export const dict: Record<string, string> = {
   "command.prompt.mode.shell": "শেল",
   "command.prompt.mode.normal": "প্রম্পট",
   "command.prompt.voice": "Voice input",
-  "command.prompt.voice.description": "Dictate a prompt with on-device Whisper Large V3",
+  "command.prompt.voice.description": "Dictate a prompt with on-device Moonshine",
   "command.permissions.autoaccept.enable": "স্বয়ংক্রিয়ভাবে অনুমতি গ্রহণ করুন",
   "command.permissions.autoaccept.disable": "স্বয়ংক্রিয়ভাবে অনুমতি নেওয়া বন্ধ করুন",
   "command.workspace.toggle": "ওয়ার্কস্পেস টগল করুন",
@@ -390,7 +390,7 @@ export const dict: Record<string, string> = {
   "prompt.toast.voice.empty.description": "Try speaking again after clicking the microphone.",
   "prompt.toast.voice.failed.title": "Voice input failed",
   "prompt.toast.voice.failed.description": "Couldn't transcribe speech on this device. Try again.",
-  "prompt.toast.voice.download.title": "Downloading Whisper Large V3",
+  "prompt.toast.voice.download.title": "Loading speech model",
   "prompt.toast.voice.download.description": "First use downloads the local speech model. It stays on this machine.",
 
   "prompt.toast.pasteUnsupported.title": "অসমর্থিত সংযুক্তি",

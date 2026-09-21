@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test"
-import { flattenPcm, joinPromptText, resamplePcm } from "./voice-input"
-import { isWhisperDownloadProgress, textFromAsr, WHISPER_MODEL_ID } from "./whisper-local"
+import {
+  flattenPcm,
+  isSpeechModelDownload,
+  joinPromptText,
+  resamplePcm,
+  mixVoiceActivity,
+  sameActivity,
+  textFromLines,
+  voiceActivityLevels,
+  voiceActivityRms,
+} from "./voice-input"
 
 describe("voice input text", () => {
   test("inserts a space between existing prompt text and speech", () => {
@@ -26,15 +35,36 @@ describe("pcm helpers", () => {
   })
 })
 
-describe("whisper progress", () => {
-  test("uses the public turbo ONNX weights", () => {
-    expect(WHISPER_MODEL_ID).toBe("onnx-community/whisper-large-v3-turbo")
+describe("voice activity", () => {
+  test("maps frequency bins onto bar levels", () => {
+    expect(voiceActivityLevels(new Uint8Array([0, 0, 255, 255]), 2)).toEqual([0, 1])
+    expect(voiceActivityLevels(new Uint8Array([64]), 1)[0]).toBeCloseTo(Math.sqrt(64 / 255))
+    expect(voiceActivityLevels(new Uint8Array(), 3)).toEqual([0, 0, 0])
   })
 
-  test("treats incomplete file fetches as downloads", () => {
-    expect(isWhisperDownloadProgress({ status: "progress", progress: 0.4 })).toBe(true)
-    expect(isWhisperDownloadProgress({ status: "ready" })).toBe(false)
-    expect(textFromAsr({ text: "  hello " })).toBe("hello")
-    expect(textFromAsr([{ text: "one" }, { text: "two" }])).toBe("one two")
+  test("lifts every bar with the microphone level", () => {
+    expect(mixVoiceActivity([0, 1], 0)).toEqual([0, 0.55])
+    expect(mixVoiceActivity([0, 0], 1)).toEqual([0.9, 0.9])
+    const silent = new Uint8Array(4).fill(128)
+    expect(voiceActivityRms(silent)).toBe(0)
+    expect(voiceActivityRms(new Uint8Array())).toBe(0)
+  })
+
+  test("treats tiny level changes as the same frame", () => {
+    expect(sameActivity([0.2, 0.4], [0.22, 0.41])).toBe(true)
+    expect(sameActivity([0.2], [0.4])).toBe(false)
+  })
+})
+
+describe("moonshine transcript", () => {
+  test("joins finished lines and ignores blanks", () => {
+    expect(textFromLines(["  fix the scroll ", "", "bug"])).toBe("fix the scroll bug")
+    expect(textFromLines([])).toBe("")
+  })
+
+  test("treats an unfinished model fetch as a download", () => {
+    expect(isSpeechModelDownload(40, 100)).toBe(true)
+    expect(isSpeechModelDownload(100, 100)).toBe(false)
+    expect(isSpeechModelDownload(0, undefined)).toBe(true)
   })
 })
