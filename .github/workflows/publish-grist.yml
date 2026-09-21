@@ -29,6 +29,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -38,8 +41,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Use npm with OIDC trusted publishing
+        run: npm install -g npm@11.15.0
 
       - name: Install
         run: bun install --ignore-scripts
@@ -59,9 +65,10 @@ jobs:
           OPENCODE_CHANNEL: ${{ inputs.channel }}
           OPENCODE_RELEASE: "1"
 
+      # Do not set NODE_AUTH_TOKEN. An npm token overrides OIDC and currently
+      # fails with EOTP because 2FA-bypass tokens can no longer publish.
       - name: Publish to npm
         run: bun run --cwd packages/opencode script/publish.ts
         env:
           OPENCODE_VERSION: ${{ inputs.version }}
           OPENCODE_CHANNEL: ${{ inputs.channel }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
