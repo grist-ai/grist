@@ -1242,6 +1242,7 @@ input:focus {
   padding: 0 0 0.9rem;
   border-bottom: 1px solid var(--line);
   max-width: 980px;
+  width: 100%;
   font-size: 0.92rem;
 }
 
