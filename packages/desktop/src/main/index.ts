@@ -36,7 +36,7 @@ import { safeWebContentsURL } from "./window-state"
 import {
   getLastFocusedWindow,
   registerRendererProtocol,
-  registerWhisperProtocol,
+  registerSpeechProtocol,
   setRelaunchHandler,
   setAppQuitting,
   setBackgroundColor,
@@ -268,7 +268,7 @@ const main = Effect.gen(function* () {
   )
   app.setAsDefaultProtocolClient(PROTOCOL_SCHEME)
   registerRendererProtocol()
-  registerWhisperProtocol()
+  registerSpeechProtocol()
   setDockIcon()
   const updater = setupAutoUpdater(stopSidecars)
   const menuDeps = {

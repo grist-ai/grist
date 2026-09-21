@@ -70,7 +70,7 @@ export const dict = {
   "command.prompt.mode.shell": "Shell",
   "command.prompt.mode.normal": "Kehote",
   "command.prompt.voice": "Voice input",
-  "command.prompt.voice.description": "Dictate a prompt with on-device Whisper Large V3",
+  "command.prompt.voice.description": "Dictate a prompt with on-device Moonshine",
   "command.permissions.autoaccept.enable": "Hyväksy käyttöoikeudet automaattisesti",
   "command.permissions.autoaccept.disable": "Lopeta käyttöoikeuksien automaattinen hyväksyminen",
   "command.workspace.toggle": "Vaihda työtiloja",
@@ -297,7 +297,7 @@ export const dict = {
   "prompt.toast.voice.empty.description": "Try speaking again after clicking the microphone.",
   "prompt.toast.voice.failed.title": "Voice input failed",
   "prompt.toast.voice.failed.description": "Couldn't transcribe speech on this device. Try again.",
-  "prompt.toast.voice.download.title": "Downloading Whisper Large V3",
+  "prompt.toast.voice.download.title": "Loading speech model",
   "prompt.toast.voice.download.description": "First use downloads the local speech model. It stays on this machine.",
 
   "prompt.toast.pasteUnsupported.title": "Liitettä ei tueta",

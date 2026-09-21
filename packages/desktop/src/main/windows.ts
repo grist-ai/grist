@@ -17,8 +17,7 @@ import { createWindowRegistry } from "./window-registry"
 import { safeWindowURL } from "./window-state"
 import { resolveExternalURL, resolveLocalFilePath } from "./external-url"
 import { PRODUCT_NAME } from "../../brand"
-import { resolveWhisperAsset, whisperResourceRoot, WHISPER_PROTOCOL } from "./whisper-assets"
-
+import { resolveSpeechAsset, speechResourceRoot, SPEECH_PROTOCOL } from "./speech-assets"
 const root = dirname(fileURLToPath(import.meta.url))
 const rendererRoot = join(root, "../renderer")
 const rendererProtocol = "oc"
@@ -40,6 +39,10 @@ const orngBackground = {
 }
 const documentPolicyHeader = "Document-Policy"
 const jsCallStacksDocumentPolicy = "include-js-call-stacks-in-crash-reports"
+const coopHeader = "Cross-Origin-Opener-Policy"
+const coepHeader = "Cross-Origin-Embedder-Policy"
+const isolationPolicy = "same-origin"
+const embedderPolicy = "credentialless"
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -52,7 +55,7 @@ protocol.registerSchemesAsPrivileged([
     },
   },
   {
-    scheme: WHISPER_PROTOCOL,
+    scheme: SPEECH_PROTOCOL,
     privileges: {
       secure: true,
       standard: true,
@@ -307,34 +310,35 @@ function windowDataFile(id: string) {
   return `opencode.window.${id.replace(/[^a-zA-Z0-9._-]/g, "-")}.dat`
 }
 
-export function registerWhisperProtocol() {
-  if (protocol.isProtocolHandled(WHISPER_PROTOCOL)) return
+export function registerSpeechProtocol() {
+  if (protocol.isProtocolHandled(SPEECH_PROTOCOL)) return
 
-  protocol.handle(WHISPER_PROTOCOL, async (request) => {
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: whisperCorsHeaders() })
-
-    const assets = whisperResourceRoot({
+  protocol.handle(SPEECH_PROTOCOL, async (request) => {
+    const assets = speechResourceRoot({
       packaged: app.isPackaged,
       resourcesPath: process.resourcesPath,
       packageRoot: join(root, "../.."),
     })
-    const file = resolveWhisperAsset(request.url, assets)
+    const file = resolveSpeechAsset(request.url, assets)
     if (!file) {
-      writeLog("protocol", "rejected whisper path", { url: request.url }, "warn")
-      return whisperNotFound()
+      writeLog("protocol", "rejected speech path", { url: request.url }, "warn")
+      return speechNotFound()
     }
 
     try {
-      const range = request.headers.get("range")
-      const response = await net.fetch(pathToFileURL(file).toString(), {
-        headers: range ? { range } : undefined,
-      })
-      return addWhisperCors(response)
+      const response = await net.fetch(pathToFileURL(file).toString())
+      const headers = new Headers(response.headers)
+      headers.set("Access-Control-Allow-Origin", "*")
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
     } catch (error) {
-      writeLog("protocol", "whisper fetch error", { url: request.url, file, error }, "error")
-      return whisperNotFound()
+      writeLog("protocol", "speech fetch error", { url: request.url, file, error }, "error")
+      return speechNotFound()
     }
   })
+}
+
+function speechNotFound() {
+  return new Response("Not found", { status: 404, headers: { "Access-Control-Allow-Origin": "*" } })
 }
 
 export function registerRendererProtocol() {
@@ -520,30 +524,12 @@ function wireWindowRecovery(win: BrowserWindow, name: string) {
   })
 }
 
-function whisperCorsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "*",
-    "Access-Control-Expose-Headers": "*",
-  }
-}
-
-function addWhisperCors(response: Response) {
-  const headers = new Headers(response.headers)
-  headers.set("Access-Control-Allow-Origin", "*")
-  headers.set("Access-Control-Allow-Headers", "*")
-  headers.set("Access-Control-Expose-Headers", "*")
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
-}
-
-function whisperNotFound() {
-  return new Response("Not found", { status: 404, headers: whisperCorsHeaders() })
-}
-
 function addDocumentPolicy(response: Response, file: string) {
   if (!file.toLowerCase().endsWith(".html")) return response
   const headers = new Headers(response.headers)
   headers.set(documentPolicyHeader, jsCallStacksDocumentPolicy)
+  headers.set(coopHeader, isolationPolicy)
+  headers.set(coepHeader, embedderPolicy)
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
@@ -572,7 +558,10 @@ function isTrustedRendererUrl(value?: string) {
 function addRendererHeaders(value: string, headers: Record<string, any>) {
   upsertKeyValue(headers, "Access-Control-Allow-Origin", ["*"])
   upsertKeyValue(headers, "Access-Control-Allow-Headers", ["*"])
-  if (isRendererUrl(value, true)) upsertKeyValue(headers, documentPolicyHeader, [jsCallStacksDocumentPolicy])
+  if (!isRendererUrl(value, true)) return
+  upsertKeyValue(headers, documentPolicyHeader, [jsCallStacksDocumentPolicy])
+  upsertKeyValue(headers, coopHeader, [isolationPolicy])
+  upsertKeyValue(headers, coepHeader, [embedderPolicy])
 }
 
 function isRendererUrl(value?: string, html = false) {
