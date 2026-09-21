@@ -17,6 +17,7 @@ import { createWindowRegistry } from "./window-registry"
 import { safeWindowURL } from "./window-state"
 import { resolveExternalURL, resolveLocalFilePath } from "./external-url"
 import { PRODUCT_NAME } from "../../brand"
+import { resolveWhisperAsset, whisperResourceRoot, WHISPER_PROTOCOL } from "./whisper-assets"
 
 const root = dirname(fileURLToPath(import.meta.url))
 const rendererRoot = join(root, "../renderer")
@@ -47,6 +48,16 @@ protocol.registerSchemesAsPrivileged([
       secure: true,
       standard: true,
       supportFetchAPI: true,
+      stream: true,
+    },
+  },
+  {
+    scheme: WHISPER_PROTOCOL,
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
       stream: true,
     },
   },
@@ -296,6 +307,36 @@ function windowDataFile(id: string) {
   return `opencode.window.${id.replace(/[^a-zA-Z0-9._-]/g, "-")}.dat`
 }
 
+export function registerWhisperProtocol() {
+  if (protocol.isProtocolHandled(WHISPER_PROTOCOL)) return
+
+  protocol.handle(WHISPER_PROTOCOL, async (request) => {
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: whisperCorsHeaders() })
+
+    const assets = whisperResourceRoot({
+      packaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      packageRoot: join(root, "../.."),
+    })
+    const file = resolveWhisperAsset(request.url, assets)
+    if (!file) {
+      writeLog("protocol", "rejected whisper path", { url: request.url }, "warn")
+      return whisperNotFound()
+    }
+
+    try {
+      const range = request.headers.get("range")
+      const response = await net.fetch(pathToFileURL(file).toString(), {
+        headers: range ? { range } : undefined,
+      })
+      return addWhisperCors(response)
+    } catch (error) {
+      writeLog("protocol", "whisper fetch error", { url: request.url, file, error }, "error")
+      return whisperNotFound()
+    }
+  })
+}
+
 export function registerRendererProtocol() {
   if (protocol.isProtocolHandled(rendererProtocol)) return
 
@@ -477,6 +518,26 @@ function wireWindowRecovery(win: BrowserWindow, name: string) {
   win.webContents.on("preload-error", (_event, preloadPath, error) => {
     writeLog("preload", "preload error", { window: name, preloadPath, error }, "error")
   })
+}
+
+function whisperCorsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Expose-Headers": "*",
+  }
+}
+
+function addWhisperCors(response: Response) {
+  const headers = new Headers(response.headers)
+  headers.set("Access-Control-Allow-Origin", "*")
+  headers.set("Access-Control-Allow-Headers", "*")
+  headers.set("Access-Control-Expose-Headers", "*")
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
+
+function whisperNotFound() {
+  return new Response("Not found", { status: 404, headers: whisperCorsHeaders() })
 }
 
 function addDocumentPolicy(response: Response, file: string) {
