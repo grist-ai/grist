@@ -637,7 +637,7 @@ function meteredSse(
 }
 
 function redactCompletion(data: Record<string, unknown>, publicID: string) {
-  const next = { ...data, model: publicID }
+  const next: Record<string, unknown> = { ...data, model: publicID }
   delete next.provider
   return next
 }
