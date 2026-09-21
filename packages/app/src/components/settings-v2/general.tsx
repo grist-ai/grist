@@ -403,6 +403,20 @@ export const SettingsGeneralV2: Component<{
           </div>
         </SettingsRowV2>
 
+        <Show when={desktop()}>
+          <SettingsRowV2
+            title={language.t("settings.general.row.showNavigation.title")}
+            description={language.t("settings.general.row.showNavigation.description")}
+          >
+            <div data-action="settings-show-navigation">
+              <Switch
+                checked={settings.general.showNavigation()}
+                onChange={(checked) => settings.general.setShowNavigation(checked)}
+              />
+            </div>
+          </SettingsRowV2>
+        </Show>
+
         <SettingsRowV2
           title={language.t("settings.general.row.showSearch.title")}
           description={language.t("settings.general.row.showSearch.description")}
