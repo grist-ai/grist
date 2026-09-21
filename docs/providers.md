@@ -37,17 +37,19 @@ Ladder ids (override with `GRIST_*_MODEL` **on the gateway**):
 | Medium | `moonshotai/kimi-k3` | `GRIST_MEDIUM_MODEL` |
 | Frontier | `openai/gpt-5.6-sol` | `GRIST_FRONTIER_MODEL` |
 
-### Ladder pricing (OpenRouter, 2026-09-19)
+### Ladder pricing (metered, 2026-09-21)
 
-Verify live on [openrouter.ai/models](https://openrouter.ai/models). DeepSeek
-first-party Flash also has peak windows — see
+Caps use first-party / typical OpenRouter rates so spend is not under-counted
+when routing lands on a dearer provider. Verify live on
+[openrouter.ai/models](https://openrouter.ai/models). DeepSeek first-party
+Flash also has peak windows — see
 [api-docs.deepseek.com](https://api-docs.deepseek.com/quick_start/pricing).
 
-| Model | In/out per 1M tok | Notes |
+| Model | In/out per 1M tok (metered) | Notes |
 | --- | --- | --- |
 | `deepseek/deepseek-v4.1-flash` | $0.15 / $0.60 off-peak (peak 2×) | Cheap default; first-party `deepseek-flash` |
-| `moonshotai/kimi-k3` | ~$1.70 / $8.50 floor | Medium default |
-| `openai/gpt-5.6-sol` | $4 / $20 list; OpenRouter 50% off ≈ $2 / $10 | Frontier default |
+| `moonshotai/kimi-k3` | $3 / $15 | Medium default (Moonshot list; some routers are cheaper) |
+| `openai/gpt-5.6-sol` | $4 / $20 | Frontier default (OpenAI Fast / list; some routers are 50% off) |
 
 Peak windows for DeepSeek (UTC weekdays): 01:00–04:00 and 06:00–10:00. US daytime ≈ off-peak.
 

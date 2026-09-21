@@ -72,9 +72,13 @@ export type PublicApiKey = {
 const DEFAULT_CAP = 5
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const MAX_API_KEYS = 20
+const TOUCH_API_KEY_MS = 60_000
 
 export function openGatewayStore(filePath = ":memory:") {
   const db = new Database(filePath)
+  db.exec("PRAGMA journal_mode = WAL")
+  db.exec("PRAGMA synchronous = NORMAL")
+  db.exec("PRAGMA busy_timeout = 5000")
   db.exec(`
     CREATE TABLE IF NOT EXISTS invites (
       code TEXT PRIMARY KEY,
@@ -362,7 +366,9 @@ export function openGatewayStore(filePath = ":memory:") {
       if (!key || key.revoked) return
       const invite = selectInvite.get(key.invite_code) as InviteRow | undefined
       if (!invite || invite.revoked || invite.expires_at <= now) return
-      touchApiKey.run(now, key.id)
+      if (!key.last_used_at || now - key.last_used_at >= TOUCH_API_KEY_MS) {
+        touchApiKey.run(now, key.id)
+      }
       return invite
     },
 
