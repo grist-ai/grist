@@ -64,9 +64,41 @@ jobs:
           OPENCODE_CHANNEL: ${{ inputs.channel }}
 
       # Do not set NODE_AUTH_TOKEN or setup-node registry-url. An empty
-      # _authToken line stops npm from doing the OIDC exchange.
-      - name: Publish to npm
+      # _authToken line stops npm from doing the OIDC exchange. Publish from
+      # this bash step (not bun $) so ACTIONS_ID_TOKEN_* reaches npm.
+      - name: Prepare npm packages
         run: bun run --cwd packages/opencode script/publish.ts
         env:
+          GRIST_PREPARE_ONLY: "1"
           OPENCODE_VERSION: ${{ inputs.version }}
+          OPENCODE_CHANNEL: ${{ inputs.channel }}
+
+      - name: Publish to npm
+        working-directory: packages/opencode
+        run: |
+          set -euo pipefail
+          publish_one() {
+            local dir="$1"
+            local name version
+            name=$(node -p "require('./${dir}/package.json').name")
+            version=$(node -p "require('./${dir}/package.json').version")
+            if npm view "${name}@${version}" version >/dev/null 2>&1; then
+              echo "skip ${name}@${version}"
+              return 0
+            fi
+            echo "publish ${name}@${version}"
+            (cd "$dir" && npm publish --access public --tag "${OPENCODE_CHANNEL:-latest}")
+          }
+          for dir in dist/grist-*; do
+            [ -d "$dir" ] || continue
+            [ "$(basename "$dir")" = "grist-ai" ] && continue
+            if ! publish_one "$dir"; then
+              case "$dir" in
+                *windows*|*musl*|*baseline*) echo "warn: ${dir} publish failed, continuing" ;;
+                *) exit 1 ;;
+              esac
+            fi
+          done
+          publish_one dist/grist-ai
+        env:
           OPENCODE_CHANNEL: ${{ inputs.channel }}
