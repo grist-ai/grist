@@ -48,3 +48,23 @@ opencode.jsonc
 /models/.cache/
 /tools/llama-prism/
 .grist/
+grist-gateway.sqlite
+
+# Local Cursor MCP config (API keys)
+.cursor/mcp.json
+
+# Firebase CLI
+firebase-debug.log
+.firebase/
+
+# Generated marketing video / composition
+brag-output/
+
+# Apple signing credentials
+*.p8
+*.p12
+*.certSigningRequest
+developerID_application.cer
+
+# Electron Vite output
+packages/desktop/out/

@@ -19,6 +19,8 @@ import {
   type NoulAnswer,
   type ScoreAnswer,
 } from "./jev-client"
+import { loadInviteConfig } from "./invite/config"
+import { fetchGateRoute, GatewayHttpError } from "./invite/client"
 
 export type GateDecision = {
   rung: Rung
@@ -120,6 +122,22 @@ export function shadowScores(text: string): {
   return { difficulty, sensitivity, underspecified }
 }
 
+export async function scoreTask(
+  text: string,
+  apiKey = typesafeKey(),
+): Promise<{
+  scores: { difficulty: number; sensitivity: number; underspecified: number }
+  provider: "jev" | "shadow"
+}> {
+  if (!apiKey) return { scores: shadowScores(text), provider: "shadow" }
+  try {
+    return { scores: await evaluateWithJev(text, apiKey), provider: "jev" }
+  } catch (error) {
+    gristWarn("[grist] Jev call failed; using shadow gate", error)
+    return { scores: shadowScores(text), provider: "shadow" }
+  }
+}
+
 async function evaluateWithJev(text: string, apiKey: string): Promise<{
   difficulty: number
   sensitivity: number
@@ -130,7 +148,7 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
     state: {
       task: text,
       product: "Grist",
-      ladder: "cheapest=DeepSeek Flash, medium=DeepSeek Pro, frontier=Claude Opus",
+      ladder: "cheapest=DeepSeek Flash, medium=Kimi K3, frontier=GPT-5.6 Sol",
     },
     questions: {
       difficulty: {
@@ -213,20 +231,17 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
     }
   }
 
-  const key = typesafeKey()
-  let scores: { difficulty: number; sensitivity: number; underspecified: number }
-  let provider: "jev" | "shadow" = "shadow"
-  if (key) {
+  const invite = loadInviteConfig()
+  if (invite) {
     try {
-      scores = await evaluateWithJev(input.text, key)
-      provider = "jev"
+      return await routeViaGateway(input, started, mode, mechanisms)
     } catch (error) {
-      gristWarn("[grist] Jev call failed; using shadow gate", error)
-      scores = shadowScores(input.text)
+      if (error instanceof GatewayHttpError && error.status === 402) throw error
+      gristWarn("[grist] gateway gate failed; using local shadow", error)
     }
-  } else {
-    scores = shadowScores(input.text)
   }
+
+  const { scores, provider } = await scoreTask(input.text)
 
   const { rung, reasons } = composeRung(scores, loadThresholds(), mode)
   const model = modelForRung(rung, input.current)
@@ -271,6 +286,52 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
       text: input.text,
     })
     .catch((error) => gristWarn("[grist:burn-in] record failed", error))
+  return decision
+}
+
+async function routeViaGateway(
+  input: GateInput,
+  started: number,
+  mode: OperatingMode,
+  fallback: MechanismSet,
+): Promise<GateDecision> {
+  const remote = await fetchGateRoute({ text: input.text, sessionID: input.sessionID })
+  const mechanisms: MechanismSet = {
+    profile: fallback.profile,
+    resolved: remote.mechanisms.observation_pack ? "efficiency" : "performance",
+    observationPack: remote.mechanisms.observation_pack,
+    actionFusion: remote.mechanisms.action_fusion,
+    reasons: ["gateway"],
+  }
+  if (input.sessionID) rememberSessionMechanisms(input.sessionID, mechanisms)
+  const model: ModelRef = {
+    providerID: remote.model.provider_id,
+    modelID: remote.model.model_id,
+  }
+  const decision: GateDecision = {
+    rung: remote.rung,
+    model,
+    provider: remote.provider ?? "jev",
+    mode: remote.mode ?? mode,
+    mechanisms,
+    difficulty: remote.difficulty,
+    sensitivity: remote.sensitivity,
+    underspecified: remote.underspecified,
+    reasons: remote.reasons,
+    latencyMs: Date.now() - started,
+  }
+  if (input.sessionID) {
+    rememberSessionControl(input.sessionID, {
+      rung: remote.rung,
+      difficulty: remote.difficulty,
+      sensitivity: remote.sensitivity,
+      underspecified: remote.underspecified,
+      task: input.text,
+    })
+  }
+  gristLog(
+    `[grist:gate] ${decision.rung} via gateway/${decision.provider} mode=${decision.mode} · ${decision.reasons.join(",")} · ${decision.latencyMs}ms → ${model.providerID}/${model.modelID}`,
+  )
   return decision
 }
 

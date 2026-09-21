@@ -142,6 +142,15 @@ export const TuiThreadCommand = cmd({
         hidden: true,
       }),
   handler: async (args) => {
+    const { loadInviteConfig, INVITE_REQUIRED_MESSAGE } = await import("@/grist/invite/config")
+    if (!loadInviteConfig()) {
+      const { ensureSignedIn } = await import("./auth")
+      if (!(await ensureSignedIn())) {
+        UI.error(INVITE_REQUIRED_MESSAGE)
+        process.exitCode = 1
+        return
+      }
+    }
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
       process.exitCode = 1

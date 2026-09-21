@@ -14,6 +14,7 @@ import {
   useCommand,
   useWslServers,
   useLanguage,
+  GristLoginScreen,
 } from "@opencode-ai/app"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import * as Sentry from "@sentry/solid"
@@ -31,6 +32,7 @@ import { availableStartupServer, readyWslConnections } from "./wsl/connections"
 import "./styles.css"
 import { Splash } from "@opencode-ai/ui/logo"
 import { useTheme } from "@opencode-ai/ui/theme/context"
+import { PRODUCT_COLOR } from "../../brand"
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -315,6 +317,18 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
         type: "image/png",
       })
     },
+
+    account: {
+      status: () => window.api.inviteStatus(),
+      startLogin: () => window.api.inviteStartLogin(),
+      waitLogin: () => window.api.inviteWaitLogin(),
+      cancelLogin: () => window.api.inviteCancelLogin(),
+      logout: () => window.api.inviteLogout(),
+      usage: () => window.api.inviteUsage(),
+      openPlans: () => {
+        void window.api.inviteOpenPlans()
+      },
+    },
   }
 }
 
@@ -327,7 +341,9 @@ listenForDeepLinks()
 function LoadingSplash() {
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-      <Splash class="w-40 h-11 opacity-60 animate-pulse text-icon-strong-base" />
+      <div style={{ color: PRODUCT_COLOR }}>
+        <Splash class="w-40 h-11 opacity-60 animate-pulse" />
+      </div>
     </div>
   )
 }
@@ -351,6 +367,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
 
   const [defaultServer] = createResource(() => platform.getDefaultServer?.())
   const [locale] = createResource(loadLocale)
+  const [account] = createResource(() => window.api.inviteStatus())
   const router = (props: BaseRouterProps) => (
     <DesktopMemoryRouter {...props} windowID={platform.windowID ?? "browser"} />
   )
@@ -377,8 +394,9 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
   function App() {
     const wslServers = useWslServers()
     const language = useLanguage()
+    const accountReady = createMemo(() => !locale.loading && !account.loading)
     const ready = createMemo(
-      () => !defaultServer.loading && !sidecar.loading && !locale.loading && !wslServers.isLoading,
+      () => accountReady() && !defaultServer.loading && !sidecar.loading && !wslServers.isLoading,
     )
     const servers = createMemo(() => {
       const data = initializationData(sidecar)
@@ -402,24 +420,28 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
       ServerConnection.Key.make(availableStartupServer(defaultServer.latest, wslServers.data)),
     )
     return (
-      <Show when={ready()} fallback={<LoadingSplash />}>
-        <Show when={effectiveDefaultServer()} keyed>
-          {(key) => (
-            <AppInterface
-              defaultServer={key}
-              servers={servers()}
-              router={router}
-              startup={onboarding.promise}
-              serverScoped={
-                <DesktopFirstLaunchOnboarding
-                  initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}
-                  onLoaded={onboarding.resolve}
-                />
-              }
-            >
-              <Inner />
-            </AppInterface>
-          )}
+      <Show when={accountReady()} fallback={<LoadingSplash />}>
+        <Show when={account.latest?.signedIn} fallback={<GristLoginScreen />}>
+          <Show when={ready()} fallback={<LoadingSplash />}>
+            <Show when={effectiveDefaultServer()} keyed>
+              {(key) => (
+                <AppInterface
+                  defaultServer={key}
+                  servers={servers()}
+                  router={router}
+                  startup={onboarding.promise}
+                  serverScoped={
+                    <DesktopFirstLaunchOnboarding
+                      initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}
+                      onLoaded={onboarding.resolve}
+                    />
+                  }
+                >
+                  <Inner />
+                </AppInterface>
+              )}
+            </Show>
+          </Show>
         </Show>
       </Show>
     )

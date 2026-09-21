@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Grist — the coding agent that learns your codebase</title>
+    <meta
+      name="description"
+      content="Grist maps your repo, remembers what actually shipped, and spends only when the work is hard. SoL-Pi keeps every turn lean. Invite-only beta. Your code stays on your machine."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css?v=stitch7" />
+    <script src="https://tally.so/widgets/embed.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <a class="mark" href="/" aria-label="Grist">
+        <pre class="wordmark">█▀▀▀ █▀▀█  █  █▀▀▀ ▀▀█▀▀
+█ ▀█ █▀▀   █  ▀▀▀█   █
+▀▀▀▀ █ ▀█  █  ▀▀▀▀   ▀</pre>
+      </a>
+      <nav>
+        <a href="/#product">Product</a>
+        <a href="/docs">Docs</a>
+        <a href="/plans">Pricing</a>
+        <a href="/#waitlist" data-auth="out">Request access</a>
+        <a class="btn btn-light" href="/login" data-auth="out">Sign in</a>
+        <a href="/admin" data-auth="admin" hidden>Admin</a>
+        <a href="/dashboard" data-auth="in" hidden>Dashboard</a>
+      </nav>
+    </header>
+
+    <main id="view-home">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">[ the coding agent ]</p>
+          <h1>It learns your repo.<br />Then it gets cheaper.</h1>
+          <p class="lede">
+            Grist maps the codebase, remembers what actually shipped, and only
+            spends when the work is hard. SoL-Pi keeps every turn lean. You keep
+            the files.
+          </p>
+          <div class="hero-install">
+            <div class="diagram-bar">
+              <span><b>$</b> install</span>
+              <button type="button" class="copy" data-copy="npm">Copy</button>
+            </div>
+            <pre>npm install -g grist-ai
+grist</pre>
+            <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Invite required. No API key.</p>
+          </div>
+          <div class="actions">
+            <a
+              class="btn btn-mac"
+              id="mac-download"
+              href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-arm64.dmg"
+            >
+              <svg class="apple" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"
+                />
+              </svg>
+              Download for macOS
+            </a>
+            <a class="btn btn-ghost" href="/#waitlist">Request access</a>
+          </div>
+          <p class="mac-note">
+            Apple Silicon
+            <a
+              id="mac-intel"
+              href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-x64.dmg"
+            >Intel Mac</a>
+          </p>
+          <p class="hero-meta">
+            <span><i></i> Local tree execution</span>
+            <span><i class="mute"></i> Prompt goes out. Source does not.</span>
+          </p>
+        </div>
+        <figure class="fig-bare" aria-hidden="true">
+          <svg class="diagram-svg fig-map" viewBox="0 0 440 318" fill="none">
+            <text class="fig-col" x="56" y="28">PATH</text>
+            <text class="fig-col" x="392" y="28" text-anchor="end">OWNER</text>
+            <path class="fig-spine" d="M 28 48 V 214" />
+            <g class="fig-map-n fig-map-n1">
+              <path class="fig-spine" d="M 28 64 H 48" />
+              <rect class="fig-node" x="48" y="48" width="360" height="32" rx="4" />
+              <text class="fig-fg" x="62" y="69">auth/cookie.ts</text>
+              <rect class="fig-chip" x="348" y="55" width="48" height="18" rx="2" />
+              <text class="fig-chip-t" x="372" y="68" text-anchor="middle">you</text>
+            </g>
+            <g class="fig-map-n fig-map-n2">
+              <path class="fig-spine" d="M 28 108 H 48" />
+              <rect class="fig-node" x="48" y="92" width="360" height="32" rx="4" />
+              <text class="fig-fg" x="62" y="113">pay/intent.ts</text>
+              <rect class="fig-chip" x="348" y="99" width="48" height="18" rx="2" />
+              <text class="fig-chip-t" x="372" y="112" text-anchor="middle">you</text>
+            </g>
+            <g class="fig-map-n fig-map-n3">
+              <path class="fig-spine" d="M 28 152 H 48" />
+              <rect class="fig-node" x="48" y="136" width="360" height="32" rx="4" />
+              <text class="fig-fg" x="62" y="157">graph/map.ts</text>
+              <rect class="fig-chip dim" x="342" y="143" width="54" height="18" rx="2" />
+              <text class="fig-dim" x="369" y="156" text-anchor="middle">team</text>
+            </g>
+            <g class="fig-map-n fig-map-n4">
+              <path class="fig-spine" d="M 28 196 H 48" />
+              <rect class="fig-node mute" x="48" y="180" width="360" height="32" rx="4" />
+              <text class="fig-dim" x="62" y="201">infra/redis.go</text>
+              <text class="fig-dim" x="392" y="201" text-anchor="end">infra</text>
+            </g>
+            <rect class="fig-map-scan" x="20" y="44" width="400" height="40" rx="4" />
+            <g class="fig-map-hit">
+              <rect class="fig-hit" x="20" y="232" width="400" height="56" rx="4" />
+              <circle class="fig-pulse" cx="44" cy="260" r="4" />
+              <text class="fig-accent" x="60" y="257">SESSION RESTORED</text>
+              <text class="fig-accent" x="60" y="276">already briefed</text>
+            </g>
+          </svg>
+        </figure>
+      </section>
+
+      <p class="ticker">
+        <span>Learns your codebase</span>
+        <span class="dot">·</span>
+        <span>Self-improves</span>
+        <span class="dot">·</span>
+        <span>SoL-Pi inside</span>
+        <span class="dot">·</span>
+        <span class="hi">Invite-only beta</span>
+      </p>
+
+      <section class="band" id="product">
+        <div class="band-copy">
+          <p class="eyebrow">[ learns your codebase ]</p>
+          <h2>It shows up already briefed.</h2>
+          <p class="lede">
+            Other agents start from zero every session. Grist mines the tree,
+            ownership, and conventions from your own history. You stop pasting
+            context. It already knows who owns the file.
+          </p>
+        </div>
+        <figure class="fig-bare fig-wide" aria-hidden="true">
+          <svg class="diagram-svg fig-pipe" viewBox="0 0 440 220" fill="none">
+            <path class="fig-flow fig-pipe-path" d="M 84 88 H 356" />
+            <circle class="fig-pipe-dot" r="5" cx="0" cy="0" />
+            <g class="fig-pipe-n fig-pipe-n1">
+              <rect class="fig-card" x="24" y="44" width="120" height="88" rx="4" />
+              <text class="fig-label" x="84" y="76" text-anchor="middle">HISTORY</text>
+              <text class="fig-cap" x="84" y="98" text-anchor="middle">commits</text>
+              <text class="fig-cap" x="84" y="114" text-anchor="middle">reviews · diffs</text>
+            </g>
+            <g class="fig-pipe-n fig-pipe-n2">
+              <rect class="fig-card on" x="160" y="44" width="120" height="88" rx="4" />
+              <text class="fig-accent" x="220" y="76" text-anchor="middle">MAP</text>
+              <text class="fig-cap" x="220" y="98" text-anchor="middle">ownership</text>
+              <text class="fig-cap" x="220" y="114" text-anchor="middle">conventions</text>
+            </g>
+            <g class="fig-pipe-n fig-pipe-n3">
+              <rect class="fig-card" x="296" y="44" width="120" height="88" rx="4" />
+              <text class="fig-label" x="356" y="76" text-anchor="middle">SESSION</text>
+              <text class="fig-cap" x="356" y="98" text-anchor="middle">already</text>
+              <text class="fig-cap" x="356" y="114" text-anchor="middle">briefed</text>
+            </g>
+            <g class="fig-pipe-hit">
+              <rect class="fig-hit" x="24" y="156" width="392" height="44" rx="4" />
+              <text class="fig-accent" x="220" y="184" text-anchor="middle">no re-explain</text>
+            </g>
+          </svg>
+        </figure>
+      </section>
+
+      <section class="split reverse" id="improve">
+        <figure class="fig-bare" aria-hidden="true">
+          <svg class="diagram-svg fig-loop" viewBox="0 0 440 300" fill="none">
+            <path
+              class="fig-flow fig-loop-path"
+              d="M 118 86 H 322 Q 352 86 352 116 V 184 Q 352 214 322 214 H 118 Q 88 214 88 184 V 116 Q 88 86 118 86"
+            />
+            <circle class="fig-loop-dot" r="5" cx="0" cy="0" />
+            <g class="fig-loop-n fig-loop-n1">
+              <rect class="fig-card" x="28" y="28" width="120" height="56" rx="4" />
+              <text class="fig-label" x="88" y="52" text-anchor="middle">TASK</text>
+              <text class="fig-cap" x="88" y="68" text-anchor="middle">incoming</text>
+            </g>
+            <g class="fig-loop-n fig-loop-n2">
+              <rect class="fig-card" x="292" y="28" width="120" height="56" rx="4" />
+              <text class="fig-label" x="352" y="52" text-anchor="middle">GATE</text>
+              <text class="fig-cap" x="352" y="68" text-anchor="middle">then DIFF</text>
+            </g>
+            <g class="fig-loop-n fig-loop-n3">
+              <rect class="fig-card on" x="292" y="216" width="120" height="56" rx="4" />
+              <text class="fig-accent" x="352" y="240" text-anchor="middle">tests pass</text>
+              <text class="fig-cap" x="352" y="256" text-anchor="middle">proven</text>
+            </g>
+            <g class="fig-loop-n fig-loop-n4">
+              <rect class="fig-card" x="28" y="216" width="120" height="56" rx="4" />
+              <text class="fig-label" x="88" y="240" text-anchor="middle">MEMORY</text>
+              <text class="fig-cap" x="88" y="256" text-anchor="middle">corpus</text>
+            </g>
+            <text class="fig-loop-core" x="220" y="156" text-anchor="middle">cheaper · faster · right</text>
+          </svg>
+        </figure>
+        <div>
+          <p class="eyebrow">[ self-improves ]</p>
+          <h2>Every verified win makes the next task sharper.</h2>
+          <p class="lede">
+            Grist only remembers what you approved or what tests proved. The
+            gate calibrates to your repo. Unreviewed noise never becomes
+            knowledge.
+          </p>
+        </div>
+      </section>
+
+      <section class="solpi-block" id="solpi">
+        <div class="solpi-head">
+          <p class="eyebrow">[ SoL-Pi ]</p>
+          <h2>Same quality. Fewer tokens. That’s SoL-Pi.</h2>
+          <p class="lede">
+            SoL-Pi sits in the harness, not in a cheaper model. Huge tool
+            output gets packed. Edit and verify fuse into one move. Spend goes
+            to judgment, not log spam.
+          </p>
+          <div class="pair">
+            <article>
+              <p class="kicker">Harness layer</p>
+              <h3>ObservationPack</h3>
+              <p>Handle plus excerpt. Full text stays on disk.</p>
+            </article>
+            <article>
+              <p class="kicker">Turn compression</p>
+              <h3>One call</h3>
+              <p>Edit and verify fuse into a single move.</p>
+            </article>
+          </div>
+        </div>
+        <figure class="fig-bare fig-wide" aria-hidden="true">
+          <svg class="diagram-svg fig-pack" viewBox="0 0 440 240" fill="none">
+            <text class="fig-col" x="24" y="28">TOOL OUTPUT · 48 KB</text>
+            <g class="fig-pack-stack">
+              <rect class="fig-bar fig-bar-1" x="24" y="44" width="168" height="14" rx="2" />
+              <rect class="fig-bar fig-bar-2" x="24" y="64" width="156" height="14" rx="2" />
+              <rect class="fig-bar fig-bar-3" x="24" y="84" width="172" height="14" rx="2" />
+              <rect class="fig-bar fig-bar-4" x="24" y="104" width="140" height="14" rx="2" />
+              <rect class="fig-bar fig-bar-5" x="24" y="124" width="162" height="14" rx="2" />
+              <rect class="fig-bar fig-bar-6" x="24" y="144" width="148" height="14" rx="2" />
+              <rect class="fig-bar fig-bar-7" x="24" y="164" width="132" height="14" rx="2" />
+            </g>
+            <text class="fig-dim" x="24" y="202">log spam billed every turn</text>
+            <path class="fig-flow fig-pack-path" d="M 204 108 H 248" />
+            <polygon class="fig-arrow" points="248,102 262,108 248,114" />
+            <circle class="fig-pack-dot" r="4" cx="0" cy="0" />
+            <g class="fig-pack-card">
+              <rect class="fig-card on" x="270" y="52" width="146" height="128" rx="4" />
+              <text class="fig-accent" x="343" y="82" text-anchor="middle">ObservationPack</text>
+              <text class="fig-fg" x="343" y="108" text-anchor="middle">~1 KB handle</text>
+              <text class="fig-cap" x="343" y="128" text-anchor="middle">excerpt only</text>
+              <text class="fig-cap" x="343" y="146" text-anchor="middle">full text on disk</text>
+            </g>
+          </svg>
+        </figure>
+      </section>
+
+      <section class="gate-section" id="gate">
+        <div>
+          <p class="eyebrow">[ the gate ]</p>
+          <h2>Frontier when it has to be. Cents when it doesn’t.</h2>
+          <p class="lede">
+            Most agents bill like every task is hard. Grist spends on difficulty,
+            not habit. Routine edits stay cheap. The expensive rung is reserved
+            for when it actually matters.
+          </p>
+        </div>
+        <ol class="ladder" aria-hidden="true">
+          <li class="fig-rung fig-rung-1">
+            <div><b>CHEAP</b><em>default</em></div>
+            <p>Routine edits, stubs, formatting. Stays here unless the work is actually hard.</p>
+          </li>
+          <li class="fig-rung fig-rung-2">
+            <div><b>CAPABLE</b><em>pre-frontier</em></div>
+            <p>Cross-file refactors and work that needs more than the cheap rung.</p>
+          </li>
+          <li class="fig-rung fig-rung-3">
+            <div><b>EXCEPTIONAL</b><em>reserved</em></div>
+            <p>Used when it is actually hard. Not a habit.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="bound-section" id="local">
+        <div class="bound-copy">
+          <p class="eyebrow">[ local ]</p>
+          <h2>The repo never leaves the machine.</h2>
+          <p class="lede">
+            Tools run in your working tree. The prompt goes out. The source
+            does not. We hold the key. You keep the files. We do not train on
+            tester repos.
+          </p>
+        </div>
+        <div class="bound-stage" aria-hidden="true">
+          <article class="bound-pane on">
+            <p class="kicker">Your disk</p>
+            <ul>
+              <li>Source files</li>
+              <li>Git history</li>
+              <li>Tool execution</li>
+              <li>Tests</li>
+            </ul>
+          </article>
+          <div class="bound-wire">
+            <span class="bound-packet"></span>
+            <span>prompt only</span>
+          </div>
+          <article class="bound-pane">
+            <p class="kicker">Gateway</p>
+            <ul>
+              <li>Prompt tokens</li>
+              <li>ObservationPack</li>
+              <li>Meter + cap</li>
+              <li>No source ingest</li>
+            </ul>
+          </article>
+        </div>
+        <p class="bound-receipt">3 files · tests passed · $0.012</p>
+      </section>
+
+      <section class="waitlist" id="waitlist">
+        <div>
+          <p class="eyebrow">[ waitlist ]</p>
+          <h2>No invite yet? Request access.</h2>
+          <p class="lede">
+            Beta is invite-only. Join the waitlist and we will send a code when
+            there is room.
+          </p>
+        </div>
+        <iframe
+          data-tally-src="https://tally.so/embed/QKGWYG?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"
+          loading="lazy"
+          width="100%"
+          height="177"
+          frameborder="0"
+          marginheight="0"
+          marginwidth="0"
+          title="Grist Waitlist"
+        ></iframe>
+      </section>
+
+      <section class="cta">
+        <p class="eyebrow">[ beta ]</p>
+        <h2>Stop re-teaching the agent your codebase.</h2>
+        <p class="lede">Invite-only. Inference included. Your code stays on your machine.</p>
+        <div class="actions center">
+          <a class="btn" href="/#waitlist">Request access</a>
+          <a class="btn btn-ghost" href="/login">Sign in</a>
+        </div>
+      </section>
+    </main>
+
+    <main id="view-docs" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ docs ]</p>
+        <h1>Using Grist</h1>
+        <p class="lede">
+          Beta is invite-only. Inference is included. The CLI is the product —
+          this page is how you get from an invite to a running agent.
+        </p>
+        <nav class="docs-toc" aria-label="On this page">
+          <a href="/docs#install">Install</a>
+          <a href="/docs#sign-in">Sign in</a>
+          <a href="/docs#repo">Start in a repo</a>
+          <a href="/docs#the-gate">The gate</a>
+          <a href="/docs#memory">Memory</a>
+          <a href="/docs#sol-pi">SoL-Pi</a>
+          <a href="/docs#spend">Spend</a>
+        </nav>
+
+        <h2 id="install">Install</h2>
+        <p>CLI (any OS):</p>
+        <pre>npm install -g grist-ai
+grist</pre>
+        <p>
+          The first <code>grist</code> run prompts to open <code>grist auth login</code>.
+          Sign in with your invite. Completions will not run until you do.
+        </p>
+        <p>
+          macOS desktop:
+          <a href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-arm64.dmg">Apple Silicon</a>
+          ·
+          <a href="https://github.com/pranav6226/grist/releases/latest/download/grist-desktop-mac-x64.dmg">Intel</a>.
+          First launch opens login.
+        </p>
+
+        <h2 id="sign-in">Sign in</h2>
+        <p>
+          <code>grist auth login</code> opens this site. Sign in with Google.
+          The first time, enter the invite you were given. After the account
+          exists, Google is enough — you do not enter the code again. The
+          terminal polls until the site approves it. You do not paste an API
+          key.
+        </p>
+        <pre>grist auth login</pre>
+        <p>
+          Usage, remaining spend, and the current plan live on the
+          <a href="/dashboard">dashboard</a>. Same account, same origin.
+        </p>
+
+        <h2 id="repo">Start in a repo</h2>
+        <p>Run Grist in the project you want changed. Tools execute on your machine.</p>
+        <pre>cd /path/to/your-repo
+grist init
+grist bootstrap
+grist</pre>
+        <p>
+          <code>grist init</code> scaffolds local state. <code>grist bootstrap</code>
+          mines history (ownership, map) so the next session is not cold.
+          Review <code>.grist/bootstrap/ownership.jsonl</code> before anything
+          is persisted to memory. <code>grist init --bootstrap</code> runs both.
+        </p>
+
+        <h2 id="the-gate">The gate</h2>
+        <p>
+          Each task is scored for difficulty and sensitivity, then routed to
+          the cheapest capable rung. Underspecified work stays cheap instead of
+          inventing scope. You do not pick a model. Logs look like
+          <code>[grist:gate] cheapest|medium|frontier</code>.
+        </p>
+        <p>Turn the gate off with <code>GRIST_GATE=off</code> (not recommended).</p>
+
+        <h2 id="memory">Memory</h2>
+        <p>
+          Grist persists only verified outcomes: tests that passed, a change you
+          approved, or a correction you made. Unreviewed generations are not
+          stored. Recall is retrieval from your own history — not a weight update.
+        </p>
+        <p>
+          Default backend is a local memory sidecar. File fallback:
+          <code>GRIST_MEMORY=file</code>. Off: <code>GRIST_MEMORY=off</code>.
+        </p>
+
+        <h2 id="sol-pi">SoL-Pi</h2>
+        <p>
+          SoL-Pi is a harness-layer set of token cuts. ObservationPack replaces
+          huge tool output with a handle plus a short excerpt (full text still
+          on disk). Action Fusion edits and verifies in one call. Profiles:
+        </p>
+        <pre>GRIST_MECH=auto          # default
+GRIST_MECH=efficiency    # pack + fuse
+GRIST_MECH=performance   # full tool output, fuse still on
+GRIST_MECH=off           # both off
+GRIST_OBS_PACK=off       # pack only</pre>
+
+        <h2 id="spend">Spend</h2>
+        <p>
+          Completions are metered against your invite cap. At the cap the CLI
+          stops. The dashboard shows remaining USD, rung mix, and expiry.
+          We hold the inference key. You never paste one. We do not train on
+          tester repos.
+        </p>
+      </article>
+    </main>
+
+    <main id="view-login" hidden>
+      <section class="auth">
+        <p class="eyebrow" id="login-kicker">[ sign in ]</p>
+        <h1 id="login-title">Sign in</h1>
+        <p class="lede" id="login-lede">
+          Sign in with Google. First time, enter your invite. After that, this
+          account is enough.
+        </p>
+        <div id="login-methods">
+          <button class="btn btn-google" type="button" id="google-btn">
+            <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+            </svg>
+            Sign in with Google
+          </button>
+          <p class="or">or email</p>
+          <form id="email-form">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+            <button class="btn" type="submit" id="email-submit">Continue with email</button>
+          </form>
+        </div>
+        <form id="invite-form" hidden>
+          <p class="muted" id="login-who" hidden></p>
+          <label for="code">Invite code</label>
+          <input
+            id="code"
+            name="code"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="grist-XXXX-XXXX"
+            required
+          />
+          <button class="btn" type="submit" id="login-submit">Enter beta</button>
+          <button class="text-btn" type="button" id="switch-account">Use a different account</button>
+        </form>
+        <p class="error" id="login-error" hidden></p>
+        <p class="muted" id="firebase-missing" hidden>
+          Firebase is not configured on this gateway yet. You can still enter an invite.
+        </p>
+        <p class="muted" id="login-waitlist">
+          No invite yet? <a href="/#waitlist">Request access</a>
+        </p>
+      </section>
+    </main>
+
+    <main id="view-cli" hidden>
+      <section class="auth">
+        <p class="eyebrow">[ cli ]</p>
+        <h1>You’re in.</h1>
+        <p class="lede">Return to the terminal. This machine is authenticated.</p>
+        <a class="btn" href="/dashboard">Go to dashboard</a>
+      </section>
+    </main>
+
+    <main id="view-dashboard" hidden>
+      <section class="dash-head">
+        <div>
+          <p class="eyebrow" id="plan-kicker">[ beta ]</p>
+          <h1>Usage</h1>
+        </div>
+        <div class="dash-actions">
+          <a href="/plans">Plans</a>
+          <a href="/admin" data-auth="admin" hidden>Admin</a>
+          <button class="text-btn sign-out" type="button">Sign out</button>
+        </div>
+      </section>
+      <p class="error" id="dash-error" hidden></p>
+      <p class="remain" id="remain">—</p>
+      <div class="bar" aria-hidden="true"><span id="spent-bar"></span></div>
+      <p class="muted" id="cap-line"></p>
+      <section class="rungs" id="rungs"></section>
+      <section class="install">
+        <h2>CLI</h2>
+        <pre id="cli"></pre>
+      </section>
+    </main>
+
+    <main id="view-admin" hidden>
+      <section class="dash-head">
+        <div>
+          <p class="eyebrow">[ admin ]</p>
+          <h1>Beta codes</h1>
+        </div>
+        <div class="dash-actions">
+          <a href="/dashboard">Usage</a>
+          <button class="text-btn sign-out" type="button">Sign out</button>
+        </div>
+      </section>
+      <p class="lede">Only codes you generate here can enter the beta. Testers bind one after they sign in.</p>
+      <p class="remain" id="admin-spent">—</p>
+      <p class="muted" id="admin-cap-line"></p>
+      <form id="mint-form" class="mint">
+        <label for="mint-count">How many</label>
+        <input id="mint-count" name="count" type="number" min="1" max="25" value="1" required />
+        <label for="mint-cap">Cap USD</label>
+        <input id="mint-cap" name="cap" type="number" min="0.01" step="0.01" value="5" required />
+        <label for="mint-days">Days</label>
+        <input id="mint-days" name="days" type="number" min="1" value="30" required />
+        <label for="mint-note">Note</label>
+        <input id="mint-note" name="note" placeholder="alice@…" />
+        <button class="btn" type="submit">Generate codes</button>
+      </form>
+      <p class="error" id="admin-error" hidden></p>
+      <section class="minted" id="minted" hidden>
+        <h2>New codes</h2>
+        <pre id="minted-codes"></pre>
+      </section>
+      <section class="admin-list" id="admin-invites"></section>
+    </main>
+
+    <main id="view-plans" hidden>
+      <section class="dash-head">
+        <div>
+          <p class="eyebrow">[ pricing ]</p>
+          <h1>Plans</h1>
+        </div>
+        <a href="/dashboard">Usage</a>
+      </section>
+      <div class="plans">
+        <article class="plan on">
+          <p class="eyebrow">Current</p>
+          <h2>Beta</h2>
+          <p class="price">$5 included</p>
+          <p>Invite-gated. Stops at the cap. Sign in with Google; first time, bind your invite.</p>
+        </article>
+        <article class="plan">
+          <p class="eyebrow">After beta</p>
+          <h2>Subscription</h2>
+          <p class="price">TBD</p>
+          <p>Same dashboard, billed to you. Nothing to manage yet.</p>
+        </article>
+      </div>
+    </main>
+
+    <footer>
+      <span class="foot-brand">Grist</span>
+      <a href="/docs">Docs</a>
+      <a href="/plans">Pricing</a>
+      <span>No training on tester repos. Code stays local.</span>
+    </footer>
+    <script>
+      (() => {
+        const path = location.pathname.replace(/\/+$/, "") || "/"
+        const views = {
+          "/": "view-home",
+          "/login": "view-login",
+          "/dashboard": "view-dashboard",
+          "/admin": "view-admin",
+          "/plans": "view-plans",
+          "/docs": "view-docs",
+        }
+        if (path === "/") return
+        const id = views[path] || "view-home"
+        for (const main of document.querySelectorAll("main")) main.hidden = main.id !== id
+      })()
+    </script>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

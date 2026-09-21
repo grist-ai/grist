@@ -24,6 +24,7 @@ import type { UpdaterController } from "./updater-controller"
 import { createUpdaterSubscriptions } from "./updater-subscriptions"
 import { createDesktopDraftStore } from "./draft-store"
 import { nativeT } from "./native-translations"
+import { cancelLogin, fetchUsage, logout, plansUrl, accountStatus, startLogin, waitLogin } from "./invite"
 
 const pickerFilters = (ext?: string[]) => {
   if (!ext || ext.length === 0) return undefined
@@ -110,6 +111,15 @@ export function registerIpcHandlers(deps: Deps) {
     const bundle = parseDesktopNativeBundle(value)
     if (!bundle) throw new Error("Invalid native translation bundle")
     deps.setNativeTranslations(bundle)
+  })
+  ipcMain.handle("invite-status", () => accountStatus())
+  ipcMain.handle("invite-start-login", () => startLogin((url) => openExternalURL(url)))
+  ipcMain.handle("invite-wait-login", () => waitLogin())
+  ipcMain.handle("invite-cancel-login", () => cancelLogin())
+  ipcMain.handle("invite-logout", () => logout())
+  ipcMain.handle("invite-usage", () => fetchUsage())
+  ipcMain.handle("invite-open-plans", () => {
+    openExternalURL(plansUrl())
   })
   ipcMain.handle("store-get", (_event: IpcMainInvokeEvent, name: string, key: string) => {
     try {

@@ -1,4 +1,4 @@
-import { Component, createSignal, startTransition } from "solid-js"
+import { Component, createSignal, Show, startTransition } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -10,6 +10,8 @@ import { SettingsKeybinds } from "./settings-keybinds"
 import { SettingsProviders } from "./settings-providers"
 import { SettingsModels } from "./settings-models"
 import { SettingsServers } from "./settings-servers"
+import { SettingsAccountV2 } from "./settings-v2/account"
+import { HIDE_MODEL_UI } from "@/product"
 
 export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const language = useLanguage()
@@ -34,6 +36,17 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
           <div class="flex flex-col justify-between h-full w-full gap-4">
             <div class="flex flex-col gap-3 w-full pt-3">
               <div class="flex flex-col gap-3">
+                <Show when={platform.account}>
+                  <div class="flex flex-col gap-1.5">
+                    <Tabs.SectionTitle>{language.t("settings.section.account")}</Tabs.SectionTitle>
+                    <div class="flex flex-col gap-1.5 w-full">
+                      <Tabs.Trigger value="account">
+                        <Icon name="shield" />
+                        {language.t("settings.tab.account")}
+                      </Tabs.Trigger>
+                    </div>
+                  </div>
+                </Show>
                 <div class="flex flex-col gap-1.5">
                   <Tabs.SectionTitle>{language.t("settings.section.desktop")}</Tabs.SectionTitle>
                   <div class="flex flex-col gap-1.5 w-full">
@@ -59,10 +72,12 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                       <Icon name="providers" />
                       {language.t("settings.providers.title")}
                     </Tabs.Trigger>
-                    <Tabs.Trigger value="models">
-                      <Icon name="models" />
-                      {language.t("settings.models.title")}
-                    </Tabs.Trigger>
+                    <Show when={!HIDE_MODEL_UI}>
+                      <Tabs.Trigger value="models">
+                        <Icon name="models" />
+                        {language.t("settings.models.title")}
+                      </Tabs.Trigger>
+                    </Show>
                   </div>
                 </div>
               </div>
@@ -73,6 +88,11 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
             </div>
           </div>
         </Tabs.List>
+        <Show when={platform.account}>
+          <Tabs.Content value="account" class="no-scrollbar">
+            <SettingsAccountV2 />
+          </Tabs.Content>
+        </Show>
         <Tabs.Content value="general" class="no-scrollbar">
           <SettingsGeneral />
         </Tabs.Content>
@@ -85,9 +105,11 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
         <Tabs.Content value="providers" class="no-scrollbar">
           <SettingsProviders onBack={showProviders} />
         </Tabs.Content>
-        <Tabs.Content value="models" class="no-scrollbar">
-          <SettingsModels />
-        </Tabs.Content>
+        <Show when={!HIDE_MODEL_UI}>
+          <Tabs.Content value="models" class="no-scrollbar">
+            <SettingsModels />
+          </Tabs.Content>
+        </Show>
       </Tabs>
     </Dialog>
   )

@@ -1,100 +1,66 @@
 # Providers (Phase 1 harness)
 
-Grist holds **one** API key via [OpenRouter](https://openrouter.ai) and routes
-the model ladder (cheapest → medium → frontier) by changing model ids only.
+Testers never hold a model key. The **gateway** has one `OPENROUTER_API_KEY`
+(the founder's) and routes cheapest → medium → frontier by model id.
+Subscription billing replaces invites later; until then every completion is
+founder credits, capped per invite code.
 
-## OpenRouter (recommended)
+See [`grist-public-launch-spec.md`](grist-public-launch-spec.md).
 
-1. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys).
-2. Export it (or put it in a local `.env` that is **not** committed):
-
-```bash
-export OPENROUTER_API_KEY=sk-or-v1-...
-```
-
-Or put it in a local **`.env`** (gitignored; Bun loads it automatically):
+## Testers
 
 ```bash
-cp .env.example .env
-# edit .env → OPENROUTER_API_KEY=sk-or-v1-...
+grist auth login --gateway https://grist-gateway.example
+grist usage
+grist
 ```
 
-3. Project config:
+The code is stored in `~/.grist/config.json` (0600). `GRIST_INVITE` /
+`GRIST_GATEWAY_URL` override the file. No `OPENROUTER_API_KEY` on the client.
+
+## Founder gateway
 
 ```bash
-cp opencode.jsonc.example opencode.jsonc
+export OPENROUTER_API_KEY=sk-or-v1-...   # this process only
+export TYPESAFE_API_KEY=...              # optional live Jev
+export GRIST_ADMIN_TOKEN=...
+grist gateway                            # :8787 — mint codes at /admin as pranavmm25@gmail.com
 ```
 
-Default model: `openrouter/deepseek/deepseek-v4.1-flash`.
-
-4. Verify:
-
-```bash
-bun run --cwd packages/opencode src/index.ts models openrouter
-# or: bun dev  then /connect openrouter
-```
-
-### Ladder (defaults — all via OpenRouter)
+Ladder ids (override with `GRIST_*_MODEL` **on the gateway**):
 
 | Rung | OpenRouter model id | Env override |
 | --- | --- | --- |
 | Cheapest | `deepseek/deepseek-v4.1-flash` | `GRIST_CHEAPEST_MODEL` |
-| Medium | `deepseek/deepseek-v4-pro` | `GRIST_MEDIUM_MODEL` |
-| Frontier | `anthropic/claude-opus-4.6` | `GRIST_FRONTIER_MODEL` |
+| Medium | `moonshotai/kimi-k3` | `GRIST_MEDIUM_MODEL` |
+| Frontier | `openai/gpt-5.6-sol` | `GRIST_FRONTIER_MODEL` |
 
-### DeepSeek pricing recheck (2026-09-19)
+### Ladder pricing (OpenRouter, 2026-09-19)
 
-First-party [api-docs.deepseek.com](https://api-docs.deepseek.com/quick_start/pricing)
-(off-peak / peak per 1M tok). OpenRouter markups may differ — verify on
-[openrouter.ai/models](https://openrouter.ai/models).
+Verify live on [openrouter.ai/models](https://openrouter.ai/models). DeepSeek
+first-party Flash also has peak windows — see
+[api-docs.deepseek.com](https://api-docs.deepseek.com/quick_start/pricing).
 
-| Model | Off-peak in/out | Peak in/out | Notes |
-| --- | --- | --- | --- |
-| `deepseek-flash` (V4.1-Flash) | $0.15 / $0.60 | $0.30 / $1.20 | Preferred cheap; legacy `deepseek-v4-flash` aliases here |
-| `deepseek-v4-pro` (0813) | $0.66 / $1.98 | $1.32 / $3.96 | Still served after 2026-09-14; was nearly withdrawn |
+| Model | In/out per 1M tok | Notes |
+| --- | --- | --- |
+| `deepseek/deepseek-v4.1-flash` | $0.15 / $0.60 off-peak (peak 2×) | Cheap default; first-party `deepseek-flash` |
+| `moonshotai/kimi-k3` | ~$1.70 / $8.50 floor | Medium default |
+| `openai/gpt-5.6-sol` | $4 / $20 list; OpenRouter 50% off ≈ $2 / $10 | Frontier default |
 
-Peak windows (UTC weekdays): 01:00–04:00 and 06:00–10:00. US daytime ≈ off-peak.
-Spec sheet table (~$0.44/$0.87 promo for Pro) is **stale** — use this row for economics.
+Peak windows for DeepSeek (UTC weekdays): 01:00–04:00 and 06:00–10:00. US daytime ≈ off-peak.
 
-Provider defaults to `openrouter` for every rung (`GRIST_*_PROVIDER` to pin
-elsewhere). Example — swap frontier to GPT-5.6 Sol still on OpenRouter:
-
-```bash
-export GRIST_FRONTIER_MODEL=openai/gpt-5.6-sol
-```
-
-Browse live ids: [openrouter.ai/models](https://openrouter.ai/models).
-
-## Backup cheap tier
-
-DeepSeek concentration risk: keep a second cheap model one env change away, e.g.
+Swap a rung without a client update, e.g. frontier to Claude:
 
 ```bash
-export GRIST_CHEAPEST_MODEL=moonshotai/kimi-k2.5   # or openai/gpt-4o-mini-class id
+export GRIST_FRONTIER_MODEL=anthropic/claude-opus-4.6
 ```
 
-Still one `OPENROUTER_API_KEY` — no new provider key.
-
-## Operating mode
+## Operating mode (gateway)
 
 ```bash
 export GRIST_MODE=capped      # frontier off; medium is top
 # export GRIST_MODE=cheapest  # cheapest-only
+# or POST /v1/admin/mode
 ```
 
 See [`gate.md`](gate.md).
-
-## Native providers (optional)
-
-You can still use first-party keys if you prefer (DeepSeek / Anthropic /
-OpenAI). Set `GRIST_*_PROVIDER` + `GRIST_*_MODEL` accordingly and export that
-provider’s key. OpenRouter remains the zero-friction default.
-
-## TypeSafe / Jev (Phase 2)
-
-```bash
-export TYPESAFE_API_KEY=...
-```
-
-See [`grist-pre-poc-spec-sheet.md`](grist-pre-poc-spec-sheet.md) §4.
-Gate: [`gate.md`](gate.md).

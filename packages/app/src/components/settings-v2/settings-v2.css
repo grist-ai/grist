@@ -78,6 +78,19 @@
   color: var(--v2-text-text-base);
 }
 
+.settings-v2-usage-bar {
+  width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--v2-background-bg-layer-02);
+  overflow: hidden;
+}
+
+.settings-v2-usage-bar > span {
+  display: block;
+  height: 100%;
+}
+
 .settings-v2-section-title + [data-component="settings-v2-list"] {
   margin-top: -4px;
   margin-bottom: 0;

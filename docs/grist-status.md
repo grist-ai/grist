@@ -9,6 +9,7 @@ do not block harness work on an external codebase.
 | Area | Surface |
 | --- | --- |
 | Harness / ladder | OpenRouter + `GRIST_*_MODEL` ([providers.md](providers.md)) |
+| Public test | Invite gateway + `grist auth login` ([grist-public-launch-spec.md](grist-public-launch-spec.md)) |
 | Gate | Jev + shadow ([gate.md](gate.md)) |
 | Control plane | continue/stop/escalate, permission, tool budget, verify, ctx rank (`GRIST_CTRL`) |
 | Operating modes | `GRIST_MODE` |
@@ -24,9 +25,11 @@ do not block harness work on an external codebase.
 ## Run Grist (no pilot repo)
 
 ```bash
-cp opencode.jsonc.example opencode.jsonc
+# Founder gateway (your OpenRouter key lives here only)
 export OPENROUTER_API_KEY=sk-or-v1-...
-# optional: TYPESAFE_API_KEY, LANGFUSE_*, GRIST_MODE, GRIST_MECH
+export GRIST_ADMIN_TOKEN=dev
+bun run --cwd packages/opencode src/index.ts gateway
+# Then: grist auth login --gateway http://127.0.0.1:8787
 bun run --cwd packages/opencode test src/grist/
 bun scripts/grist-eval.ts
 bun scripts/burn-in-report.ts

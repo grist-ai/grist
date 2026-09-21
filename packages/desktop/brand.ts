@@ -2,6 +2,7 @@
 export const PRODUCT_NAME = "Grist"
 export const PRODUCT_NAME_LOWER = "grist"
 export const PRODUCT_COLOR = "#EC5B2B"
+export const PRODUCT_GATEWAY_URL = "https://grist.lol"
 
 export const APP_NAMES = {
   dev: "Grist Dev",
