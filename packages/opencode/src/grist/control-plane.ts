@@ -10,7 +10,7 @@
  *
  * Kill switch: `GRIST_CTRL=off`
  */
-import { RUNG_MODELS, type ModelRef, type Rung } from "./rung"
+import { publicModelRef, type ModelRef, type Rung } from "./rung"
 import { loadOperatingMode, applyModeCap } from "./mode"
 import {
   askSystemOne,
@@ -178,7 +178,7 @@ export function shadowContinue(input: {
         reasons,
         confidence: 0.7,
         rung: up,
-        model: { ...RUNG_MODELS[up] },
+        model: publicModelRef(up),
         latencyMs: Date.now() - started,
       }
     }
@@ -281,7 +281,7 @@ async function jevContinue(input: {
       reasons: ["jev_escalate", ...capped.reasons],
       confidence,
       rung: capped.rung,
-      model: { ...RUNG_MODELS[capped.rung] },
+      model: publicModelRef(capped.rung),
       latencyMs: Date.now() - started,
     }
   }

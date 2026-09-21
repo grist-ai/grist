@@ -23,6 +23,10 @@ describe("scaffoldGrist", () => {
     const first = scaffoldGrist({ cwd: dir })
     expect(first.created).toContain(".grist/")
     expect(first.created).toContain("opencode.jsonc")
+    const config = fs.readFileSync(path.join(dir, "opencode.jsonc"), "utf8")
+    expect(config).toContain("openrouter/cheapest")
+    expect(config).not.toContain("deepseek")
+    expect(config).not.toContain("kimi")
     expect(fs.existsSync(path.join(dir, ".grist", "README.md"))).toBe(true)
     expect(fs.readFileSync(path.join(dir, ".gitignore"), "utf8")).toContain(".grist/")
 
