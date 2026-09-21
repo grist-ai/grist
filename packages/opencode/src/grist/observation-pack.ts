@@ -30,6 +30,35 @@ export function excerptHead(text: string, maxBytes: number): string {
   return out
 }
 
+export function excerptTail(text: string, maxBytes: number): string {
+  if (Buffer.byteLength(text, "utf-8") <= maxBytes) return text
+  const kept: string[] = []
+  let bytes = 0
+  for (const line of text.split("\n").toReversed()) {
+    const size = Buffer.byteLength(line, "utf-8") + (kept.length ? 1 : 0)
+    if (bytes + size > maxBytes) break
+    kept.push(line)
+    bytes += size
+  }
+  if (kept.length === 0) {
+    const buf = Buffer.from(text, "utf-8")
+    let start = Math.max(0, buf.length - maxBytes)
+    while (start < buf.length && (buf[start] & 0xc0) === 0x80) start++
+    return buf.subarray(start).toString("utf-8")
+  }
+  return kept.toReversed().join("\n")
+}
+
+/** First ~256 bytes plus tail so build/test errors at the end survive packing. */
+export function excerptEnds(text: string, maxBytes: number, headBytes = 256): string {
+  if (Buffer.byteLength(text, "utf-8") <= maxBytes) return text
+  const head = excerptHead(text, Math.min(headBytes, maxBytes))
+  const sep = "\n...\n"
+  const tailBudget = maxBytes - Buffer.byteLength(head, "utf-8") - Buffer.byteLength(sep, "utf-8")
+  if (tailBudget <= 0) return excerptHead(text, maxBytes)
+  return `${head}${sep}${excerptTail(text, tailBudget)}`
+}
+
 export type PackDecision =
   | { action: "passthrough"; count: number }
   | { action: "pack"; handle: string; excerpt: string; count: number }
@@ -66,7 +95,7 @@ export function consider(input: { sessionID: string; toolID: string; text: strin
   return {
     action: "pack",
     handle,
-    excerpt: excerptHead(input.text, EXCERPT_BYTES),
+    excerpt: excerptEnds(input.text, EXCERPT_BYTES),
     count,
   }
 }
@@ -90,7 +119,11 @@ export function formatPacked(input: {
   ].join("\n")
 }
 
+export function clearObservationPack(sessionID: string) {
+  sessions.delete(sessionID)
+}
+
 /** Test helper */
 export function resetSession(sessionID: string) {
-  sessions.delete(sessionID)
+  clearObservationPack(sessionID)
 }

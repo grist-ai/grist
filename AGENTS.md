@@ -3,8 +3,9 @@
 This repository is **Grist**: a fork of OpenCode used as the coding-agent harness.
 Living plan: `docs/grist-pre-poc-spec-sheet.md`. TypeSafe / Jev skill: `.agents/skills/typesafe-ai`.
 Do not introduce a separate “mill” CLI that shells out to OpenCode — Grist *is* the agent loop.
-Default model ladder goes through **OpenRouter** (`OPENROUTER_API_KEY`) so one
-key covers cheapest → medium → frontier; not a local llama.cpp path.
+Default model ladder is served by the **invite gateway** using the founder's
+`OPENROUTER_API_KEY` (cheapest → medium → frontier). Testers hold an invite
+code only — not a local llama.cpp path and not their own OpenRouter key.
 Default GitHub branch for this fork is `main`; upstream OpenCode’s default is `dev`.
 
 # OpenCode (upstream agent notes)

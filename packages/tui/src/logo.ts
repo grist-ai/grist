@@ -1,14 +1,13 @@
-/** Grist product logo (glyph dialect: _ ^ ~ ,). Spells GRIST. */
+/** Grist product logo. Same 5-row pixel geometry as the desktop wordmark. */
 export const logo = {
-  // G + R (R stem touches bowl, no gap) | I S T — G/R solid primary like I/S/T
-  left: ["      ", "█▀▀▀ █▀▀█", "█ ▀█ █▀▀ ", "▀▀▀▀ █ ▀█"],
-  right: ["              ", " █  █▀▀▀ ▀▀█▀▀", "_█_ ▀▀▀█  _█_ ", "_█_ ▀▀▀▀  _▀_ "],
+  left: ["████  ███", "█     █  ", "█ ██  █ █", "█     █ █", "████  █ █"],
+  right: [" █  ████  ██████", " █  █       ██  ", " █  ████    ██  ", " █     █    ██  ", " █  ████    ██  "],
 }
 
-/** Compact G mark for splash / exit badge. */
+/** Compact G mark — same letter as the desktop app icon. */
 export const go = {
-  left: ["    ", "█▀▀▀", "█ ▀█", "▀▀▀▀"],
-  right: ["    ", "█▀▀▀", "█ ▀█", "▀▀▀▀"],
+  left: ["████", "█   ", "█ ██", "█   ", "████"],
+  right: ["████", "█   ", "█ ██", "█   ", "████"],
 }
 
 export const marks = "_^~,"

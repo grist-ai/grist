@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // One key for the whole ladder: export OPENROUTER_API_KEY=sk-or-v1-...
+  // Models are routed by the invite gateway (founder's OpenRouter key).
   // Change rungs via GRIST_*_MODEL without new provider keys.
   "model": "openrouter/deepseek/deepseek-v4.1-flash",
   "lsp": true,

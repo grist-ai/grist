@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import path from "path"
-import { CliError, effectCmd } from "../effect-cmd"
+import { CliError, effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
 import { scaffoldGrist } from "@/grist/init/scaffold"
 import { bootstrapCodebase } from "@/grist/init/bootstrap"
@@ -11,6 +11,8 @@ type Args = {
   bootstrap?: boolean
   since?: string
   "skip-graph"?: boolean
+  invite?: string
+  gateway?: string
 }
 
 export const InitCommand = effectCmd({
@@ -39,6 +41,14 @@ export const InitCommand = effectCmd({
       .option("skip-graph", {
         describe: "with --bootstrap, skip Graphify even if installed",
         type: "boolean",
+      })
+      .option("invite", {
+        describe: "invite code (grist-XXXX-XXXX) for the public test gateway",
+        type: "string",
+      })
+      .option("gateway", {
+        describe: "gateway URL (default GRIST_GATEWAY_URL)",
+        type: "string",
       }),
   directory: (args) => path.resolve(args.directory || process.cwd()),
   handler: Effect.fn("Cli.init")(function* (args) {
@@ -56,13 +66,41 @@ export const InitCommand = effectCmd({
       UI.println(UI.Style.TEXT_WARNING + "  ! " + warning + UI.Style.TEXT_NORMAL)
     }
 
+    if (args.invite) {
+      const gatewayUrl = args.gateway?.trim() || process.env.GRIST_GATEWAY_URL?.trim()
+      if (!gatewayUrl) {
+        return yield* fail("pass --gateway or set GRIST_GATEWAY_URL")
+      }
+      const { canonicalInviteCode } = yield* Effect.promise(() => import("@/grist/gateway/codes"))
+      const { validateInvite } = yield* Effect.promise(() => import("@/grist/invite/client"))
+      const { saveInviteConfig } = yield* Effect.promise(() => import("@/grist/invite/config"))
+      const code = canonicalInviteCode(args.invite)
+      if (!code) return yield* fail("invite code must look like grist-XXXX-XXXX")
+      const check = yield* Effect.tryPromise({
+        try: () => validateInvite({ code, gatewayUrl }),
+        catch: (error) =>
+          new CliError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+      if (!check.valid) return yield* fail("invite code was not accepted")
+      saveInviteConfig({ code, gatewayUrl })
+      UI.println("")
+      UI.println(
+        UI.Style.TEXT_SUCCESS +
+          "Invite saved" +
+          UI.Style.TEXT_NORMAL +
+          ` · remaining $${(check.remaining_usd ?? 0).toFixed(2)} of $${(check.spend_cap_usd ?? 0).toFixed(2)}`,
+      )
+    }
+
     if (!args.bootstrap) {
       UI.println("")
       UI.println(
-        "Next: export OPENROUTER_API_KEY=… then run " +
-          UI.Style.TEXT_HIGHLIGHT +
-          "grist" +
-          UI.Style.TEXT_NORMAL,
+        args.invite
+          ? "Next: run " + UI.Style.TEXT_HIGHLIGHT + "grist" + UI.Style.TEXT_NORMAL
+          : "Next: " +
+              UI.Style.TEXT_HIGHLIGHT +
+              "grist auth login --gateway <url>" +
+              UI.Style.TEXT_NORMAL,
       )
       UI.println(
         "Cold-start: " +

@@ -61,7 +61,7 @@ npm install -g ${PRODUCT_NPM}
 ${PRODUCT_BIN}
 \`\`\`
 
-Requires \`OPENROUTER_API_KEY\`. Optional: \`TYPESAFE_API_KEY\` for live Jev routing.
+Invite-gated. Sign in with \`${PRODUCT_BIN} auth login\` — testers do not need an API key.
 
 Repo: https://github.com/${PRODUCT_REPO}
 `)

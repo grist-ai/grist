@@ -1,11 +1,12 @@
 import fs from "fs"
 import path from "path"
+import { loadInviteConfig } from "../invite/config"
 
 export const CONFIG_NAME = "opencode.jsonc"
 
 export const DEFAULT_CONFIG = `{
   "$schema": "https://opencode.ai/config.json",
-  // One key for the whole ladder: export OPENROUTER_API_KEY=sk-or-v1-...
+  // Models are routed by the invite gateway (founder's OpenRouter key).
   "model": "openrouter/deepseek/deepseek-v4.1-flash",
   "lsp": true,
   "provider": {
@@ -33,11 +34,10 @@ Local Grist state for this codebase (gitignored by default).
 
 ## Next steps
 
-1. \`export OPENROUTER_API_KEY=…\` (required)
-2. Optional: \`export TYPESAFE_API_KEY=…\` for live Jev routing
-3. Optional: \`bunx supermemory local install\` then keep \`supermemory-server\` available
-4. \`grist bootstrap\` — mine ownership / build map (review before \`memory remember\`)
-5. \`grist\` — start the agent in this repo
+1. \`grist auth login --gateway <url>\` — required; inference is billed to the founder
+2. Optional: \`bunx supermemory local install\` then keep \`supermemory-server\` available
+3. \`grist bootstrap\` — mine ownership / build map (review before \`memory remember\`)
+4. \`grist\` — start the agent; \`grist usage\` shows remaining invite spend
 
 See docs: memory.md, gate.md, code-map.md, shadow-burn-in.md
 `
@@ -88,11 +88,8 @@ export function scaffoldGrist(input?: { cwd?: string; force?: boolean }): InitRe
     created.push(".gitignore")
   }
 
-  if (!process.env.OPENROUTER_API_KEY?.trim()) {
-    warnings.push("OPENROUTER_API_KEY is not set — export it before running grist")
-  }
-  if (!process.env.TYPESAFE_API_KEY?.trim()) {
-    warnings.push("TYPESAFE_API_KEY is not set — gate will use shadow heuristics until set")
+  if (!loadInviteConfig()) {
+    warnings.push("Not signed in — run `grist auth login --gateway <url>`")
   }
 
   return { directory, created, skipped, warnings }
