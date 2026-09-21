@@ -30,6 +30,14 @@ const SITE_FILES: Record<string, string> = {
   "index.html": "text/html; charset=utf-8",
   "styles.css": "text/css; charset=utf-8",
   "app.js": "text/javascript; charset=utf-8",
+  "favicon.svg": "image/svg+xml",
+  "favicon-32.png": "image/png",
+  "apple-touch-icon.png": "image/png",
+}
+const MAC_DMG = /^\/download\/(grist-desktop-mac-(arm64|x64)\.dmg)$/
+const PUBLIC_MAC_DMGS: Record<string, string> = {
+  "grist-desktop-mac-arm64.dmg":
+    "https://github.com/pranav6226/grist-downloads/releases/latest/download/grist-desktop-mac-arm64.dmg",
 }
 
 const VALIDATE_LIMIT = 10
@@ -583,12 +591,30 @@ async function readJson(req: Request): Promise<Record<string, unknown> | undefin
 }
 
 async function serveSite(root: string, pathname: string): Promise<Response> {
+  const dmg = pathname.match(MAC_DMG)?.[1]
+  if (dmg) return serveMacDmg(root, dmg)
   const name = SITE_PAGES.has(pathname) ? "index.html" : pathname.replace(/^\//, "")
   const type = SITE_FILES[name]
   if (!type) return json(404, { error: "not found" })
   const file = Bun.file(path.join(root, name))
   if (!(await file.exists())) return json(404, { error: "not found" })
   return new Response(file, { headers: { "Content-Type": type } })
+}
+
+async function serveMacDmg(root: string, name: string): Promise<Response> {
+  const file = Bun.file(path.join(root, "download", name))
+  if (await file.exists()) {
+    return new Response(file, {
+      headers: {
+        "Content-Type": "application/x-apple-diskimage",
+        "Content-Disposition": `attachment; filename="${name}"`,
+        "Cache-Control": "public, max-age=3600",
+      },
+    })
+  }
+  const remote = PUBLIC_MAC_DMGS[name]
+  if (remote) return Response.redirect(remote, 302)
+  return json(404, { error: "not found" })
 }
 
 function json(status: number, body: unknown): Response {

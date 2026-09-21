@@ -73,18 +73,10 @@ a:hover {
 }
 
 .wordmark {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.08;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  display: block;
+  height: 1.7rem;
+  width: auto;
   color: var(--accent);
-  background: none;
-  border: 0;
-  padding: 0.15rem 0;
-  max-width: none;
-  white-space: pre;
 }
 
 .top nav {
@@ -125,8 +117,6 @@ a:visited {
 
 nav a:visited,
 .mark:visited,
-.btn-ghost:visited,
-footer a:visited,
 .docs-toc a:visited {
   color: inherit;
 }
@@ -227,30 +217,6 @@ footer a:visited,
   color: var(--fg);
 }
 
-.hero-meta .intel {
-  color: var(--dim);
-  margin-left: auto;
-}
-
-.mac-note {
-  display: flex;
-  gap: 1rem;
-  margin: 0.7rem 0 0;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
-
-.mac-note a {
-  color: var(--muted);
-}
-
-.mac-note a:hover {
-  color: var(--fg);
-}
-
 .apple {
   width: 0.95rem;
   height: 0.95rem;
@@ -282,11 +248,22 @@ footer a:visited,
   font-weight: 600;
   letter-spacing: 0.04em;
   cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 8px 18px rgba(236, 91, 43, 0.28);
 }
 
 .btn:hover {
   color: #000;
-  filter: brightness(1.08);
+  filter: brightness(1.1);
+}
+
+.btn:active {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
 }
 
 .btn-light {
@@ -294,6 +271,7 @@ footer a:visited,
   color: #000;
   border-color: var(--fg);
   padding: 0.5rem 0.85rem;
+  box-shadow: none;
 }
 
 .btn-light:hover {
@@ -306,6 +284,7 @@ footer a:visited,
   border-color: #fff;
   letter-spacing: 0.02em;
   text-transform: none;
+  box-shadow: none;
 }
 
 .btn-google:hover {
@@ -322,20 +301,34 @@ footer a:visited,
 }
 
 .btn-ghost {
-  background: var(--panel);
+  background: transparent;
   color: var(--fg);
-  border-color: var(--line);
+  border-color: var(--fg);
+  box-shadow: none;
 }
 
-.btn-ghost:hover {
+.btn-ghost:visited {
   color: var(--fg);
-  border-color: var(--dim);
+}
+
+.btn-ghost:hover,
+.btn-ghost:hover:visited {
+  background: var(--fg);
+  color: #000;
+  border-color: var(--fg);
+  filter: none;
+}
+
+.top nav .btn {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.72rem;
 }
 
 .btn-mac {
   background: var(--fg);
   color: #000;
   border-color: var(--fg);
+  box-shadow: none;
 }
 
 .btn-mac:hover,
@@ -1210,6 +1203,22 @@ input:focus {
   font-size: 0.88rem;
 }
 
+.legal-agree {
+  margin: 0.85rem 0 0;
+  max-width: 36rem;
+  line-height: 1.45;
+}
+
+.legal-agree a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.legal-agree a:visited {
+  color: var(--fg);
+}
+
 .dash-head {
   display: flex;
   justify-content: space-between;
@@ -1446,17 +1455,92 @@ pre {
   max-width: none;
 }
 
+.docs h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1.6rem 0 0.45rem;
+  color: var(--fg);
+}
+
+.docs ol,
+.docs ul {
+  padding-left: 1.25rem;
+  margin: 0 0 1.1rem;
+}
+
+.docs li {
+  margin: 0.4rem 0;
+}
+
+.legal-meta {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0 0 1.6rem;
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.15rem;
+  margin: 0 0 2.2rem;
+  padding: 0 0 1.1rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+
+.legal-nav a {
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.legal-nav a[aria-current="page"] {
+  color: var(--accent);
+}
+
+.legal-nav a:visited {
+  color: var(--fg);
+}
+
+.legal-nav a[aria-current="page"]:visited {
+  color: var(--accent);
+}
+
 footer {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1rem 1.5rem;
   padding: 1.6rem 4vw;
   border-top: 1px solid var(--line);
   color: var(--dim);
   font-family: var(--mono);
   font-size: 0.75rem;
   margin-top: 0;
+}
+
+.foot-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.1rem;
+}
+
+footer a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+footer a:visited {
+  color: var(--muted);
+}
+
+footer a:hover {
+  color: var(--fg);
 }
 
 .foot-brand {
@@ -1516,7 +1600,7 @@ footer {
   }
 
   .wordmark {
-    font-size: 8px;
+    height: 1.35rem;
   }
 
   .mint {

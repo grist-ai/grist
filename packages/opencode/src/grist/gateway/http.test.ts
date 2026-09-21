@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import os from "os"
+import path from "path"
 import { canonicalDeviceUserCode, canonicalInviteCode, generateDeviceUserCode, generateInviteCode } from "./codes"
 import { usdForUsage } from "./prices"
 import { createGateway } from "./http"
@@ -134,7 +136,11 @@ describe("gateway HTTP", () => {
     expect(html).toContain("learns your codebase")
     expect(html).toContain("SoL-Pi")
     expect(html).toContain("self-improves")
-    expect(html).toContain("█▀▀▀ █▀▀█")
+    expect(html).toContain('aria-label="Grist"')
+    expect(html).toContain("M0 6H24V12H6V30H24V36H0V6")
+    expect(html).toContain("/favicon.svg")
+    expect(html).not.toContain("Apple Silicon")
+    expect(html).not.toContain("Intel")
     expect(html).toContain("view-docs")
     expect(html).not.toContain("Three steps")
     expect(html).not.toContain("deepseek")
@@ -150,6 +156,10 @@ describe("gateway HTTP", () => {
 
     const adminPage = await gateway.fetch(new Request("http://gateway.test/admin"))
     expect(await adminPage.text()).toContain("Generate codes")
+
+    const favicon = await gateway.fetch(new Request("http://gateway.test/favicon.svg"))
+    expect(favicon.headers.get("Content-Type")).toContain("image/svg+xml")
+    expect(await favicon.text()).toContain("M0 0H16V4H4V16H16V20H0V0")
   })
 
   test("binds a CLI login after the site approves the invite", async () => {
@@ -299,6 +309,24 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_AUTH_DOMAIN
     delete process.env.FIREBASE_PROJECT_ID
     delete process.env.FIREBASE_APP_ID
+  })
+
+  test("serves the Apple Silicon dmg from /download", async () => {
+    const root = path.join(os.tmpdir(), `grist-site-${crypto.randomUUID()}`)
+    await Bun.write(path.join(root, "download", "grist-desktop-mac-arm64.dmg"), "dmg-bytes")
+    const gateway = createGateway({ siteRoot: root })
+    const found = await gateway.fetch(new Request("http://gateway.test/download/grist-desktop-mac-arm64.dmg"))
+    expect(found.status).toBe(200)
+    expect(found.headers.get("content-type")).toBe("application/x-apple-diskimage")
+    expect(await found.text()).toBe("dmg-bytes")
+    const blocked = await gateway.fetch(new Request("http://gateway.test/download/../index.html"))
+    expect(blocked.status).toBe(404)
+    const missingRoot = path.join(os.tmpdir(), `grist-site-${crypto.randomUUID()}`)
+    const redirect = await createGateway({ siteRoot: missingRoot }).fetch(
+      new Request("http://gateway.test/download/grist-desktop-mac-arm64.dmg"),
+    )
+    expect(redirect.status).toBe(302)
+    expect(redirect.headers.get("location")).toContain("grist-downloads")
   })
 })
 

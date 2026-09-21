@@ -181,7 +181,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
   let height = 1
 
   if (kind === "entry") {
-    const mark = go.right.slice(1)
+    const mark = go.right
     const top = 1
     const body_left = (mark[0]?.length ?? 0) + 2
 
@@ -209,7 +209,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
   }
 
   if (kind === "exit") {
-    const mark = go.right.slice(1)
+    const mark = go.right
     const top = 1
     const body_left = (mark[0]?.length ?? 0) + 2
     const session = "Session  "
