@@ -45,7 +45,7 @@ grist run --format json --auto --dir /path/to/repo -c "Continue: address the tes
 grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: …"
 ```
 
-Do not use the interactive TUI. Do not run `grist auth login` on a headless VM — the API key is the credential.
+Do not use the interactive TUI. On a headless VM, set `GRIST_API_KEY` (or run `grist auth login --provider grist --api-key "$GRIST_API_KEY"` once). Do not open a browser login.
 
 ## Workflow
 

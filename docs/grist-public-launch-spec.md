@@ -40,10 +40,10 @@ key, and the ladder config. Testers never set `OPENROUTER_API_KEY`. Subscription
 billing replaces invites later; until then every completion is the founder's
 OpenRouter credits, metered per code.
 
-**One client mode:** invite. `grist auth login` opens the site; after the
-invite is entered there the CLI stores the code. `GRIST_GATEWAY_URL` +
-`X-Grist-Invite` is how the CLI talks to the gateway.
-No bring-your-own-key path.
+**One client mode:** gateway auth. `grist auth login --provider grist` accepts
+a dashboard `grist_sk_...` key or an invite (opens the site). The CLI stores
+the credential. `GRIST_GATEWAY_URL` plus `X-Grist-Invite` or `X-Grist-Api-Key`
+is how the CLI talks to the gateway. Testers never set `OPENROUTER_API_KEY`.
 
 ## 2. npm package
 

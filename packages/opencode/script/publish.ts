@@ -72,7 +72,7 @@ npm install -g ${PRODUCT_NPM}
 ${PRODUCT_BIN}
 \`\`\`
 
-Invite-gated. Sign in with \`${PRODUCT_BIN} auth login\` — testers do not need an API key.
+Invite-gated. Sign in with \`${PRODUCT_BIN} auth login --provider grist\` (invite or a dashboard \`grist_sk_\` key). Testers do not need an OpenAI or Anthropic key.
 
 Repo: https://github.com/${PRODUCT_REPO}
 `)
