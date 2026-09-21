@@ -170,7 +170,7 @@ export const dict = {
   "command.prompt.mode.shell": "शेल",
   "command.prompt.mode.normal": "प्रॉम्प्ट",
   "command.prompt.voice": "Voice input",
-  "command.prompt.voice.description": "Dictate a prompt with on-device Whisper Large V3",
+  "command.prompt.voice.description": "Dictate a prompt with on-device Moonshine",
   "command.permissions.autoaccept.enable": "अनुमतियाँ स्वतः स्वीकार करें",
   "command.permissions.autoaccept.disable": "अनुमतियाँ स्वत: स्वीकार करना बंद करें",
   "command.workspace.toggle": "वर्कस्पेस टॉगल करें",
@@ -397,7 +397,7 @@ export const dict = {
   "prompt.toast.voice.empty.description": "Try speaking again after clicking the microphone.",
   "prompt.toast.voice.failed.title": "Voice input failed",
   "prompt.toast.voice.failed.description": "Couldn't transcribe speech on this device. Try again.",
-  "prompt.toast.voice.download.title": "Downloading Whisper Large V3",
+  "prompt.toast.voice.download.title": "Loading speech model",
   "prompt.toast.voice.download.description": "First use downloads the local speech model. It stays on this machine.",
 
   "prompt.toast.pasteUnsupported.title": "असमर्थित अनुलग्नक",

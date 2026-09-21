@@ -1,6 +1,54 @@
 export const WHISPER_SAMPLE_RATE = 16_000
 export const VOICE_MAX_SECONDS = 90
 
+export const VOICE_ACTIVITY_BARS = 5
+
+export function voiceActivityLevels(bins: Uint8Array, bars = VOICE_ACTIVITY_BARS) {
+  if (bars <= 0) return []
+  if (bins.length === 0) return Array.from({ length: bars }, () => 0)
+  const width = Math.max(1, Math.floor(bins.length / bars))
+  return Array.from({ length: bars }, (_, index) => {
+    const start = index * width
+    const end = index === bars - 1 ? bins.length : Math.min(bins.length, start + width)
+    let sum = 0
+    for (let i = start; i < end; i++) sum += bins[i] ?? 0
+    const linear = sum / Math.max(1, end - start) / 255
+    return Math.min(1, Math.sqrt(linear))
+  })
+}
+
+export function mixVoiceActivity(bands: readonly number[], rms: number) {
+  const level = Math.min(1, Math.max(0, rms))
+  return bands.map((band) => Math.min(1, band * 0.55 + level * 0.9))
+}
+
+export function voiceActivityRms(samples: Uint8Array) {
+  if (samples.length === 0) return 0
+  let sum = 0
+  for (let i = 0; i < samples.length; i++) {
+    const sample = ((samples[i] ?? 128) - 128) / 128
+    sum += sample * sample
+  }
+  return Math.min(1, Math.sqrt(sum / samples.length) * 4)
+}
+
+export function sameActivity(prev: readonly number[], next: readonly number[], epsilon = 0.05) {
+  if (prev.length !== next.length) return false
+  return next.every((value, index) => Math.abs(value - prev[index]!) <= epsilon)
+}
+
+export function textFromLines(lines: readonly string[]) {
+  return lines
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join(" ")
+}
+
+export function isSpeechModelDownload(loaded: number, total?: number) {
+  if (total === undefined) return true
+  return loaded < total
+}
+
 export function joinPromptText(existing: string, incoming: string) {
   const spoken = incoming.trim()
   if (!spoken) return existing
