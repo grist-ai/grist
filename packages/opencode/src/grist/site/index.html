@@ -18,7 +18,6 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <script src="https://tally.so/widgets/embed.js"></script>
   </head>
   <body>
     <header class="top">
@@ -336,27 +335,27 @@ grist</pre>
           <p class="eyebrow">[ waitlist ]</p>
           <h2>No invite yet? Request access.</h2>
           <p class="lede">
-            Beta is invite-only. Join the waitlist and we will send a code when
-            there is room.
+            Beta is invite-only. Leave your email. If there‚Äôs room, we‚Äôll send a code.
           </p>
         </div>
         <div>
-          <iframe
-            data-tally-src="https://tally.so/embed/QKGWYG?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"
-            loading="lazy"
-            width="100%"
-            height="177"
-            frameborder="0"
-            marginheight="0"
-            marginwidth="0"
-            title="Grist Waitlist"
-          ></iframe>
-          <p class="muted legal-agree">
+          <form id="request-form" class="request-form">
+            <label for="request-email">Email</label>
+            <input id="request-email" name="email" type="email" autocomplete="email" required />
+            <label for="request-name">Name</label>
+            <input id="request-name" name="name" autocomplete="name" maxlength="80" />
+            <label for="request-note">What are you building?</label>
+            <textarea id="request-note" name="note" maxlength="500" rows="3"></textarea>
+            <button class="btn" type="submit">Request access</button>
+            <p class="error" id="request-error" hidden></p>
+          </form>
+          <p class="muted legal-agree" id="request-legal">
             By submitting this form you agree to the
             <a href="/terms">Terms of Use</a>,
             <a href="/privacy">Privacy Policy</a>, and
             <a href="/acceptable-use">Acceptable Use Policy</a>.
           </p>
+          <p id="request-done" hidden>Request received. If there‚Äôs room, we‚Äôll email a code to that address.</p>
         </div>
       </section>
 
@@ -732,13 +731,18 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       <section class="dash-head">
         <div>
           <p class="eyebrow">[ admin ]</p>
-          <h1>Beta codes</h1>
+          <h1 id="admin-title">Beta codes</h1>
         </div>
         <div class="dash-actions">
           <a href="/dashboard">Usage</a>
           <button class="text-btn sign-out" type="button">Sign out</button>
         </div>
       </section>
+      <nav class="dash-tabs" aria-label="Admin">
+        <a href="/admin" data-admin="codes">Codes</a>
+        <a href="/admin/requests" data-admin="requests">Requests</a>
+      </nav>
+      <div id="admin-panel-codes">
       <p class="lede">Only codes you generate here can enter the beta. Testers bind one after they sign in.</p>
       <p class="remain" id="admin-spent">‚Äî</p>
       <p class="muted" id="admin-cap-line"></p>
@@ -755,10 +759,22 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       </form>
       <p class="error" id="admin-error" hidden></p>
       <section class="minted" id="minted" hidden>
-        <h2>New codes</h2>
+        <h2>Email</h2>
         <pre id="minted-codes"></pre>
+        <button type="button" class="copy" id="copy-mint-mail">Copy email</button>
       </section>
       <section class="admin-list" id="admin-invites"></section>
+      </div>
+      <div id="admin-panel-requests" hidden>
+        <p class="lede">Generate a code, copy the email, and send it yourself. Nothing is emailed from here.</p>
+        <p class="error" id="admin-request-error" hidden></p>
+        <section class="minted" id="request-mail" hidden>
+          <h2>Email</h2>
+          <pre id="request-mail-body"></pre>
+          <button type="button" class="copy" id="copy-request-mail">Copy email</button>
+        </section>
+        <section class="admin-list" id="admin-requests"></section>
+      </div>
     </main>
 
     <main id="view-plans" hidden>
@@ -789,7 +805,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       <article class="docs">
         <p class="eyebrow">[ legal ]</p>
         <h1>Privacy Policy</h1>
-        <p class="legal-meta">Effective 20 September 2026 ¬∑ Last updated 20 September 2026</p>
+        <p class="legal-meta">Effective 20 September 2026 ¬∑ Last updated 21 September 2026</p>
         <nav class="legal-nav" aria-label="Legal pages">
           <a href="/privacy" aria-current="page">Privacy</a>
           <a href="/terms">Terms</a>
@@ -846,7 +862,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         </ul>
         <h3>Waitlist</h3>
         <ul>
-          <li>Information you submit on the waitlist form, processed by Tally on our behalf.</li>
+          <li>Email, name, and note you submit on the access request form. We store that on the gateway so a code can be sent by hand.</li>
         </ul>
         <h3>Usage and metering</h3>
         <ul>
@@ -878,7 +894,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <p>
           Legal bases where GDPR or UK GDPR apply: contract (providing the
           beta), legitimate interests (security, metering, abuse prevention),
-          consent (waitlist form and non-essential cookies, if any), and legal
+          consent (access request form and non-essential cookies, if any), and legal
           obligation.
         </p>
 
@@ -889,7 +905,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         </p>
         <ul>
           <li><strong>Google LLC</strong> ‚Äî Firebase Authentication and Google Sign-In.</li>
-          <li><strong>Tally</strong> ‚Äî waitlist form hosting and storage.</li>
           <li><strong>OpenRouter and downstream model providers</strong> ‚Äî completions. Providers on the ladder may include DeepSeek, Moonshot, OpenAI, and others we route to. Those providers receive the prompt payload for that turn.</li>
           <li><strong>TypeSafe</strong> ‚Äî routing scores for task difficulty and sensitivity. That request includes the task state we send to the gate, not your entire repo.</li>
           <li><strong>Hosting and infrastructure providers</strong> ‚Äî currently including Railway, to serve the site and gateway.</li>
@@ -1233,7 +1248,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       <article class="docs">
         <p class="eyebrow">[ legal ]</p>
         <h1>Cookie Policy</h1>
-        <p class="legal-meta">Effective 20 September 2026 ¬∑ Last updated 20 September 2026</p>
+        <p class="legal-meta">Effective 20 September 2026 ¬∑ Last updated 21 September 2026</p>
         <nav class="legal-nav" aria-label="Legal pages">
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
@@ -1248,7 +1263,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <h2>1. What we mean by ‚Äúcookies‚Äù</h2>
         <p>
           Browsers may store cookies, local storage keys, and similar items.
-          Some are set by us, some by processors (Google / Firebase, Tally).
+          Some are set by us, some by processors (Google / Firebase).
         </p>
 
         <h2>2. Strictly necessary</h2>
@@ -1258,15 +1273,13 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           <li><strong>Security and rate limits.</strong> We may use transient IP-based counters on the server. Those are not browser cookies.</li>
         </ul>
 
-        <h2>3. Waitlist (Tally)</h2>
+        <h2>3. Access requests</h2>
         <p>
-          The waitlist is an embedded Tally form. Tally may set cookies or
-          collect device data according to
-          <a href="https://tally.so/help/privacy-policy">Tally‚Äôs privacy policy</a>.
-          If you do not want that embed, do not open the waitlist section and
-          do not submit the form. Email
+          The request form is ours. Submitting it sends your email, name, and
+          note to the Grist gateway. It does not load a third-party form or
+          set a third-party cookie. Email
           <a href="mailto:privacy@grist.lol">privacy@grist.lol</a>
-          instead to request access.
+          instead if you would rather not use the form.
         </p>
 
         <h2>4. What we do not use</h2>
@@ -1308,12 +1321,17 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
     <script>
       (() => {
         const path = location.pathname.replace(/\/+$/, "") || "/"
+        if (path === "/admin" || path === "/admin/requests" || path === "/dashboard" || path === "/dashboard/api") {
+          for (const main of document.querySelectorAll("main")) main.hidden = true
+          return
+        }
         const views = {
           "/": "view-home",
           "/login": "view-login",
           "/dashboard": "view-dashboard",
           "/dashboard/api": "view-dashboard",
           "/admin": "view-admin",
+          "/admin/requests": "view-admin",
           "/plans": "view-plans",
           "/docs": "view-docs",
           "/docs/skills": "view-docs-skills",
@@ -1327,6 +1345,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         for (const main of document.querySelectorAll("main")) main.hidden = main.id !== id
       })()
     </script>
-    <script src="/app.js" type="module"></script>
+    <script src="/app.js?v=invite-mail" type="module"></script>
   </body>
 </html>
