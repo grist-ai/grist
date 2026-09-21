@@ -4,7 +4,7 @@
  *
  * Prerequisites:
  *   bun run --cwd packages/opencode script/build.ts
- *   npm login  (or NODE_AUTH_TOKEN)
+ *   npm login locally, or GitHub Actions OIDC trusted publishing (no NODE_AUTH_TOKEN)
  *
  * Optional: OPENCODE_VERSION=0.1.0 OPENCODE_CHANNEL=latest
  */
@@ -26,6 +26,10 @@ async function publish(cwd: string, name: string, version: string) {
     console.log(`already published ${name}@${version}`)
     return
   }
+  const pkgFile = Bun.file(`${cwd}/package.json`)
+  const pkg = await pkgFile.json()
+  pkg.repository = { type: "git", url: `git+https://github.com/${PRODUCT_REPO}.git` }
+  await pkgFile.write(`${JSON.stringify(pkg, null, 2)}\n`)
   await $`bun pm pack`.cwd(cwd)
   await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(cwd)
 }
