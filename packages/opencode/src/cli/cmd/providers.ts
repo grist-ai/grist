@@ -6,7 +6,7 @@ import { UI } from "../ui"
 import * as Prompt from "../effect/prompt"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
 
-import { map, pipe, sortBy, values } from "remeda"
+import { map, pipe, sortBy } from "remeda"
 import path from "path"
 import os from "os"
 import { Config } from "@/config/config"
@@ -17,6 +17,8 @@ import { Process } from "@/util/process"
 import { errorMessage } from "@/util/error"
 import { text } from "node:stream/consumers"
 import { Effect, Option } from "effect"
+import { canonicalApiKey } from "@/grist/gateway/codes"
+import { forgetGristLogin, runAuthApiKey, runAuthLogin } from "./auth"
 
 type PluginAuth = NonNullable<Hooks["auth"]>
 
@@ -236,6 +238,148 @@ export function resolvePluginProviders(input: {
   return result
 }
 
+export type WellKnownAuth = {
+  command: string[]
+  env: string
+}
+
+export function parseWellKnownAuth(body: unknown): WellKnownAuth | undefined {
+  if (!body || typeof body !== "object") return
+  const auth = (body as { auth?: unknown }).auth
+  if (!auth || typeof auth !== "object") return
+  const command = (auth as { command?: unknown }).command
+  const env = (auth as { env?: unknown }).env
+  if (!Array.isArray(command) || command.length === 0 || typeof env !== "string") return
+  if (!command.every((item) => typeof item === "string")) return
+  return { command, env }
+}
+
+export function loginProviderChoices(input: {
+  providers: Array<{ id: string; name: string }>
+  pluginProviders: Array<{ id: string; name: string }>
+}): Array<{ label: string; value: string; hint?: string }> {
+  const priority: Record<string, number> = {
+    grist: 0,
+    opencode: 1,
+    openai: 2,
+    "github-copilot": 3,
+    google: 4,
+    anthropic: 5,
+    openrouter: 6,
+    vercel: 7,
+  }
+  const rest = [
+    ...pipe(
+      input.providers,
+      sortBy(
+        (x) => priority[x.id] ?? 99,
+        (x) => x.name ?? x.id,
+      ),
+      map((x) => ({
+        label: x.name,
+        value: x.id,
+        hint: {
+          opencode: "recommended for third-party keys",
+          openai: "ChatGPT Plus/Pro or API key",
+        }[x.id],
+      })),
+    ),
+    ...input.pluginProviders
+      .filter((x) => x.id !== "grist")
+      .map((x) => ({
+        label: x.name,
+        value: x.id,
+        hint: "plugin",
+      })),
+  ].filter((x) => x.value !== "grist")
+  return [{ label: "Grist", value: "grist", hint: "recommended" }, ...rest]
+}
+
+function isInviteMethod(method?: string) {
+  const value = method?.trim().toLowerCase()
+  return value === "invite" || value === "invite (opens site)" || value === "invite code"
+}
+
+async function looksLikeGristGateway(url: string) {
+  const response = await fetch(`${url}/health`).catch(() => undefined)
+  if (!response?.ok) return false
+  const body = (await response.json().catch(() => undefined)) as { ok?: unknown } | undefined
+  return body?.ok === true
+}
+
+const loginGristApiKey = Effect.fn("Cli.providers.gristApiKey")(function* (input: {
+  key: string
+  gateway?: string
+}) {
+  const result = yield* cliTry("Failed to authenticate with Grist: ", () =>
+    runAuthApiKey({ key: input.key, gatewayUrl: input.gateway }),
+  )
+  if (!result.ok) {
+    if (result.reason === "invalid") {
+      return yield* fail("That is not a Grist API key. Mint one at https://grist.lol/dashboard/api")
+    }
+    return yield* fail("Grist rejected that API key. Check the gateway URL and mint a new key.")
+  }
+  yield* put("grist", {
+    type: "api",
+    key: result.key,
+    metadata: { gatewayUrl: result.gatewayUrl },
+  })
+  yield* Prompt.log.success("Logged into Grist")
+  yield* Prompt.outro("Done")
+})
+
+const loginGristInvite = Effect.fn("Cli.providers.gristInvite")(function* (gateway?: string) {
+  const result = yield* cliTry("Failed to start Grist invite login: ", () => runAuthLogin(gateway))
+  if (!result.ok) {
+    if (result.reason === "expired") return yield* fail("Login expired. Run grist auth login --provider grist again.")
+    return yield* fail("Could not reach the Grist site.")
+  }
+  yield* put("grist", {
+    type: "api",
+    key: result.code,
+    metadata: { gatewayUrl: result.gatewayUrl, kind: "invite" },
+  })
+  yield* Prompt.log.success("Logged into Grist")
+  yield* Prompt.outro("Done")
+})
+
+const loginGrist = Effect.fn("Cli.providers.grist")(function* (input: {
+  method?: string
+  apiKey?: string
+  gateway?: string
+}) {
+  if (isInviteMethod(input.method)) {
+    yield* loginGristInvite(input.gateway)
+    return
+  }
+  const key = canonicalApiKey(input.apiKey ?? "") ?? canonicalApiKey(process.env.GRIST_API_KEY ?? "")
+  if (key) {
+    yield* loginGristApiKey({ key, gateway: input.gateway })
+    return
+  }
+  const method = yield* promptValue(
+    yield* Prompt.select({
+      message: "Login method",
+      options: [
+        { label: "API key", value: "api", hint: "grist_sk_... from the dashboard" },
+        { label: "Invite (opens site)", value: "invite" },
+      ],
+    }),
+  )
+  if (method === "invite") {
+    yield* loginGristInvite(input.gateway)
+    return
+  }
+  const typed = yield* promptValue(
+    yield* Prompt.password({
+      message: "Enter your Grist API key",
+      validate: (x) => (canonicalApiKey(x ?? "") ? undefined : "Expected a grist_sk_... key"),
+    }),
+  )
+  yield* loginGristApiKey({ key: typed, gateway: input.gateway })
+})
+
 export const ProvidersCommand = cmd({
   command: "providers",
   aliases: ["auth"],
@@ -300,7 +444,7 @@ export const ProvidersLoginCommand = effectCmd({
   command: "login [url]",
   describe: "log in to a provider",
   // URL login skips instance bootstrap, which would load remote config with the stale token and crash before re-auth.
-  instance: (args) => !args.url,
+  instance: (args) => !args.url && args.provider !== "grist",
   builder: (yargs: Argv) =>
     yargs
       .positional("url", {
@@ -316,22 +460,62 @@ export const ProvidersLoginCommand = effectCmd({
         alias: ["m"],
         describe: "login method label (skips method selection)",
         type: "string",
+      })
+      .option("api-key", {
+        describe: "Grist API key (grist_sk_...). Skips the prompt.",
+        type: "string",
+      })
+      .option("gateway", {
+        describe: "Grist gateway URL (default https://grist.lol)",
+        type: "string",
       }),
   handler: Effect.fn("Cli.providers.login")(function* (args) {
     const authSvc = yield* Auth.Service
 
     UI.empty()
     yield* Prompt.intro("Add credential")
+    const providerArg = args.provider?.trim()
+    if (!args.url && providerArg && providerArg.toLowerCase() === "grist") {
+      yield* loginGrist({
+        method: args.method,
+        apiKey: args["api-key"],
+        gateway: args.gateway,
+      })
+      return
+    }
     if (args.url) {
       const url = args.url.replace(/\/+$/, "")
-      const wellknown = (yield* cliTry(`Failed to load auth provider metadata from ${url}: `, () =>
-        fetch(`${url}/.well-known/opencode`).then((x) => x.json()),
-      )) as {
-        auth: { command: string[]; env: string }
+      const keyFromUrl = canonicalApiKey(url)
+      if (keyFromUrl) {
+        yield* loginGristApiKey({ key: keyFromUrl, gateway: args.gateway })
+        return
       }
-      yield* Prompt.log.info(`Running \`${wellknown.auth.command.join(" ")}\``)
+      if (!/^https?:\/\//i.test(url)) {
+        return yield* fail(
+          `"${url}" is not a login URL. For Grist, run: grist auth login --provider grist`,
+        )
+      }
+
+      const wellknownResponse = yield* cliTry(`Failed to load auth provider metadata from ${url}: `, () =>
+        fetch(`${url}/.well-known/opencode`),
+      )
+      const wellknownBody = yield* cliTry(`Failed to read auth provider metadata from ${url}: `, () =>
+        wellknownResponse.json().catch(() => undefined),
+      )
+      const wellknown = parseWellKnownAuth(wellknownBody)
+      if (!wellknown) {
+        const grist = yield* cliTry(`Failed to reach ${url}: `, () => looksLikeGristGateway(url))
+        if (grist) {
+          yield* loginGristInvite(url)
+          return
+        }
+        return yield* fail(
+          `${url} is not an OpenCode auth provider. For Grist, run: grist auth login --provider grist`,
+        )
+      }
+      yield* Prompt.log.info(`Running \`${wellknown.command.join(" ")}\``)
       const abort = new AbortController()
-      const proc = Process.spawn(wellknown.auth.command, { stdout: "pipe", stderr: "inherit", abort: abort.signal })
+      const proc = Process.spawn(wellknown.command, { stdout: "pipe", stderr: "inherit", abort: abort.signal })
       if (!proc.stdout) {
         yield* Prompt.log.error("Failed")
         yield* Prompt.outro("Done")
@@ -345,7 +529,7 @@ export const ProvidersLoginCommand = effectCmd({
         yield* Prompt.outro("Done")
         return
       }
-      yield* Effect.orDie(authSvc.set(url, { type: "wellknown", key: wellknown.auth.env, token: token.trim() }))
+      yield* Effect.orDie(authSvc.set(url, { type: "wellknown", key: wellknown.env, token: token.trim() }))
       yield* Prompt.log.success("Logged into " + url)
       yield* Prompt.outro("Done")
       return
@@ -368,15 +552,6 @@ export const ProvidersLoginCommand = effectCmd({
     }
     const hooks = yield* pluginSvc.list()
 
-    const priority: Record<string, number> = {
-      opencode: 0,
-      openai: 1,
-      "github-copilot": 2,
-      google: 3,
-      anthropic: 4,
-      openrouter: 5,
-      vercel: 6,
-    }
     const pluginProviders = resolvePluginProviders({
       hooks,
       existingProviders: providers,
@@ -384,29 +559,10 @@ export const ProvidersLoginCommand = effectCmd({
       enabled,
       providerNames: Object.fromEntries(Object.entries(config.provider ?? {}).map(([id, p]) => [id, p.name])),
     })
-    const options = [
-      ...pipe(
-        providers,
-        values(),
-        sortBy(
-          (x) => priority[x.id] ?? 99,
-          (x) => x.name ?? x.id,
-        ),
-        map((x) => ({
-          label: x.name,
-          value: x.id,
-          hint: {
-            opencode: "recommended",
-            openai: "ChatGPT Plus/Pro or API key",
-          }[x.id],
-        })),
-      ),
-      ...pluginProviders.map((x) => ({
-        label: x.name,
-        value: x.id,
-        hint: "plugin",
-      })),
-    ]
+    const options = loginProviderChoices({
+      providers: Object.values(providers).map((x) => ({ id: x.id, name: x.name ?? x.id })),
+      pluginProviders,
+    })
 
     let provider: string
     if (args.provider) {
@@ -426,6 +582,15 @@ export const ProvidersLoginCommand = effectCmd({
           options: [...options, { value: "other", label: "Other" }],
         }),
       )
+    }
+
+    if (provider === "grist") {
+      yield* loginGrist({
+        method: args.method,
+        apiKey: args["api-key"],
+        gateway: args.gateway,
+      })
+      return
     }
 
     const plugin = hooks.findLast((x) => x.auth?.provider === provider)
@@ -529,6 +694,7 @@ export const ProvidersLogoutCommand = effectCmd({
         )
     if (!provider) return yield* fail(`Unknown configured provider "${args.provider}"`)
     yield* Effect.orDie(authSvc.remove(provider))
+    if (provider === "grist") forgetGristLogin()
     yield* Prompt.outro("Logout successful")
   }),
 })
