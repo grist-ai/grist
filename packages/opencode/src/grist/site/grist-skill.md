@@ -26,8 +26,22 @@ If `grist` is missing or `grist usage` fails, stop and tell the human. Do not in
 Headless, one shot, JSON on stdout. Point `--dir` at the git checkout. `--auto` is required so tool permissions are not rejected.
 
 ```bash
-grist run --format json --auto --dir /path/to/repo "Precise task: what to change, where, and how to verify."
+grist run --format json --auto --dir /path/to/repo -m openrouter/deepseek/deepseek-v4.1-flash "Precise task: what to change, where, and how to verify."
 ```
+
+Always pass an explicit `-m` ladder model id. Without `-m`, the CLI defaults
+to `openrouter/medium`, which the gateway rejects with "Model not found".
+Ladder ids: `openrouter/deepseek/deepseek-v4.1-flash` (cheapest),
+`openrouter/moonshotai/kimi-k3` (medium), `openrouter/openai/gpt-5.6-sol`
+(frontier).
+
+Two headless gotchas:
+
+- `grist run` waits for stdin EOF even when a message argument is given. On a
+  non-interactive shell, always redirect `< /dev/null` or it hangs silently.
+- The agent sandbox only permits file access inside `--dir`. The task prompt
+  and any spec files it references must live inside `--dir`; reads outside it
+  are auto-rejected.
 
 Each stdout line is one JSON event:
 
