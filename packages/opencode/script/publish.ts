@@ -17,6 +17,36 @@ const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
 const prepareOnly = Boolean(process.env.GRIST_PREPARE_ONLY)
+// Provenance attestations need the GitHub OIDC identity; a local
+// `npm login` publish has none, so only request them in CI.
+const wantProvenance = Boolean(process.env.GITHUB_ACTIONS)
+
+// Files that must never ship inside a published tarball. Checked per package
+// dir before `npm publish`; fail closed so a stray secret or test fixture
+// blocks the release instead of leaking onto the registry.
+const FORBIDDEN_TARBALL_PATTERNS = [
+  "**/.env",
+  "**/.env.*",
+  "**/*.pem",
+  "**/*.key",
+  "**/__tests__/**",
+  "**/*.test.*",
+  "**/*.spec.*",
+  "**/test/**",
+  "**/tests/**",
+  "**/fixtures/**",
+]
+
+function assertNoForbiddenFiles(cwd: string, name: string) {
+  const hits: string[] = []
+  for (const pattern of FORBIDDEN_TARBALL_PATTERNS) {
+    for (const file of new Bun.Glob(pattern).scanSync({ cwd, dot: true })) hits.push(file)
+  }
+  if (hits.length === 0) return
+  throw new Error(
+    `refusing to publish ${name}: forbidden files in ${cwd}:\n${hits.map((h) => `  - ${h}`).join("\n")}`,
+  )
+}
 
 async function published(name: string, version: string) {
   return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
@@ -28,6 +58,7 @@ async function publish(cwd: string, name: string, version: string) {
     console.log(`already published ${name}@${version}`)
     return
   }
+  assertNoForbiddenFiles(cwd, name)
   const pkgFile = Bun.file(`${cwd}/package.json`)
   const pkg = await pkgFile.json()
   pkg.repository = { type: "git", url: `https://github.com/${PRODUCT_REPO}.git` }
@@ -36,7 +67,9 @@ async function publish(cwd: string, name: string, version: string) {
     console.log(`prepared ${name}@${version}`)
     return
   }
-  const result = Bun.spawnSync(["npm", "publish", "--access", "public", "--tag", Script.channel], {
+  const args = ["publish", "--access", "public", "--tag", Script.channel]
+  if (wantProvenance) args.push("--provenance")
+  const result = Bun.spawnSync(["npm", ...args], {
     cwd,
     env: process.env,
     stdout: "inherit",

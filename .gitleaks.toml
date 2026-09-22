@@ -1,0 +1,40 @@
+# .gitleaks.toml — Grist pre-publish secret scan config.
+#
+# Extends gitleaks' default rule set. The [allowlist] below suppresses only
+# reviewed false positives found in the working tree (baseline: 2026-09-22,
+# 25 findings, all reviewed — no real secrets). Each entry matches the exact
+# offending *line* (regexTarget = "line"), so if a line's content changes the
+# allowlist stops matching and the finding resurfaces for re-review.
+#
+# Used by .github/workflows/publish-grist.yml (pre-publish gate) and can be
+# run locally with:
+#   gitleaks detect --source . --no-git --config .gitleaks.toml
+
+[allowlist]
+description = "Reviewed false positives (2026-09-22). If a finding resurfaces, re-review the line before extending this list."
+regexTarget = "line"
+regexes = [
+  # Keyboard shortcut labels, not secrets (packages/app/src/pages/layout.tsx)
+  '''keybind: "shift\+alt\+arrow(up|down)",''',
+  # Perf-test fixture IDs, not keys (packages/app/e2e/performance/timeline-stability/context-matrix.spec.ts)
+  '''prt_key_0[123]_(read|glob|grep)''',
+  # Stripe *publishable* test key in a dev npm script — public by design (packages/console/app/package.json)
+  '''VITE_STRIPE_PUBLISHABLE_KEY=pk_test_51RtuLNE7fOCwHSD4''',
+  # Translated UI prose mentioning "Responses API" (packages/console/app/src/i18n/*.ts, 13 locales)
+  '''Responses API''',
+  # Docs curl example whose bearer token is the literal placeholder YOUR_API_KEY
+  # (packages/docs/ai-tools/cursor.mdx). Matches the fence line so a real token
+  # added on the -H line would still be flagged.
+  '''^ *```curl''',
+  # Secret-redactor test fixtures with deliberately fake values
+  # (packages/http-recorder/test/record-replay.test.ts)
+  '''sk-123456789012345678901234''',
+  '''AIzaSyDHibiBRvJZLsFnPYPoiTwxY4ztQ55yqCE''',
+  '''api_key=secret-value''',
+  # OAuth *client* ID — public by design (packages/opencode/src/plugin/digitalocean.ts)
+  '''DO_OAUTH_CLIENT_ID = "b1a6c5158156caac821fd1b30253ca8acb52454a48fa744420e41889cb589f82"''',
+  # Generated SDK field names, not secrets (packages/sdk/js/src/v2/gen/sdk.gen.ts)
+  '''key: "questionV2Reply"''',
+  # i18n plural-key type name, not a secret (packages/session-ui/src/components/tool-count-summary.tsx)
+  '''key: UiI18nPluralKey''',
+]
