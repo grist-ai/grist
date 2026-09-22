@@ -28,9 +28,6 @@ export type GatewayOptions = {
   rateLimits?: Partial<Record<"validate" | "keyMint" | "completions" | "deviceStart" | "gateRoute", { limit: number; windowMs: number }>>
 }
 
-/** Sign-in identity for /admin (Google or email/password). Public mailto is admin@grist.lol. */
-export const DEFAULT_ADMIN_EMAIL = "pranavmm25@gmail.com"
-
 /** An invite plus the API key that authenticated the request, when one did. */
 type ResolvedInvite = InviteRow & { keyId: string | null }
 
@@ -122,9 +119,9 @@ export function createGateway(opts: GatewayOptions = {}) {
   const now = opts.now ?? Date.now
   const openrouterKey = opts.openrouterKey ?? process.env.OPENROUTER_API_KEY?.trim() ?? ""
   const adminToken = opts.adminToken ?? process.env.GRIST_ADMIN_TOKEN?.trim() ?? ""
-  const adminEmail = (opts.adminEmail ?? process.env.GRIST_ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL)
-    .trim()
-    .toLowerCase()
+  // Env-only on purpose: no admin email is hardcoded into the build, and an
+  // empty value disables the Google sign-in admin shortcut entirely.
+  const adminEmail = (opts.adminEmail ?? process.env.GRIST_ADMIN_EMAIL ?? "").trim().toLowerCase()
   const globalBudget = opts.globalBudgetUsd ?? Number(process.env.GRIST_GLOBAL_BUDGET_USD ?? DEFAULT_GLOBAL_BUDGET)
   const trustedProxies = parseTrustedProxies(opts.trustedProxies ?? process.env.GRIST_TRUSTED_PROXIES ?? "")
   const limits = { ...RATE_LIMITS, ...opts.rateLimits }
@@ -633,15 +630,17 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   async function requireAdmin(req: Request): Promise<Response | undefined> {
-    if (adminToken && req.headers.get("X-Grist-Admin") === adminToken) return
-    const bearer = req.headers.get("Authorization") ?? ""
-    if (!bearer.startsWith("Bearer ")) return json(401, { error: "unauthorized" })
-    const user = await verifyFirebaseIdToken(bearer.slice(7).trim(), fetchImpl)
-    if (!user || !isAdminEmail(user.email)) return json(401, { error: "unauthorized" })
+    // The admin token is required, always. A Firebase session — even the
+    // founder's Google account — is not sufficient on its own: compromising
+    // that account alone must not yield admin API access. When no token is
+    // configured, admin endpoints are closed entirely (fail closed).
+    if (!adminToken || req.headers.get("X-Grist-Admin") !== adminToken) {
+      return json(401, { error: "unauthorized" })
+    }
   }
 
   function isAdminEmail(email?: string) {
-    if (!email) return false
+    if (!email || !adminEmail) return false
     return email.trim().toLowerCase() === adminEmail
   }
 

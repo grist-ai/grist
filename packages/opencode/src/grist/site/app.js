@@ -227,10 +227,27 @@ function fail(node, message) {
 }
 
 async function headers() {
+  const out = {}
   const user = state.auth?.currentUser
-  if (user) return { Authorization: `Bearer ${await user.getIdToken()}` }
-  if (invite()) return { "X-Grist-Invite": invite() }
-  return {}
+  if (user) out.Authorization = `Bearer ${await user.getIdToken()}`
+  else if (invite()) out["X-Grist-Invite"] = invite()
+  // Admin endpoints require the admin token on every call (B4): the
+  // dashboard keeps it in session storage, entered once per tab session.
+  const adminToken = sessionStorage.getItem("grist-admin-token")
+  if (adminToken) out["X-Grist-Admin"] = adminToken
+  return out
+}
+
+function wireAdminToken() {
+  const input = document.getElementById("admin-token")
+  if (!input || input.dataset.wired) return
+  input.dataset.wired = "1"
+  input.value = sessionStorage.getItem("grist-admin-token") ?? ""
+  input.addEventListener("input", () => {
+    const token = input.value.trim()
+    if (token) sessionStorage.setItem("grist-admin-token", token)
+    else sessionStorage.removeItem("grist-admin-token")
+  })
 }
 
 async function finishCliLogin(code) {
@@ -283,6 +300,7 @@ async function route() {
     show(state.admin ? "view-admin" : "view-dashboard")
     setAuthNav()
     if (state.admin) {
+      wireAdminToken()
       setAdminTab("codes")
       void loadAdmin()
       return
@@ -300,6 +318,7 @@ async function route() {
     }
     show("view-admin")
     setAuthNav()
+    wireAdminToken()
     const requests = path === "/admin/requests"
     setAdminTab(requests ? "requests" : "codes")
     if (requests) void loadRequests()
@@ -434,7 +453,7 @@ async function loadAdmin() {
   error.hidden = true
   const response = await fetch("/v1/admin/invites", { headers: await headers() })
   if (response.status !== 200) {
-    fail(error, "Admin session expired. Sign in again.")
+    fail(error, "Admin API needs the admin token: paste it above, then reload.")
     return
   }
   const data = await response.json()
@@ -463,7 +482,7 @@ async function loadRequests() {
   error.hidden = true
   const response = await fetch("/v1/admin/requests", { headers: await headers() })
   if (response.status !== 200) {
-    fail(error, "Admin session expired. Sign in again.")
+    fail(error, "Admin API needs the admin token: paste it above, then reload.")
     return
   }
   const data = await response.json()

@@ -3,12 +3,33 @@ import os from "os"
 import path from "path"
 import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generateApiKeySecret, generateDeviceUserCode, generateInviteCode } from "./codes"
 import { usdForUsage } from "./prices"
-import { createGateway, DEFAULT_ADMIN_EMAIL, MAX_COMPLETION_TOKENS } from "./http"
+import { createGateway, MAX_COMPLETION_TOKENS } from "./http"
 import { openGatewayStore } from "./store"
 import { RUNG_MODELS } from "./ladder"
 
-test("admin sign-in identity is the founder Gmail, not the public inbox", () => {
-  expect(DEFAULT_ADMIN_EMAIL).toBe("pranavmm25@gmail.com")
+test("admin email has no hardcoded default (env-only)", async () => {
+  // Without the adminEmail opt or GRIST_ADMIN_EMAIL env, no email matches —
+  // the Google sign-in admin shortcut stays disabled by default.
+  delete process.env.GRIST_ADMIN_EMAIL
+  process.env.FIREBASE_API_KEY = "key"
+  process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+  process.env.FIREBASE_PROJECT_ID = "grist-test"
+  process.env.FIREBASE_APP_ID = "1:1:web:abc"
+  const gateway = createGateway({
+    fetch: async () =>
+      new Response(JSON.stringify({ users: [{ localId: "uid_x", email: "founder@example.com" }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+  })
+  const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
+    body: { id_token: "tok" },
+  })
+  expect((session.json as { admin: boolean }).admin).toBe(false)
+  delete process.env.FIREBASE_API_KEY
+  delete process.env.FIREBASE_AUTH_DOMAIN
+  delete process.env.FIREBASE_PROJECT_ID
+  delete process.env.FIREBASE_APP_ID
 })
 
 describe("invite codes", () => {
@@ -384,12 +405,13 @@ describe("gateway HTTP", () => {
     expect((valid.json as { valid: boolean }).valid).toBe(false)
   })
 
-  test("lets only the admin email mint and list codes", async () => {
+  test("requires the admin token for admin endpoints, always", async () => {
     process.env.FIREBASE_API_KEY = "test-key"
     process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
     process.env.FIREBASE_PROJECT_ID = "grist-test"
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
     const gateway = createGateway({
+      adminToken: "secret",
       adminEmail: "pranavmm25@gmail.com",
       fetch: async (_input, init) => {
         const body = JSON.parse(String(init?.body ?? "{}")) as { idToken?: string }
@@ -408,6 +430,13 @@ describe("gateway HTTP", () => {
     })
     expect(testerMint.status).toBe(401)
 
+    // A Firebase session for the admin email alone is NOT sufficient.
+    const firebaseOnly = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { Authorization: "Bearer admin-tok" },
+      body: { note: "nope" },
+    })
+    expect(firebaseOnly.status).toBe(401)
+
     const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
       body: { id_token: "admin-tok" },
     })
@@ -417,7 +446,7 @@ describe("gateway HTTP", () => {
     expect(adminSession.code).toMatch(/^grist-/)
 
     const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
-      headers: { Authorization: "Bearer admin-tok" },
+      headers: { "X-Grist-Admin": "secret" },
       body: { count: 2, cap_usd: 5, note: "beta" },
     })
     expect(minted.status).toBe(200)
@@ -425,7 +454,7 @@ describe("gateway HTTP", () => {
     expect(codes).toHaveLength(2)
 
     const listed = await call(gateway.fetch, "GET", "/v1/admin/invites", {
-      headers: { Authorization: "Bearer admin-tok" },
+      headers: { "X-Grist-Admin": "secret" },
     })
     expect(listed.status).toBe(200)
     const overview = listed.json as { invites: { code: string; note: string | null }[] }
