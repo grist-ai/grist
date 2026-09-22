@@ -5,6 +5,7 @@ import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generate
 import { usdForUsage } from "./prices"
 import { createGateway, DEFAULT_ADMIN_EMAIL } from "./http"
 import { openGatewayStore } from "./store"
+import { RUNG_MODELS } from "../rung"
 
 test("admin sign-in identity is the founder Gmail, not the public inbox", () => {
   expect(DEFAULT_ADMIN_EMAIL).toBe("pranavmm25@gmail.com")
@@ -570,6 +571,51 @@ describe("gateway HTTP", () => {
     expect(log).not.toContain("deepseek")
     const upstreamMs = Number(log?.match(/upstream_ms=(\d+)/)?.[1])
     expect(upstreamMs).toBeGreaterThanOrEqual(20)
+  })
+
+  test("capped mode blocks frontier completions and allows cheapest", async () => {
+    const forwarded: string[] = []
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async (_input, init) => {
+        const payload = JSON.parse(String(init?.body ?? "{}")) as { model?: string }
+        forwarded.push(payload.model ?? "")
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 1000, completion_tokens: 500 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      },
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const mode = await call(gateway.fetch, "POST", "/v1/admin/mode", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { mode: "capped" },
+    })
+    expect(mode.status).toBe(200)
+
+    const frontier = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "frontier", messages: [], stream: false },
+    })
+    expect(frontier.status).toBe(200)
+    expect(forwarded[0]).toBe(RUNG_MODELS.medium.modelID)
+    expect(forwarded[0]).not.toBe(RUNG_MODELS.frontier.modelID)
+
+    const cheapest = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "cheapest", messages: [], stream: false },
+    })
+    expect(cheapest.status).toBe(200)
+    expect(forwarded[1]).toBe(RUNG_MODELS.cheapest.modelID)
   })
 
   test("strips vendor model ids from streamed completions", async () => {
