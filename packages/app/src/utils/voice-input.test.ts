@@ -5,6 +5,7 @@ import {
   joinPromptText,
   resamplePcm,
   mixVoiceActivity,
+  moonshineLocateFile,
   sameActivity,
   textFromLines,
   voiceActivityLevels,
@@ -66,5 +67,13 @@ describe("moonshine transcript", () => {
     expect(isSpeechModelDownload(40, 100)).toBe(true)
     expect(isSpeechModelDownload(100, 100)).toBe(false)
     expect(isSpeechModelDownload(0, undefined)).toBe(true)
+  })
+
+  test("points pthread workers at the bundled Moonshine glue instead of moonshine.mjs", () => {
+    const moduleUrl = "oc://renderer/assets/moonshine--hashed.mjs"
+    const wasmUrl = "oc://renderer/assets/moonshine-hashed.wasm"
+    expect(moonshineLocateFile("moonshine.mjs", moduleUrl, wasmUrl)).toBe(moduleUrl)
+    expect(moonshineLocateFile("moonshine.wasm", moduleUrl, wasmUrl)).toBe(wasmUrl)
+    expect(new URL("moonshine.mjs", moduleUrl).href).toBe("oc://renderer/assets/moonshine.mjs")
   })
 })
