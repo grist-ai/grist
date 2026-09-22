@@ -2,8 +2,10 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
+import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { moonshinePthreadCopy } from "./src/main/pthread-assets"
 
 const OPENCODE_SERVER_DIST = "../opencode/dist/node"
 const transformersWeb = join(
@@ -97,7 +99,21 @@ const require = __cjs_mod__.createRequire(import.meta.url);
     },
   },
   renderer: {
-    plugins: [appPlugin, sentry],
+    plugins: [
+      appPlugin,
+      sentry,
+      {
+        name: "grist:moonshine-pthread-assets",
+        async writeBundle(output) {
+          const dir = join(output.dir ?? "out/renderer", "assets")
+          if (!existsSync(dir)) return
+          const copies = moonshinePthreadCopy(await fs.readdir(dir))
+          for (const copy of copies) {
+            await fs.copyFile(join(dir, copy.from), join(dir, copy.to))
+          }
+        },
+      },
+    ],
     publicDir: "../../../app/public",
     root: "src/renderer",
     resolve: {

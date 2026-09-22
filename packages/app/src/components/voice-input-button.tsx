@@ -26,6 +26,7 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
   let partial = ""
   let detachActivity: (() => void) | undefined
   let cancelled = false
+  let capturing = false
 
   const detach = () => {
     detachActivity?.()
@@ -51,6 +52,7 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
       detach()
       setVoice({ state: "busy", stopping: true })
       try {
+        if (!capturing) return
         await mic?.stop()
         const text = textFromLines(partial && lines.at(-1) !== partial ? [...lines, partial] : lines)
         lines = []
@@ -73,6 +75,7 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
           variant: "error",
         })
       } finally {
+        capturing = false
         setVoice({ state: "idle", stopping: false })
       }
       return
@@ -109,6 +112,7 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
         await mic.stop()
         return
       }
+      capturing = true
       detachActivity = attachVoiceActivity(mic, (levels) => {
         setVoice("levels", (prev: readonly number[]) => (sameActivity(prev, levels) ? prev : [...levels]))
       })
@@ -135,10 +139,12 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
 }
 
 export function VoiceActivityBars(props: { levels: readonly number[]; class?: string }) {
+  const live = () => props.levels.some((level) => level > 0.08)
   return (
     <div
       aria-hidden="true"
       data-slot="voice-activity"
+      data-live={live() ? "" : undefined}
       class="flex h-4 items-center gap-0.5"
       classList={{ [props.class ?? ""]: !!props.class }}
     >
