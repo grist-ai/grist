@@ -775,13 +775,19 @@ function maybeAlert(
 ) {
   const hour = store.spendSince(invite.code, now() - 60 * 60 * 1000)
   if (hour > HOURLY_ABUSE_USD) {
-    alert(`code ${invite.code} burned $${hour.toFixed(2)} in the last hour`)
+    // Invite codes are bearer credentials: alert on a fingerprint, never the code.
+    alert(`invite ${inviteFingerprint(invite.code)} burned $${hour.toFixed(2)} in the last hour`)
   }
   const global = store.allInvites().reduce((sum, row) => sum + row.spent_usd, 0)
   if (global >= globalBudget * 0.8 && !store.getAlertFlag("global_80")) {
     store.setAlertFlag("global_80")
     alert(`global test spend $${global.toFixed(2)} is ≥80% of $${globalBudget}`)
   }
+}
+
+/** Non-reversible fingerprint identifying an invite in logs/alerts without leaking the code. */
+function inviteFingerprint(code: string): string {
+  return createHash("sha256").update(code).digest("hex").slice(0, 12)
 }
 
 function meteredSse(

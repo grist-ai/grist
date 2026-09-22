@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import os from "os"
 import path from "path"
 import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generateApiKeySecret, generateDeviceUserCode, generateInviteCode } from "./codes"
@@ -887,6 +888,39 @@ describe("gateway HTTP", () => {
     // Same client IP via a direct connection shares the exhausted bucket.
     const viaDirect = await call(gateway.fetch, "POST", "/v1/auth/device", { peerIp: "9.9.9.9" })
     expect(viaDirect.status).toBe(429)
+  })
+
+  test("alerts on invite fingerprint, never the code", async () => {
+    const alerts: string[] = []
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      alert: (message) => alerts.push(message),
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 10, completion_tokens: 5 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 50 },
+    })
+    const code = (minted.json as { code: string }).code
+    // Push hourly spend over the $2 abuse threshold.
+    gateway.store.addSpend({ code, model: "test", rung: "cheapest", inputTokens: 0, outputTokens: 0, usd: 3 })
+    const ok = await call(gateway.fetch, "POST", "/v1/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "deepseek/deepseek-v4.1-flash", messages: [] },
+    })
+    expect(ok.status).toBe(200)
+    expect(alerts).toHaveLength(1)
+    const fingerprint = createHash("sha256").update(code).digest("hex").slice(0, 12)
+    expect(alerts[0]).toContain(fingerprint)
+    expect(alerts[0]).not.toContain(code)
   })
 
   test("ignores spoofed X-Forwarded-For from public peers", async () => {
