@@ -1669,7 +1669,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     class="size-8 p-0"
                     style={buttons()}
                     onClick={() => void voice.toggle()}
-                    disabled={store.mode !== "normal" || voice.state() === "busy" || voice.stopping()}
+                    disabled={store.mode !== "normal" || voice.stopping()}
                     tabIndex={store.mode === "normal" ? undefined : -1}
                     aria-label={
                       voice.state() === "recording" || voice.stopping()
