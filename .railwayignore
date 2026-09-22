@@ -5,4 +5,4 @@
 !packages/opencode/src
 !packages/opencode/src/grist
 !packages/opencode/src/grist/**
-!railway.toml
+!railway.json
