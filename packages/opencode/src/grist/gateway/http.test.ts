@@ -779,6 +779,113 @@ describe("gateway HTTP", () => {
     expect(limited.status).toBe(429)
   })
 
+  test("rate-limits api key minting per account", async () => {
+    const gateway = createGateway({ adminToken: "secret" })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+
+    for (let i = 0; i < 10; i++) {
+      const ok = await call(gateway.fetch, "POST", "/v1/api-keys", {
+        headers: { "X-Grist-Invite": code },
+        body: { name: `key-${i}` },
+      })
+      expect(ok.status).toBe(200)
+    }
+
+    const limited = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      headers: { "X-Grist-Invite": code },
+      body: { name: "one-too-many" },
+    })
+    expect(limited.status).toBe(429)
+  })
+
+  test("rate-limits completions per account", async () => {
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      rateLimits: { completions: { limit: 2, windowMs: 60_000 } },
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 10, completion_tokens: 5 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+
+    for (let i = 0; i < 2; i++) {
+      const ok = await call(gateway.fetch, "POST", "/v1/completions", {
+        headers: { "X-Grist-Invite": code },
+        body: { model: "deepseek/deepseek-v4.1-flash", messages: [] },
+      })
+      expect(ok.status).toBe(200)
+    }
+
+    const limited = await call(gateway.fetch, "POST", "/v1/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "deepseek/deepseek-v4.1-flash", messages: [] },
+    })
+    expect(limited.status).toBe(429)
+  })
+
+  test("rate-limits device flow start per IP", async () => {
+    const gateway = createGateway({})
+    for (let i = 0; i < 10; i++) {
+      const ok = await call(gateway.fetch, "POST", "/v1/auth/device", {})
+      expect(ok.status).toBe(200)
+    }
+    const limited = await call(gateway.fetch, "POST", "/v1/auth/device", {})
+    expect(limited.status).toBe(429)
+  })
+
+  test("trusts X-Forwarded-For only from private peers", async () => {
+    const gateway = createGateway({})
+    const headers = { "X-Forwarded-For": "9.9.9.9" }
+    // Private peer (edge proxy): XFF trusted, bucket keyed by 9.9.9.9.
+    for (let i = 0; i < 10; i++) {
+      const ok = await call(gateway.fetch, "POST", "/v1/auth/device", { headers, peerIp: "10.0.0.5" })
+      expect(ok.status).toBe(200)
+    }
+    // Same client IP via a direct connection shares the exhausted bucket.
+    const viaDirect = await call(gateway.fetch, "POST", "/v1/auth/device", { peerIp: "9.9.9.9" })
+    expect(viaDirect.status).toBe(429)
+  })
+
+  test("ignores spoofed X-Forwarded-For from public peers", async () => {
+    const gateway = createGateway({})
+    const headers = { "X-Forwarded-For": "9.9.9.9" }
+    // Public peer: XFF ignored, bucket keyed by the peer 203.0.113.7.
+    for (let i = 0; i < 10; i++) {
+      const ok = await call(gateway.fetch, "POST", "/v1/auth/device", { headers, peerIp: "203.0.113.7" })
+      expect(ok.status).toBe(200)
+    }
+    const limited = await call(gateway.fetch, "POST", "/v1/auth/device", { headers, peerIp: "203.0.113.7" })
+    expect(limited.status).toBe(429)
+    // The spoofed identity was never counted: fresh bucket.
+    const fresh = await call(gateway.fetch, "POST", "/v1/auth/device", { peerIp: "9.9.9.9" })
+    expect(fresh.status).toBe(200)
+  })
+
+  test("trusts X-Forwarded-For from configured proxy CIDRs", async () => {
+    const gateway = createGateway({ trustedProxies: "203.0.113.0/24" })
+    const headers = { "X-Forwarded-For": "9.9.9.9" }
+    for (let i = 0; i < 10; i++) {
+      const ok = await call(gateway.fetch, "POST", "/v1/auth/device", { headers, peerIp: "203.0.113.7" })
+      expect(ok.status).toBe(200)
+    }
+    const viaDirect = await call(gateway.fetch, "POST", "/v1/auth/device", { peerIp: "9.9.9.9" })
+    expect(viaDirect.status).toBe(429)
+  })
+
   test("meters Jev scoring and leaves shadow scoring free", async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = (async () =>
@@ -851,10 +958,10 @@ describe("gateway HTTP", () => {
 })
 
 async function call(
-  fetch: (req: Request) => Promise<Response>,
+  fetch: (req: Request, peerIp?: string) => Promise<Response>,
   method: string,
   path: string,
-  input?: { headers?: Record<string, string>; body?: unknown },
+  input?: { headers?: Record<string, string>; body?: unknown; peerIp?: string },
 ) {
   const response = await fetch(
     new Request(`http://gateway.test${path}`, {
@@ -865,6 +972,7 @@ async function call(
       },
       body: method === "GET" || method === "DELETE" ? undefined : JSON.stringify(input?.body ?? {}),
     }),
+    input?.peerIp,
   )
   const text = await response.text()
   return {
