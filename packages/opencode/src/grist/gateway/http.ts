@@ -118,11 +118,31 @@ export function createGateway(opts: GatewayOptions = {}) {
   const fetchImpl = opts.fetch ?? globalThis.fetch
   const now = opts.now ?? Date.now
   // B8: upstream calls must never hang the gateway worker. Every fetchImpl
-  // use goes through here so a stalled OpenRouter/Firebase socket dies at 120s.
+  // use goes through here. The watchdog is an idle timer, not a total
+  // deadline: it is re-armed on every chunk of the upstream response body so
+  // a long-but-progressing stream survives while a stalled socket dies 120s
+  // after the last data.
   const UPSTREAM_TIMEOUT_MS = 120_000
   function upstreamFetch(input: string, init?: RequestInit): Promise<Response> {
-    const signal = init?.signal ?? AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
-    return fetchImpl(input, { ...init, signal })
+    if (init?.signal) return fetchImpl(input, init)
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const arm = () => {
+      clearTimeout(timer)
+      timer = setTimeout(
+        () => controller.abort(new Error(`upstream idle for ${UPSTREAM_TIMEOUT_MS}ms`)),
+        UPSTREAM_TIMEOUT_MS,
+      )
+    }
+    const stop = () => clearTimeout(timer)
+    arm()
+    return fetchImpl(input, { ...init, signal: controller.signal }).then(
+      (response) => watchUpstreamIdle(response, controller, arm, stop),
+      (error) => {
+        stop()
+        throw error
+      },
+    )
   }
   const openrouterKey = opts.openrouterKey ?? process.env.OPENROUTER_API_KEY?.trim() ?? ""
   const adminToken = opts.adminToken ?? process.env.GRIST_ADMIN_TOKEN?.trim() ?? ""
@@ -800,6 +820,54 @@ function maybeAlert(
 /** Non-reversible fingerprint identifying an invite in logs/alerts without leaking the code. */
 function inviteFingerprint(code: string): string {
   return createHash("sha256").update(code).digest("hex").slice(0, 12)
+}
+
+/**
+ * Re-arm the idle watchdog on every chunk of an upstream body and stop it once
+ * the body closes, errors, or is cancelled. Wrapping `response.body` (rather
+ * than racing the whole response) lets a slow stream that keeps producing data
+ * outlive `UPSTREAM_TIMEOUT_MS` while still aborting a stalled socket. When the
+ * watchdog fires it aborts the fetch `controller`, which errors the underlying
+ * reader; we surface that error to our own stream consumer.
+ */
+function watchUpstreamIdle(
+  response: Response,
+  controller: AbortController,
+  arm: () => void,
+  stop: () => void,
+): Response {
+  if (!response.body) {
+    stop()
+    return response
+  }
+  const reader = response.body.getReader()
+  const body = new ReadableStream<Uint8Array>({
+    async pull(stream) {
+      try {
+        const chunk = await reader.read()
+        if (chunk.done) {
+          stop()
+          stream.close()
+          return
+        }
+        arm()
+        stream.enqueue(chunk.value)
+      } catch (error) {
+        stop()
+        stream.error(error)
+      }
+    },
+    cancel(reason) {
+      stop()
+      controller.abort(reason)
+      return reader.cancel(reason)
+    },
+  })
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
 }
 
 function meteredSse(
