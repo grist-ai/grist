@@ -710,6 +710,101 @@ describe("gateway HTTP", () => {
     expect(row?.status).toBe("sent")
     expect(row?.code).toBe(code)
   })
+
+  test("rate-limits gate/route per account", async () => {
+    const gateway = createGateway({ adminToken: "secret", typesafeKey: "" })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+
+    for (let i = 0; i < 30; i++) {
+      const ok = await call(gateway.fetch, "POST", "/v1/gate/route", {
+        headers: { "X-Grist-Invite": code },
+        body: { text: "rename a helper" },
+      })
+      expect(ok.status).toBe(200)
+    }
+
+    const limited = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      headers: { "X-Grist-Invite": code },
+      body: { text: "rename a helper" },
+    })
+    expect(limited.status).toBe(429)
+  })
+
+  test("meters Jev scoring and leaves shadow scoring free", async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            model: "jev-latest",
+            answers: {
+              difficulty: { type: "score", score: 2 },
+              sensitivity: { type: "score", score: 1 },
+              underspecified: { type: "noul", noul: 0.1 },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )) as typeof fetch
+    try {
+      const gateway = createGateway({ adminToken: "secret", typesafeKey: "ts-test" })
+      const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+        headers: { "X-Grist-Admin": "secret" },
+        body: { cap_usd: 5 },
+      })
+      const code = (minted.json as { code: string }).code
+
+      const route = await call(gateway.fetch, "POST", "/v1/gate/route", {
+        headers: { "X-Grist-Invite": code },
+        body: { text: "refactor auth across files" },
+      })
+      expect(route.status).toBe(200)
+      expect((route.json as { provider: string }).provider).toBe("jev")
+      expect(gateway.store.usageFor(code).some((event) => event.model === "gate/route")).toBe(true)
+      expect(gateway.store.getInvite(code)?.spent_usd).toBeCloseTo(0.0003)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+
+    const shadow = createGateway({ adminToken: "secret", typesafeKey: "" })
+    const minted = await call(shadow.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const route = await call(shadow.fetch, "POST", "/v1/gate/route", {
+      headers: { "X-Grist-Invite": code },
+      body: { text: "refactor auth across files" },
+    })
+    expect((route.json as { provider: string }).provider).toBe("shadow")
+    expect(shadow.store.usageFor(code)).toHaveLength(0)
+    expect(shadow.store.getInvite(code)?.spent_usd).toBe(0)
+  })
+
+  test("rejects oversized request bodies with 413", async () => {
+    const gateway = createGateway({ adminToken: "secret", typesafeKey: "" })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+
+    const gate = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      headers: { "X-Grist-Invite": code },
+      body: { text: "x".repeat(9 * 1024) },
+    })
+    expect(gate.status).toBe(413)
+
+    const completions = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "cheapest", messages: [{ role: "user", content: "x".repeat(257 * 1024) }] },
+    })
+    expect(completions.status).toBe(413)
+  })
 })
 
 async function call(

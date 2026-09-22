@@ -59,9 +59,22 @@ const PUBLIC_MAC_DMGS: Record<string, string> = {
 
 const VALIDATE_LIMIT = 10
 const VALIDATE_WINDOW_MS = 60_000
+const GATE_ROUTE_LIMIT = 30
+const GATE_ROUTE_WINDOW_MS = 60_000
+/**
+ * Flat debit per Jev `scoreTask` call. Jev bills per request rather than per
+ * token, so the gateway charges a small fixed amount when it actually reaches
+ * the paid provider (shadow scoring stays free). Tune from the TypeSafe invoice.
+ */
+const GATE_ROUTE_COST_USD = 0.0003
+const MAX_JSON_BYTES = 256 * 1024
+const MAX_GATE_BYTES = 8 * 1024
 const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
+
+/** Thrown by `readJson` when a request body exceeds its endpoint cap. */
+class PayloadTooLargeError extends Error {}
 
 export function createGateway(opts: GatewayOptions = {}) {
   const store = opts.store ?? openGatewayStore(opts.dbPath ?? ":memory:")
@@ -88,6 +101,15 @@ export function createGateway(opts: GatewayOptions = {}) {
     })
 
   async function handle(req: Request): Promise<Response> {
+    try {
+      return await route(req)
+    } catch (error) {
+      if (error instanceof PayloadTooLargeError) return json(413, { error: "payload too large" })
+      throw error
+    }
+  }
+
+  async function route(req: Request): Promise<Response> {
     const url = new URL(req.url)
     const pathname = url.pathname.replace(/\/+$/, "") || "/"
 
@@ -286,11 +308,28 @@ export function createGateway(opts: GatewayOptions = {}) {
   async function gateRoute(req: Request): Promise<Response> {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
-    const body = await readJson(req)
+    if (invite.spent_usd >= invite.cap_usd) return capHit(invite)
+    if (!allowWindow(`gate:${invite.code}`, GATE_ROUTE_LIMIT, GATE_ROUTE_WINDOW_MS)) {
+      return json(429, { error: "too many routing requests" })
+    }
+    const body = await readJson(req, MAX_GATE_BYTES)
     const text = typeof body?.text === "string" ? body.text : ""
     const sessionID = typeof body?.session_id === "string" ? body.session_id : undefined
     const started = now()
     const { scores, provider } = await scoreTask(text, opts.typesafeKey ?? typesafeKey())
+    // Jev scoring is a paid upstream call; debit a flat per-call cost so the
+    // invite cap reflects it. Shadow scoring never reaches a paid provider.
+    if (provider === "jev") {
+      const updated = store.addSpend({
+        code: invite.code,
+        model: "gate/route",
+        rung: "cheapest",
+        inputTokens: 0,
+        outputTokens: 0,
+        usd: GATE_ROUTE_COST_USD,
+      })
+      maybeAlert(store, updated, alert, globalBudget, now)
+    }
     const mode = store.getMode()
     const { rung, reasons } = composeRung(scores, undefined, mode)
     const model = publicModelRef(rung)
@@ -329,7 +368,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (invite.spent_usd >= invite.cap_usd) return capHit(invite)
 
-    const body = await readJson(req)
+    const body = await readJson(req, MAX_JSON_BYTES)
     const rawModel = typeof body?.model === "string" ? body.model : ""
     const publicID = publicLadderID(rawModel)
     if (!publicID || !isLadderModel(rawModel)) {
@@ -497,13 +536,17 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   function allowValidate(ip: string): boolean {
+    return allowWindow(ip, VALIDATE_LIMIT, VALIDATE_WINDOW_MS)
+  }
+
+  function allowWindow(bucket: string, limit: number, windowMs: number): boolean {
     const t = now()
-    const cur = windows.get(ip)
+    const cur = windows.get(bucket)
     if (!cur || t >= cur.reset) {
-      windows.set(ip, { count: 1, reset: t + VALIDATE_WINDOW_MS })
+      windows.set(bucket, { count: 1, reset: t + windowMs })
       return true
     }
-    if (cur.count >= VALIDATE_LIMIT) return false
+    if (cur.count >= limit) return false
     cur.count += 1
     return true
   }
@@ -749,8 +792,19 @@ function usageFromUnknown(value: unknown): { input: number; output: number } | u
   return { input, output }
 }
 
-async function readJson(req: Request): Promise<Record<string, unknown> | undefined> {
+/**
+ * Read and parse a JSON request body, rejecting anything larger than
+ * `maxBytes`. `Content-Length` is checked before buffering; the decoded text
+ * is measured again for chunked bodies that omit the header.
+ */
+async function readJson(
+  req: Request,
+  maxBytes = MAX_JSON_BYTES,
+): Promise<Record<string, unknown> | undefined> {
+  const declared = Number(req.headers.get("content-length"))
+  if (Number.isFinite(declared) && declared > maxBytes) throw new PayloadTooLargeError()
   const text = await req.text()
+  if (new TextEncoder().encode(text).length > maxBytes) throw new PayloadTooLargeError()
   if (!text.trim()) return
   try {
     const parsed = JSON.parse(text) as unknown
