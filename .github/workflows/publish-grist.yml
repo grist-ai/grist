@@ -1,5 +1,10 @@
 name: publish-grist
 
+# Releases are manual ONLY (workflow_dispatch) — deliberately not triggered by
+# tags or pushes. Publishing the Grist CLI ships a billing-adjacent artifact
+# (metered spend caps, panic button), so every release is a human decision
+# with an explicit version + dist-tag. Guardrails below: pre-publish gitleaks
+# secret scan of the working tree, and --provenance attestations on publish.
 on:
   workflow_dispatch:
     inputs:
@@ -46,6 +51,17 @@ jobs:
       - name: Use npm with OIDC trusted publishing
         run: npm install -g npm@11.15.0
 
+      # Pre-publish secret gate: fail the release if gitleaks finds anything
+      # outside .gitleaks.toml's reviewed allowlist. Runs before `bun install`
+      # so node_modules never enters the scan. Version pinned to match the
+      # config's baseline (8.28.0, verified 2026-09-22).
+      - name: Secret scan (gitleaks)
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --no-git --config .gitleaks.toml --verbose
+
       - name: Install
         run: bun install --ignore-scripts
 
@@ -87,7 +103,7 @@ jobs:
               return 0
             fi
             echo "publish ${name}@${version}"
-            (cd "$dir" && npm publish --access public --tag "${OPENCODE_CHANNEL:-latest}")
+            (cd "$dir" && npm publish --provenance --access public --tag "${OPENCODE_CHANNEL:-latest}")
           }
           for dir in dist/grist-*; do
             [ -d "$dir" ] || continue
