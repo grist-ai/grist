@@ -52,7 +52,7 @@ Rung → model defaults (override with env):
 | --- | --- | --- |
 | cheapest | `GRIST_CHEAPEST_*` | `openrouter` / `deepseek/deepseek-v4.1-flash` |
 | medium | `GRIST_MEDIUM_*` | `openrouter` / `moonshotai/kimi-k3` |
-| frontier | `GRIST_FRONTIER_*` | `openrouter` / `openai/gpt-5.6-sol` |
+| frontier | `GRIST_FRONTIER_*` | `openrouter` / `openai/gpt-6-sol` |
 
 One path: invite code against the gateway. The founder `OPENROUTER_API_KEY`
 never ships in the client. See [`providers.md`](providers.md) and

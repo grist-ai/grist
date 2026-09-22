@@ -26,7 +26,7 @@ export const RUNG_MODELS: Record<Rung, ModelRef> = {
   },
   frontier: {
     providerID: process.env.GRIST_FRONTIER_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_FRONTIER_MODEL ?? "openai/gpt-5.6-sol",
+    modelID: process.env.GRIST_FRONTIER_MODEL ?? "openai/gpt-6-sol",
   },
 }
 
