@@ -4,7 +4,7 @@ import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
 import { publicModelRef } from "../rung"
 import { typesafeKey } from "../jev-client"
-import type { OperatingMode } from "../mode"
+import { applyModeCap, type OperatingMode } from "../mode"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase"
 import { isLadderModel, publicLadderID, upstreamLadderID, priceForModel, usdForUsage } from "./prices"
 import { openGatewayStore, type GatewayStore, type InviteRow } from "./store"
@@ -332,9 +332,15 @@ export function createGateway(opts: GatewayOptions = {}) {
     const body = await readJson(req)
     const rawModel = typeof body?.model === "string" ? body.model : ""
     const publicID = publicLadderID(rawModel)
-    const upstreamModel = upstreamLadderID(rawModel)
-    if (!publicID || !upstreamModel || !isLadderModel(rawModel)) {
+    if (!publicID || !isLadderModel(rawModel)) {
       return json(400, { error: "model not on ladder" })
+    }
+    // Operating mode clamps the ladder server-side: in `capped` mode a
+    // frontier request degrades to medium rather than paying frontier prices.
+    const { rung: effectivePublicID } = applyModeCap(publicID, store.getMode())
+    const upstreamModel = upstreamLadderID(effectivePublicID)
+    if (!upstreamModel) {
+      return json(500, { error: "ladder misconfigured" })
     }
     if (!openrouterKey) {
       return json(503, { error: "gateway has no OpenRouter key" })
