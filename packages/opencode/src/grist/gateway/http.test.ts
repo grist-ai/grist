@@ -398,6 +398,106 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_APP_ID
   })
 
+  test("single-use binding: 409 on taken code, 400 on rebind, idempotent retry", async () => {
+    process.env.FIREBASE_API_KEY = "test-key"
+    process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+    process.env.FIREBASE_PROJECT_ID = "grist-test"
+    process.env.FIREBASE_APP_ID = "1:1:web:abc"
+    const gateway = createGateway({
+      adminToken: "secret",
+      fetch: async (_input, init) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { idToken?: string }
+        const n = body.idToken === "tok-b" ? "b" : "a"
+        return new Response(
+          JSON.stringify({ users: [{ localId: `uid_${n}`, email: `${n}@x.co` }] }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      },
+    })
+    const mint = async () =>
+      (await call(gateway.fetch, "POST", "/v1/admin/invites", {
+        headers: { "X-Grist-Admin": "secret" },
+        body: {},
+      })).json as { code: string }
+    const bind = (idToken: string, code: string) =>
+      call(gateway.fetch, "POST", "/v1/auth/session/bind", { body: { id_token: idToken, code } })
+
+    const code1 = (await mint()).code
+    const code2 = (await mint()).code
+
+    // First bind wins.
+    expect(((await bind("tok-a", code1)).json as { ok: boolean }).ok).toBe(true)
+    // Idempotent retry: same account + same code is fine.
+    const retry = await bind("tok-a", code1)
+    expect(retry.status).toBe(200)
+    expect((retry.json as { ok: boolean }).ok).toBe(true)
+    // Second account on the same code: 409, not a 500.
+    const taken = await bind("tok-b", code1)
+    expect(taken.status).toBe(409)
+    expect((taken.json as { ok: boolean }).ok).toBe(false)
+    // Same account trying a different code: 400.
+    const rebind = await bind("tok-a", code2)
+    expect(rebind.status).toBe(400)
+    expect((rebind.json as { ok: boolean }).ok).toBe(false)
+
+    delete process.env.FIREBASE_API_KEY
+    delete process.env.FIREBASE_AUTH_DOMAIN
+    delete process.env.FIREBASE_PROJECT_ID
+    delete process.env.FIREBASE_APP_ID
+  })
+
+  test("binding revokes the account's other unclaimed request codes", async () => {
+    process.env.FIREBASE_API_KEY = "test-key"
+    process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+    process.env.FIREBASE_PROJECT_ID = "grist-test"
+    process.env.FIREBASE_APP_ID = "1:1:web:abc"
+    const gateway = createGateway({
+      adminToken: "secret",
+      fetch: async () =>
+        new Response(JSON.stringify({ users: [{ localId: "uid_s", email: "sib@x.co" }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    })
+    const adminHeaders = { "X-Grist-Admin": "secret" }
+    const requestCode = async () => {
+      await call(gateway.fetch, "POST", "/v1/access/requests", {
+        body: { email: "sib@x.co", name: "Sib" },
+      })
+      const listed = await call(gateway.fetch, "GET", "/v1/admin/requests", {
+        headers: adminHeaders,
+      })
+      const requests = (listed.json as { requests: { id: string; status: string }[] }).requests
+      const open = requests.find((r) => r.status === "open")
+      const minted = await call(gateway.fetch, "POST", `/v1/admin/requests/${open?.id}/code`, {
+        headers: adminHeaders,
+      })
+      const code = (minted.json as { code: string }).code
+      // Mark sent so a later request for the same email opens a fresh row.
+      await call(gateway.fetch, "POST", `/v1/admin/requests/${open?.id}/sent`, {
+        headers: adminHeaders,
+      })
+      return code
+    }
+    // Two separate requests for the same email -> two request-linked codes.
+    const code1 = await requestCode()
+    const code2 = await requestCode()
+    expect(code1).not.toBe(code2)
+
+    const bound = await call(gateway.fetch, "POST", "/v1/auth/session/bind", {
+      body: { id_token: "tok", code: code1 },
+    })
+    expect((bound.json as { ok: boolean }).ok).toBe(true)
+    // Bound code stays usable; the sibling spare is revoked (single-use).
+    expect(gateway.store.getInvite(code1)?.revoked).toBe(0)
+    expect(gateway.store.getInvite(code2)?.revoked).toBe(1)
+
+    delete process.env.FIREBASE_API_KEY
+    delete process.env.FIREBASE_AUTH_DOMAIN
+    delete process.env.FIREBASE_PROJECT_ID
+    delete process.env.FIREBASE_APP_ID
+  })
+
   test("rejects codes that were never minted", async () => {
     const gateway = createGateway({ adminToken: "secret" })
     const valid = await call(gateway.fetch, "POST", "/v1/invite/validate", {

@@ -204,8 +204,26 @@ export function openGatewayStore(filePath = ":memory:") {
   const insertAccount = db.prepare(
     `INSERT INTO accounts (firebase_uid, invite_code, email, created_at) VALUES (?, ?, ?, ?)`,
   )
+  // B6: atomic bind backstop. BEGIN IMMEDIATE serializes binders across
+  // processes; ON CONFLICT DO NOTHING turns a lost race into changes === 0
+  // (clean 409) instead of an unhandled 500.
+  const insertAccountIgnore = db.prepare(
+    `INSERT INTO accounts (firebase_uid, invite_code, email, created_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT DO NOTHING`,
+  )
   const selectAccount = db.prepare(`SELECT * FROM accounts WHERE firebase_uid = ?`)
   const selectAccountByInvite = db.prepare(`SELECT * FROM accounts WHERE invite_code = ?`)
+  // B6 single-use: when an account binds a code, revoke its other unclaimed
+  // request codes so spares can't be handed to a second account.
+  const revokeSiblingCodes = db.prepare(`
+    UPDATE invites SET revoked = 1
+    WHERE code IN (
+      SELECT invite_code FROM access_requests
+      WHERE email = ? AND invite_code IS NOT NULL AND invite_code != ?
+    )
+    AND code NOT IN (SELECT invite_code FROM accounts)
+    AND revoked = 0
+  `)
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
     `INSERT INTO api_keys (id, invite_code, hash, prefix, name, created_at, last_used_at, revoked)
@@ -382,12 +400,53 @@ export function openGatewayStore(filePath = ":memory:") {
       return selectAccount.get(uid) as AccountRow | undefined
     },
 
-    bindAccount(input: { uid: string; email?: string; inviteCode: string }): AccountRow | undefined {
-      const existing = selectAccount.get(input.uid) as AccountRow | undefined
-      if (existing) return existing.invite_code === input.inviteCode ? existing : undefined
-      if (selectAccountByInvite.get(input.inviteCode)) return
-      insertAccount.run(input.uid, input.inviteCode, input.email ?? null, Date.now())
-      return selectAccount.get(input.uid) as AccountRow
+    bindAccount(input: {
+      uid: string
+      email?: string
+      inviteCode: string
+    }):
+      | { ok: true; account: AccountRow }
+      | { ok: false; reason: "code_taken" | "already_bound" } {
+      // Single-use onboarding: one code -> one account, one account -> one
+      // code, no unbind/rebind. BEGIN IMMEDIATE makes check-then-insert atomic
+      // across processes sharing the DB file (overlapping deploys).
+      db.exec("BEGIN IMMEDIATE")
+      try {
+        const existing = selectAccount.get(input.uid) as AccountRow | undefined
+        if (existing) {
+          const result =
+            existing.invite_code === input.inviteCode
+              ? { ok: true as const, account: existing }
+              : { ok: false as const, reason: "already_bound" as const }
+          db.exec("COMMIT")
+          return result
+        }
+        const bound = selectAccountByInvite.get(input.inviteCode) as AccountRow | undefined
+        if (bound) {
+          db.exec("COMMIT")
+          return { ok: false, reason: "code_taken" }
+        }
+        const applied = insertAccountIgnore.run(input.uid, input.inviteCode, input.email ?? null, Date.now())
+        if (applied.changes === 0) {
+          // Lost a race that slipped past the reads: classify the winner.
+          const winner = selectAccountByInvite.get(input.inviteCode) as AccountRow | undefined
+          db.exec("COMMIT")
+          if (winner && winner.firebase_uid !== input.uid) return { ok: false, reason: "code_taken" }
+          const mine = selectAccount.get(input.uid) as AccountRow | undefined
+          return mine ? { ok: true, account: mine } : { ok: false, reason: "already_bound" }
+        }
+        const account = selectAccount.get(input.uid) as AccountRow
+        db.exec("COMMIT")
+        return { ok: true, account }
+      } catch (error) {
+        db.exec("ROLLBACK")
+        throw error
+      }
+    },
+
+    revokeSiblingRequestCodes(input: { email: string; exceptCode: string }): number {
+      const result = revokeSiblingCodes.run(input.email.trim().toLowerCase(), input.exceptCode)
+      return Number(result.changes)
     },
 
     createApiKey(input: { inviteCode: string; name?: string }): { secret: string; key: PublicApiKey } | undefined {

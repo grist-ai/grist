@@ -344,8 +344,15 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (!user) return json(401, { ok: false })
     const invite = store.getInvite(raw)
     if (!invite || !inviteUsable(invite, now())) return json(200, { ok: false })
-    const account = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code })
-    if (!account) return json(200, { ok: false })
+    const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code })
+    if (!result.ok) {
+      // B6: single-use binding. A code already bound to another account is a
+      // 409; an account trying to bind a second code is a 400.
+      return result.reason === "code_taken"
+        ? json(409, { ok: false, error: "invite code already used" })
+        : json(400, { ok: false, error: "account already bound to a different invite code" })
+    }
+    if (user.email) store.revokeSiblingRequestCodes({ email: user.email, exceptCode: invite.code })
     return json(200, { ok: true, code: invite.code })
   }
 
@@ -648,14 +655,12 @@ export function createGateway(opts: GatewayOptions = {}) {
     const existing = store.getAccount(user.uid)
     if (existing) return existing
     const invite = store.createInvite({ note: "admin", capUsd: 50 })
-    return (
-      store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code }) ?? {
-        firebase_uid: user.uid,
-        invite_code: invite.code,
-        email: user.email ?? null,
-        created_at: Date.now(),
-      }
-    )
+    const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code })
+    // The code was just minted, so code_taken is impossible; already_bound is
+    // impossible because getAccount just returned undefined. Anything else is
+    // a real bug — fail loudly instead of returning a phantom account.
+    if (!result.ok) throw new Error(`admin account bind failed: ${result.reason}`)
+    return result.account
   }
 
   function adminOverview() {
