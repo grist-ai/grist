@@ -28,13 +28,15 @@ describe("invite codes", () => {
 })
 
 describe("metering", () => {
+  const offPeak = Date.UTC(2026, 8, 21, 12, 0, 0)
+
   test("prices Flash tokens in USD", () => {
-    expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 0)).toBeCloseTo(0.15)
-    expect(usdForUsage("moonshotai/kimi-k3", 1_000_000, 1_000_000)).toBeCloseTo(18)
-    expect(usdForUsage("openai/gpt-5.6-sol", 0, 1_000_000)).toBeCloseTo(20)
-    expect(usdForUsage("cheapest", 1_000_000, 0)).toBeCloseTo(0.15)
-    expect(usdForUsage("medium", 1_000_000, 1_000_000)).toBeCloseTo(18)
-    expect(usdForUsage("openrouter/frontier", 0, 1_000_000)).toBeCloseTo(20)
+    expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 0, { at: offPeak })).toBeCloseTo(0.15)
+    expect(usdForUsage("moonshotai/kimi-k3", 1_000_000, 1_000_000, { at: offPeak })).toBeCloseTo(18)
+    expect(usdForUsage("openai/gpt-5.6-sol", 0, 1_000_000, { at: offPeak })).toBeCloseTo(20)
+    expect(usdForUsage("cheapest", 1_000_000, 0, { at: offPeak })).toBeCloseTo(0.15)
+    expect(usdForUsage("medium", 1_000_000, 1_000_000, { at: offPeak })).toBeCloseTo(18)
+    expect(usdForUsage("openrouter/frontier", 0, 1_000_000, { at: offPeak })).toBeCloseTo(20)
   })
 })
 
