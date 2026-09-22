@@ -40,6 +40,28 @@ describe("metering", () => {
   })
 })
 
+describe("atomic spend cap", () => {
+  test("applies debits only while the total stays within the cap", () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite({ capUsd: 0.001 })
+    const debit = (usd: number) =>
+      store.addSpend({
+        code: invite.code,
+        model: "deepseek/deepseek-v4.1-flash",
+        rung: "cheapest",
+        inputTokens: 1000,
+        outputTokens: 0,
+        usd,
+      })
+    expect(debit(0.0005).spent_usd).toBeCloseTo(0.0005)
+    expect(debit(0.0005).spent_usd).toBeCloseTo(0.001)
+    // Would exceed the cap: rejected and clamped, never 0.0015.
+    expect(debit(0.0005).spent_usd).toBeCloseTo(0.001)
+    expect(store.getInvite(invite.code)?.spent_usd).toBeCloseTo(0.001)
+    store.close()
+  })
+})
+
 describe("api key last_used_at", () => {
   test("does not write last_used_at on every request", () => {
     const store = openGatewayStore()
