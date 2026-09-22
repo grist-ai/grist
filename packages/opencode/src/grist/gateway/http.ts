@@ -117,6 +117,13 @@ export function createGateway(opts: GatewayOptions = {}) {
   const windows = new Map<string, { count: number; reset: number }>()
   const fetchImpl = opts.fetch ?? globalThis.fetch
   const now = opts.now ?? Date.now
+  // B8: upstream calls must never hang the gateway worker. Every fetchImpl
+  // use goes through here so a stalled OpenRouter/Firebase socket dies at 120s.
+  const UPSTREAM_TIMEOUT_MS = 120_000
+  function upstreamFetch(input: string, init?: RequestInit): Promise<Response> {
+    const signal = init?.signal ?? AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    return fetchImpl(input, { ...init, signal })
+  }
   const openrouterKey = opts.openrouterKey ?? process.env.OPENROUTER_API_KEY?.trim() ?? ""
   const adminToken = opts.adminToken ?? process.env.GRIST_ADMIN_TOKEN?.trim() ?? ""
   // Env-only on purpose: no admin email is hardcoded into the build, and an
@@ -443,7 +450,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const stream = Boolean(body?.stream)
     const payload = upstreamPayload(body ?? {}, upstreamModel, stream)
     const upstreamStarted = now()
-    const upstream = await fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
+    const upstream = await upstreamFetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${openrouterKey}`,

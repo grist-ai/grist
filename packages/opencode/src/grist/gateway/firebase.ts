@@ -31,6 +31,8 @@ export async function verifyFirebaseIdToken(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
+      // B8: a wedged identitytoolkit socket must not hang the bind endpoint.
+      signal: AbortSignal.timeout(120_000),
     },
   )
   if (!response.ok) return
