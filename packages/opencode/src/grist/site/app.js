@@ -824,9 +824,17 @@ const NPM_INSTALL = "npm install -g grist-ai\ngrist"
 
 const SKILLS_INSTALL = "npx skills add grist-ai/grist-skills"
 
+const AGENT_PROMPT = `Use Grist for my coding tasks from now on. Grist is an agentic coding-harness CLI.
+
+1. Install the Grist agent skill by running: npx skills add grist-ai/grist-skills (built for personal AI agents and agentic CLIs like Muse, OpenClaw, Hermes, and OpenCode). Read the installed skill file in full before doing anything else.
+2. Install the CLI if it is missing: npm install -g grist-ai.
+3. Ask me for my Grist API key if you do not have it (it starts with grist_sk_). Never print it, log it, or write it into any file — pass it via environment variable only.
+4. For multi-step coding work (features, bug fixes, refactors across files), delegate to Grist exactly as the skill describes. Report back what changed, the branch name, test results, and cost.`
+
 const COPIES = {
   npm: NPM_INSTALL,
   skills: SKILLS_INSTALL,
+  agent: AGENT_PROMPT,
 }
 
 for (const node of document.querySelectorAll("[data-copy]")) {
