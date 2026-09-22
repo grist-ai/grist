@@ -17,8 +17,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import { gatewayAuthHeaders, loadInviteConfig } from "@/grist/invite/config"
-import { publicLadderID } from "@/grist/gateway/prices"
-import { PUBLIC_RUNG_NAME, publicModelRef } from "@/grist/rung"
+import { PUBLIC_RUNG_NAME, publicModelRef, publicRungFor } from "@/grist/rung"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -1927,7 +1926,7 @@ const layer = Layer.effect(
         return yield* new ModelNotFoundError({ providerID, modelID, suggestions })
       }
 
-      const lookupID = loadInviteConfig() ? ModelV2.ID.make(publicLadderID(modelID) ?? modelID) : modelID
+      const lookupID = loadInviteConfig() ? ModelV2.ID.make(publicRungFor(modelID) ?? modelID) : modelID
       const info = provider.models[lookupID]
       if (!info) {
         const current = modelSuggestions(provider, lookupID, runtimeFlags.enableExperimentalModels)
