@@ -10,7 +10,11 @@ let transcriberPromise: Promise<Transcriber> | undefined
 
 export async function openMoonshineMic(onLine: (line: TranscriptLine) => void) {
   const transcriber = await loadTranscriber()
-  return new MicTranscriber().useTranscriber(transcriber).language("en").onLine(onLine)
+  return new MicTranscriber()
+    .useTranscriber(transcriber)
+    .language("en")
+    .audioConstraints({ channelCount: 1, echoCancellation: true, noiseSuppression: true })
+    .onLine(onLine)
 }
 
 export function preloadSpeechModel() {
@@ -31,13 +35,18 @@ async function createTranscriber() {
   // The Emscripten glue has to stay a separate file. Bundling it makes its
   // pthread workers lose the wasm URL.
   const imported = (await import(/* @vite-ignore */ moonshineModuleUrl)) as { default?: LoadModuleOptions["factory"] }
-  const factory = imported.default ?? (imported as LoadModuleOptions["factory"])
+  const factory = imported.default
+  if (!factory) throw new Error("Moonshine speech runtime is missing")
+  const glue = await fetch(moonshineModuleUrl)
+  if (!glue.ok) throw new Error("Moonshine speech runtime is missing")
+  const blob = await glue.blob()
+  const locateFile = (path: string) => moonshineLocateFile(path, moonshineModuleUrl, moonshineWasmUrl)
   return Transcriber.load({
     files: await bundledModelFiles(),
     modelArch: ModelArch.MediumStreaming,
     moduleOptions: {
-      factory,
-      locateFile: (path) => moonshineLocateFile(path, moonshineModuleUrl, moonshineWasmUrl),
+      factory: (args) => factory({ ...(args ?? {}), locateFile, mainScriptUrlOrBlob: blob }),
+      locateFile,
     },
   })
 }

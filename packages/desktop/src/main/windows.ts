@@ -3,9 +3,9 @@ import { resolveThemeVariant } from "@opencode-ai/ui/theme/resolve"
 import type { DesktopTheme } from "@opencode-ai/ui/theme/types"
 import orngThemeJson from "../../../ui/src/theme/themes/orng.json"
 import { randomUUID } from "node:crypto"
-import { rmSync } from "node:fs"
+import { existsSync, readdirSync, rmSync } from "node:fs"
 import { app, BrowserWindow, dialog, net, nativeImage, nativeTheme, protocol, shell } from "electron"
-import { dirname, isAbsolute, join, relative, resolve } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { TitlebarTheme } from "../preload/types"
 import { exportDebugLogs, write as writeLog } from "./logging"
@@ -17,6 +17,7 @@ import { createWindowRegistry } from "./window-registry"
 import { safeWindowURL } from "./window-state"
 import { resolveExternalURL, resolveLocalFilePath } from "./external-url"
 import { PRODUCT_NAME } from "../../brand"
+import { moonshinePthreadFallback } from "./pthread-assets"
 import { resolveSpeechAsset, speechResourceRoot, SPEECH_PROTOCOL } from "./speech-assets"
 const root = dirname(fileURLToPath(import.meta.url))
 const rendererRoot = join(root, "../renderer")
@@ -351,12 +352,13 @@ export function registerRendererProtocol() {
       return new Response("Not found", { status: 404 })
     }
 
-    const file = resolve(rendererRoot, `.${decodeURIComponent(url.pathname)}`)
-    const rel = relative(rendererRoot, file)
+    const requested = resolve(rendererRoot, `.${decodeURIComponent(url.pathname)}`)
+    const rel = relative(rendererRoot, requested)
     if (rel.startsWith("..") || isAbsolute(rel)) {
-      writeLog("protocol", "rejected path", { url: request.url, file }, "warn")
+      writeLog("protocol", "rejected path", { url: request.url, file: requested }, "warn")
       return new Response("Not found", { status: 404 })
     }
+    const file = resolveRendererAsset(requested)
 
     try {
       const range = request.headers.get("range")
@@ -382,6 +384,15 @@ export function registerRendererProtocol() {
       return new Response("Not found", { status: 404 })
     }
   })
+}
+
+function resolveRendererAsset(requested: string) {
+  if (existsSync(requested)) return requested
+  const dir = dirname(requested)
+  if (!existsSync(dir)) return requested
+  const fallback = moonshinePthreadFallback(basename(requested), readdirSync(dir))
+  if (!fallback) return requested
+  return join(dir, fallback)
 }
 
 function loadWindow(win: BrowserWindow, html: string) {
