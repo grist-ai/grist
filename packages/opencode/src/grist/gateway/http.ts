@@ -27,6 +27,9 @@ export type GatewayOptions = {
 /** Sign-in identity for /admin (Google or email/password). Public mailto is admin@grist.lol. */
 export const DEFAULT_ADMIN_EMAIL = "pranavmm25@gmail.com"
 
+/** An invite plus the API key that authenticated the request, when one did. */
+type ResolvedInvite = InviteRow & { keyId: string | null }
+
 const SITE_ROOT = path.join(import.meta.dir, "..", "site")
 const SITE_PAGES = new Set([
   "/",
@@ -344,6 +347,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (provider === "jev") {
       const updated = store.addSpend({
         code: invite.code,
+        keyId: invite.keyId,
         model: "gate/route",
         rung: "cheapest",
         inputTokens: 0,
@@ -569,7 +573,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     return true
   }
 
-  async function resolveInvite(req: Request): Promise<InviteRow | Response> {
+  async function resolveInvite(req: Request): Promise<ResolvedInvite | Response> {
     const apiKey = req.headers.get("X-Grist-Api-Key") ?? bearerApiKey(req)
     if (apiKey) {
       const invite = store.inviteForApiKey(apiKey, now())
@@ -580,7 +584,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (raw) {
       const invite = store.getInvite(raw)
       if (!invite || !inviteUsable(invite, now())) return json(401, { error: "unauthorized" })
-      return invite
+      return { ...invite, keyId: null }
     }
     const bearer = req.headers.get("Authorization") ?? ""
     if (!bearer.startsWith("Bearer ")) return json(401, { error: "unauthorized" })
@@ -590,10 +594,10 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (!account) return json(401, { error: "unauthorized" })
     const invite = store.getInvite(account.invite_code)
     if (!invite || !inviteUsable(invite, now())) return json(401, { error: "unauthorized" })
-    return invite
+    return { ...invite, keyId: null }
   }
 
-  async function requireAccount(req: Request): Promise<InviteRow | Response> {
+  async function requireAccount(req: Request): Promise<ResolvedInvite | Response> {
     if (req.headers.get("X-Grist-Api-Key") || bearerApiKey(req)) {
       return json(401, { error: "unauthorized" })
     }
@@ -712,7 +716,7 @@ function upstreamPayload(
 
 function meterFromUsage(
   store: GatewayStore,
-  invite: InviteRow,
+  invite: ResolvedInvite,
   model: string,
   usage: { input: number; output: number } | undefined,
   alert: (message: string) => void,
@@ -725,6 +729,7 @@ function meterFromUsage(
   if (usd <= 0) return
   const updated = store.addSpend({
     code: invite.code,
+    keyId: invite.keyId,
     model,
     rung: price?.rung ?? "cheapest",
     inputTokens: usage.input,
@@ -755,7 +760,7 @@ function maybeAlert(
 function meteredSse(
   body: ReadableStream<Uint8Array>,
   store: GatewayStore,
-  invite: InviteRow,
+  invite: ResolvedInvite,
   model: string,
   publicID: string,
   alert: (message: string) => void,
