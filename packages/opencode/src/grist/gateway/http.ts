@@ -408,7 +408,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
 
     const stream = Boolean(body?.stream)
-    const payload = upstreamPayload(body, upstreamModel, stream)
+    const payload = upstreamPayload(body ?? {}, upstreamModel, stream)
     const upstreamStarted = now()
     const upstream = await fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",

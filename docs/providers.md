@@ -35,7 +35,7 @@ Ladder ids (override with `GRIST_*_MODEL` **on the gateway**):
 | --- | --- | --- |
 | Cheapest | `deepseek/deepseek-v4.1-flash` | `GRIST_CHEAPEST_MODEL` |
 | Medium | `moonshotai/kimi-k3` | `GRIST_MEDIUM_MODEL` |
-| Frontier | `openai/gpt-5.6-sol` | `GRIST_FRONTIER_MODEL` |
+| Frontier | `openai/gpt-6-sol` | `GRIST_FRONTIER_MODEL` |
 
 ### Ladder pricing (metered, 2026-09-21)
 
@@ -49,7 +49,7 @@ Flash also has peak windows — see
 | --- | --- | --- |
 | `deepseek/deepseek-v4.1-flash` | $0.15 / $0.60 off-peak (peak 2×) | Cheap default; first-party `deepseek-flash` |
 | `moonshotai/kimi-k3` | $3 / $15 | Medium default (Moonshot list; some routers are cheaper) |
-| `openai/gpt-5.6-sol` | $4 / $20 | Frontier default (OpenAI Fast / list; some routers are 50% off) |
+| `openai/gpt-6-sol` | $4 / $20 | Frontier default (OpenAI Fast / list; some routers are 50% off) |
 
 Peak windows for DeepSeek (UTC weekdays): 01:00–04:00 and 06:00–10:00. US daytime ≈ off-peak.
 

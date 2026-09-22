@@ -34,7 +34,7 @@ describe("metering", () => {
   test("prices Flash tokens in USD", () => {
     expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 0, { at: offPeak })).toBeCloseTo(0.15)
     expect(usdForUsage("moonshotai/kimi-k3", 1_000_000, 1_000_000, { at: offPeak })).toBeCloseTo(18)
-    expect(usdForUsage("openai/gpt-5.6-sol", 0, 1_000_000, { at: offPeak })).toBeCloseTo(20)
+    expect(usdForUsage("openai/gpt-6-sol", 0, 1_000_000, { at: offPeak })).toBeCloseTo(20)
     expect(usdForUsage("cheapest", 1_000_000, 0, { at: offPeak })).toBeCloseTo(0.15)
     expect(usdForUsage("medium", 1_000_000, 1_000_000, { at: offPeak })).toBeCloseTo(18)
     expect(usdForUsage("openrouter/frontier", 0, 1_000_000, { at: offPeak })).toBeCloseTo(20)
@@ -781,20 +781,18 @@ describe("gateway HTTP", () => {
 
   test("meters Jev scoring and leaves shadow scoring free", async () => {
     const originalFetch = globalThis.fetch
-    globalThis.fetch = (() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            model: "jev-latest",
-            answers: {
-              difficulty: { type: "score", score: 2 },
-              sensitivity: { type: "score", score: 1 },
-              underspecified: { type: "noul", noul: 0.1 },
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      )) as typeof fetch
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          model: "jev-latest",
+          answers: {
+            difficulty: { type: "score", score: 2 },
+            sensitivity: { type: "score", score: 1 },
+            underspecified: { type: "noul", noul: 0.1 },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )) as unknown as typeof fetch
     try {
       const gateway = createGateway({ adminToken: "secret", typesafeKey: "ts-test" })
       const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
