@@ -2,7 +2,7 @@
 import moonshineModuleUrl from "@moonshine-ai/moonshine-wasm/moonshine.mjs?url"
 import moonshineWasmUrl from "@moonshine-ai/moonshine-wasm/moonshine.wasm?url"
 import { MicTranscriber, ModelArch, Transcriber, type LoadModuleOptions, type TranscriptLine } from "@moonshine-ai/moonshine-wasm"
-import { mixVoiceActivity, voiceActivityLevels, voiceActivityRms } from "@/utils/voice-input"
+import { mixVoiceActivity, moonshineLocateFile, voiceActivityLevels, voiceActivityRms } from "@/utils/voice-input"
 
 const SPEECH_MODEL_BASE = "grist-speech://models/"
 
@@ -11,6 +11,10 @@ let transcriberPromise: Promise<Transcriber> | undefined
 export async function openMoonshineMic(onLine: (line: TranscriptLine) => void) {
   const transcriber = await loadTranscriber()
   return new MicTranscriber().useTranscriber(transcriber).language("en").onLine(onLine)
+}
+
+export function preloadSpeechModel() {
+  void loadTranscriber()
 }
 
 async function loadTranscriber() {
@@ -33,10 +37,7 @@ async function createTranscriber() {
     modelArch: ModelArch.MediumStreaming,
     moduleOptions: {
       factory,
-      locateFile: (path) =>
-        path.endsWith(".wasm")
-          ? moonshineWasmUrl
-          : new URL(path, new URL(moonshineModuleUrl, window.location.href)).href,
+      locateFile: (path) => moonshineLocateFile(path, moonshineModuleUrl, moonshineWasmUrl),
     },
   })
 }

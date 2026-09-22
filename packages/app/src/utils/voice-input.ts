@@ -49,6 +49,13 @@ export function isSpeechModelDownload(loaded: number, total?: number) {
   return loaded < total
 }
 
+export function moonshineLocateFile(path: string, moduleUrl: string, wasmUrl: string) {
+  const name = path.split(/[\\/]/).pop() ?? path
+  if (name.endsWith(".wasm")) return wasmUrl
+  if (name.endsWith(".mjs") || name.endsWith(".js")) return moduleUrl
+  return new URL(name, moduleUrl).href
+}
+
 export function joinPromptText(existing: string, incoming: string) {
   const spoken = incoming.trim()
   if (!spoken) return existing
