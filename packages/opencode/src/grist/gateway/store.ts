@@ -41,6 +41,7 @@ export type InviteRow = {
 
 export type UsageRow = {
   code: string
+  key_id: string | null
   at: number
   model: string
   rung: Rung
@@ -102,6 +103,7 @@ export function openGatewayStore(filePath = ":memory:") {
     CREATE TABLE IF NOT EXISTS usage_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       code TEXT NOT NULL,
+      key_id TEXT,
       at INTEGER NOT NULL,
       model TEXT NOT NULL,
       rung TEXT NOT NULL,
@@ -109,6 +111,7 @@ export function openGatewayStore(filePath = ":memory:") {
       output_tokens INTEGER NOT NULL,
       usd REAL NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS usage_events_code_at ON usage_events(code, at);
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -153,6 +156,12 @@ export function openGatewayStore(filePath = ":memory:") {
     );
     CREATE INDEX IF NOT EXISTS access_requests_email ON access_requests(email);
   `)
+  // `CREATE TABLE IF NOT EXISTS` will not add the column to a database created
+  // before per-key attribution existed, so backfill it in place.
+  const usageColumns = db.prepare("PRAGMA table_info(usage_events)").all() as { name: string }[]
+  if (!usageColumns.some((column) => column.name === "key_id")) {
+    db.exec("ALTER TABLE usage_events ADD COLUMN key_id TEXT")
+  }
 
   const insertInvite = db.prepare(
     `INSERT INTO invites (code, cap_usd, spent_usd, expires_at, revoked, note, created_at)
@@ -168,8 +177,8 @@ export function openGatewayStore(filePath = ":memory:") {
     `UPDATE invites SET spent_usd = cap_usd WHERE code = ? AND spent_usd < cap_usd`,
   )
   const insertUsage = db.prepare(
-    `INSERT INTO usage_events (code, at, model, rung, input_tokens, output_tokens, usd)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO usage_events (code, key_id, at, model, rung, input_tokens, output_tokens, usd)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   )
   const usageByCode = db.prepare(`SELECT * FROM usage_events WHERE code = ? ORDER BY at ASC`)
   const hourlySpend = db.prepare(
@@ -260,6 +269,7 @@ export function openGatewayStore(filePath = ":memory:") {
 
     addSpend(input: {
       code: string
+      keyId?: string | null
       model: string
       rung: Rung
       inputTokens: number
@@ -270,6 +280,7 @@ export function openGatewayStore(filePath = ":memory:") {
       db.transaction(() => {
         insertUsage.run(
           input.code,
+          input.keyId ?? null,
           at,
           input.model,
           input.rung,
@@ -438,7 +449,7 @@ export function openGatewayStore(filePath = ":memory:") {
       return selectRequest.get(id) as AccessRequestRow
     },
 
-    inviteForApiKey(raw: string, now: number): InviteRow | undefined {
+    inviteForApiKey(raw: string, now: number): (InviteRow & { keyId: string }) | undefined {
       const secret = canonicalApiKey(raw)
       if (!secret) return
       const key = selectApiKeyByHash.get(hashApiKey(secret)) as ApiKeyRow | undefined
@@ -448,7 +459,7 @@ export function openGatewayStore(filePath = ":memory:") {
       if (!key.last_used_at || now - key.last_used_at >= TOUCH_API_KEY_MS) {
         touchApiKey.run(now, key.id)
       }
-      return invite
+      return { ...invite, keyId: key.id }
     },
 
     close() {
