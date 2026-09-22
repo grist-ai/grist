@@ -4,4 +4,9 @@ COPY packages/opencode/src/grist ./src/grist
 ENV NODE_ENV=production
 ENV GRIST_GATEWAY_DB=/data/grist-gateway.sqlite
 EXPOSE 8787
+# B7: never run as root; HEALTHCHECK lets Railway/Compose restart a wedged gateway.
+RUN addgroup -S grist && adduser -S grist -G grist && chown -R grist:grist /app
+USER grist
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD bun -e 'const r = await fetch("http://127.0.0.1:8787/health"); if (!r.ok) process.exit(1)'
 CMD ["bun", "src/grist/gateway/entry.ts"]
