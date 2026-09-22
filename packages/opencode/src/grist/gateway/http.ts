@@ -772,30 +772,46 @@ function meteredSse(
   const encoder = new TextEncoder()
   let leftover = ""
   let usage: { input: number; output: number } | undefined
+  // Meter exactly once: normal completion, mid-stream upstream error, or
+  // client disconnect (cancel) must not double-bill.
+  let metered = false
+  const meterOnce = () => {
+    if (metered) return
+    metered = true
+    meterFromUsage(store, invite, model, usage, alert, globalBudget, now)
+  }
   return new ReadableStream({
     async pull(controller) {
-      const chunk = await reader.read()
-      if (chunk.done) {
-        if (leftover) {
-          const parsed = usageFromSse(leftover)
-          if (parsed) usage = parsed
-          controller.enqueue(encoder.encode(`${redactSseLine(leftover, publicID)}\n`))
+      try {
+        const chunk = await reader.read()
+        if (chunk.done) {
+          if (leftover) {
+            const parsed = usageFromSse(leftover)
+            if (parsed) usage = parsed
+            controller.enqueue(encoder.encode(`${redactSseLine(leftover, publicID)}\n`))
+          }
+          meterOnce()
+          controller.close()
+          return
         }
-        meterFromUsage(store, invite, model, usage, alert, globalBudget, now)
-        controller.close()
-        return
+        leftover += decoder.decode(chunk.value, { stream: true })
+        const lines = leftover.split("\n")
+        leftover = lines.pop() ?? ""
+        if (lines.length === 0) return
+        const out: string[] = []
+        for (const line of lines) {
+          const parsed = usageFromSse(line)
+          if (parsed) usage = parsed
+          out.push(redactSseLine(line, publicID))
+        }
+        controller.enqueue(encoder.encode(`${out.join("\n")}\n`))
+      } catch (err) {
+        meterOnce()
+        throw err
       }
-      leftover += decoder.decode(chunk.value, { stream: true })
-      const lines = leftover.split("\n")
-      leftover = lines.pop() ?? ""
-      if (lines.length === 0) return
-      const out: string[] = []
-      for (const line of lines) {
-        const parsed = usageFromSse(line)
-        if (parsed) usage = parsed
-        out.push(redactSseLine(line, publicID))
-      }
-      controller.enqueue(encoder.encode(`${out.join("\n")}\n`))
+    },
+    cancel() {
+      meterOnce()
     },
   })
 }
