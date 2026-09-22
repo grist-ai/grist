@@ -31,6 +31,12 @@ export const ModelsCommand = effectCmd({
       UI.println(UI.Style.TEXT_SUCCESS_BOLD + "Models cache refreshed" + UI.Style.TEXT_NORMAL)
     }
 
+    // Grist mode: upstream model identities never surface. Only the ladder
+    // rungs are listed; the full catalog stays internal.
+    const { loadInviteConfig } = yield* Effect.promise(() => import("@/grist/invite/config"))
+    const gristMode = !!loadInviteConfig()
+    const GRIST_RUNGS = ["cheapest", "medium", "frontier"]
+
     const provider = yield* Provider.Service
     const providers = yield* provider.list()
 
@@ -38,6 +44,7 @@ export const ModelsCommand = effectCmd({
       const p = providers[providerID]
       const sorted = Object.entries(p.models).sort(([a], [b]) => a.localeCompare(b))
       for (const [modelID, model] of sorted) {
+        if (gristMode && !GRIST_RUNGS.includes(modelID)) continue
         process.stdout.write(`${providerID}/${modelID}`)
         process.stdout.write(EOL)
         if (verbose) {

@@ -28,8 +28,20 @@ import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
-function pick(value: string | undefined): ModelInput | undefined {
+/** Grist ladder rungs — the only `-m` values accepted in Grist mode. Upstream
+ *  model identities never surface to users. */
+const GRIST_RUNGS = ["cheapest", "medium", "frontier"] as const
+
+function pick(value: string | undefined, gristMode = false): ModelInput | undefined {
   if (!value) return undefined
+  if (gristMode) {
+    // Rung name only: the client addresses the gateway with the rung as the
+    // model id; the gateway resolves it to the upstream model server-side.
+    return {
+      providerID: "openrouter",
+      modelID: value,
+    } as ModelInput
+  }
   const [providerID, ...rest] = value.split("/")
   return {
     providerID,
@@ -165,7 +177,7 @@ export const RunCommand = effectCmd({
       .option("model", {
         type: "string",
         alias: ["m"],
-        describe: "model to use in the format of provider/model",
+        describe: "rung to use: cheapest, medium, or frontier (Grist mode; upstream model ids are never exposed)",
       })
       .option("agent", {
         type: "string",
@@ -262,10 +274,14 @@ export const RunCommand = effectCmd({
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
     const { loadInviteConfig, INVITE_REQUIRED_MESSAGE } = yield* Effect.promise(() => import("@/grist/invite/config"))
-    if (!loadInviteConfig()) {
+    const gristMode = !!loadInviteConfig()
+    if (!gristMode) {
       const { ensureSignedIn } = yield* Effect.promise(() => import("./auth"))
       const signedIn = yield* Effect.promise(() => ensureSignedIn())
       if (!signedIn) return yield* fail(INVITE_REQUIRED_MESSAGE)
+    }
+    if (gristMode && args.model && !(GRIST_RUNGS as readonly string[]).includes(args.model)) {
+      return yield* fail(`Invalid model "${args.model}". In Grist mode, -m accepts only a rung name: cheapest, medium, frontier.`)
     }
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
@@ -866,7 +882,7 @@ export const RunCommand = effectCmd({
             return
           }
 
-          const model = pick(args.model)
+          const model = pick(args.model, gristMode)
           const result = await client.session.prompt({
             sessionID,
             agent,
@@ -883,7 +899,7 @@ export const RunCommand = effectCmd({
           return
         }
 
-        const model = pick(args.model)
+        const model = pick(args.model, gristMode)
         const { runInteractiveMode } = await import("./run/runtime")
         try {
           await runInteractiveMode({
@@ -911,7 +927,7 @@ export const RunCommand = effectCmd({
       }
 
       if (interactive && !args.attach && !args.session && !args.continue) {
-        const model = pick(args.model)
+        const model = pick(args.model, gristMode)
         const { runInteractiveLocalMode } = await import("./run/runtime")
         const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
           const { Server } = await import("@/server/server")

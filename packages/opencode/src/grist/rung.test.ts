@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { PUBLIC_RUNG_NAME, publicModelRef, RUNG_MODELS } from "./rung"
+import { PUBLIC_RUNG_NAME, publicModelRef } from "./rung"
+import { RUNG_MODELS } from "./gateway/ladder"
 
 describe("RUNG_MODELS", () => {
   test("defaults to OpenRouter for every rung", () => {

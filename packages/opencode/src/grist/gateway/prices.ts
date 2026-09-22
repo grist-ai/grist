@@ -1,4 +1,5 @@
-import { RUNG_MODELS, type Rung } from "../rung"
+import { RUNG_MODELS } from "./ladder"
+import type { Rung } from "../rung"
 
 /**
  * Gateway metering prices (USD per 1M tokens), verified 2026-09-21.
