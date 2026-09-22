@@ -1,11 +1,11 @@
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
-import { Index, onCleanup, Show } from "solid-js"
+import { Index, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
-import { attachVoiceActivity, openMoonshineMic } from "@/utils/moonshine-local"
+import { attachVoiceActivity, openMoonshineMic, preloadSpeechModel } from "@/utils/moonshine-local"
 import { sameActivity, textFromLines, VOICE_ACTIVITY_BARS } from "@/utils/voice-input"
 import { showToast } from "@/utils/toast"
 
@@ -25,6 +25,7 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
   let lines: string[] = []
   let partial = ""
   let detachActivity: (() => void) | undefined
+  let cancelled = false
 
   const detach = () => {
     detachActivity?.()
@@ -32,15 +33,21 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
     setVoice("levels", restingLevels())
   }
 
+  onMount(() => {
+    preloadSpeechModel()
+  })
+
   onCleanup(() => {
+    cancelled = true
     detach()
     void mic?.stop()
     mic?.close()
   })
 
   const toggle = async () => {
-    if (voice.state === "busy") return
+    if (voice.stopping) return
     if (voice.state === "recording") {
+      cancelled = true
       detach()
       setVoice({ state: "busy", stopping: true })
       try {
@@ -81,7 +88,8 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
       return
     }
 
-    setVoice("state", "busy")
+    cancelled = false
+    setVoice("state", "recording")
     lines = []
     partial = ""
     try {
@@ -95,12 +103,17 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
           partial = text.trim()
         })
       }
+      if (cancelled) return
       await mic.start()
+      if (cancelled) {
+        await mic.stop()
+        return
+      }
       detachActivity = attachVoiceActivity(mic, (levels) => {
         setVoice("levels", (prev: readonly number[]) => (sameActivity(prev, levels) ? prev : [...levels]))
       })
-      setVoice("state", "recording")
     } catch (error) {
+      if (cancelled) return
       console.error("voice input failed", error)
       detach()
       void mic?.stop()
@@ -109,7 +122,7 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
         description: language.t("prompt.toast.voice.failed.description"),
         variant: "error",
       })
-      setVoice("state", "idle")
+      setVoice({ state: "idle", stopping: false })
     }
   }
 
@@ -171,7 +184,7 @@ export function VoiceInputButton(props: {
           }
           variant="ghost-muted"
           size="large"
-          disabled={props.disabled || props.voice.state() === "busy"}
+          disabled={props.disabled || props.voice.stopping()}
           aria-label={label()}
           aria-pressed={recording()}
           style={
