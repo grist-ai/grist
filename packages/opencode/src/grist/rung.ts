@@ -7,29 +7,6 @@ export type ModelRef = {
   variant?: string
 }
 
-/**
- * Ladder ids go through OpenRouter on the **gateway** (founder `OPENROUTER_API_KEY`).
- * Testers hold an invite code only — never a model key. Override any slot with
- * `GRIST_<RUNG>_PROVIDER` / `GRIST_<RUNG>_MODEL` on the gateway process.
- *
- * OpenRouter model ids keep their org/model slash (provider is still `openrouter`).
- */
-export const RUNG_MODELS: Record<Rung, ModelRef> = {
-  cheapest: {
-    providerID: process.env.GRIST_CHEAPEST_PROVIDER ?? "openrouter",
-    // OpenRouter id for DeepSeek-V4.1-Flash (legacy deepseek-v4-flash still aliases).
-    modelID: process.env.GRIST_CHEAPEST_MODEL ?? "deepseek/deepseek-v4.1-flash",
-  },
-  medium: {
-    providerID: process.env.GRIST_MEDIUM_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_MEDIUM_MODEL ?? "moonshotai/kimi-k3",
-  },
-  frontier: {
-    providerID: process.env.GRIST_FRONTIER_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_FRONTIER_MODEL ?? "openai/gpt-6-sol",
-  },
-}
-
 /** Tester-facing labels. Vendor ids stay on the gateway. */
 export const PUBLIC_RUNG_NAME: Record<Rung, string> = {
   cheapest: "Fast",
@@ -37,6 +14,11 @@ export const PUBLIC_RUNG_NAME: Record<Rung, string> = {
   frontier: "Max",
 }
 
+/**
+ * Public model reference for a rung: the client addresses the gateway with the
+ * rung name as the model id; the gateway resolves it to the upstream model via
+ * the gateway-only `RUNG_MODELS` (`src/grist/gateway/ladder.ts`).
+ */
 export function publicModelRef(rung: Rung): ModelRef {
   return { providerID: "openrouter", modelID: rung }
 }

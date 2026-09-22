@@ -5,7 +5,7 @@ import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generate
 import { usdForUsage } from "./prices"
 import { createGateway, DEFAULT_ADMIN_EMAIL, MAX_COMPLETION_TOKENS } from "./http"
 import { openGatewayStore } from "./store"
-import { RUNG_MODELS } from "../rung"
+import { RUNG_MODELS } from "./ladder"
 
 test("admin sign-in identity is the founder Gmail, not the public inbox", () => {
   expect(DEFAULT_ADMIN_EMAIL).toBe("pranavmm25@gmail.com")
