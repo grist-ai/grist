@@ -73,6 +73,28 @@ const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
 
+/**
+ * Fields the gateway forwards upstream. Everything else is dropped so clients
+ * cannot smuggle `provider`, `models`, `reasoning`, or `plugins` and shift
+ * spend onto providers/paths the metered ladder price does not cover.
+ */
+const UPSTREAM_FIELDS = [
+  "messages",
+  "temperature",
+  "top_p",
+  "stop",
+  "tools",
+  "tool_choice",
+  "parallel_tool_calls",
+  "response_format",
+  "seed",
+  "presence_penalty",
+  "frequency_penalty",
+] as const
+
+/** Hard ceiling on generated tokens per completion, regardless of request. */
+export const MAX_COMPLETION_TOKENS = 8192
+
 /** Thrown by `readJson` when a request body exceeds its endpoint cap. */
 class PayloadTooLargeError extends Error {}
 
@@ -386,11 +408,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
 
     const stream = Boolean(body?.stream)
-    const payload = {
-      ...body,
-      model: upstreamModel,
-      ...(stream ? { stream_options: { include_usage: true } } : {}),
-    }
+    const payload = upstreamPayload(body, upstreamModel, stream)
     const upstreamStarted = now()
     const upstream = await fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -666,6 +684,30 @@ function capHit(invite: InviteRow): Response {
   return json(402, {
     error: `Invite spend cap reached ($${invite.cap_usd.toFixed(2)}). Ask the founder for a top-up.`,
   })
+}
+
+/**
+ * Build the upstream payload from an explicit allowlist and clamp generation
+ * length. The OpenRouter key belongs to the founder, so client-supplied
+ * `provider` / `models` / `reasoning` / `plugins` could otherwise route to a
+ * costlier provider than the ladder price the account is metered against.
+ */
+function upstreamPayload(
+  body: Record<string, unknown>,
+  upstreamModel: string,
+  stream: boolean,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = { model: upstreamModel, stream }
+  for (const field of UPSTREAM_FIELDS) {
+    if (body[field] !== undefined) payload[field] = body[field]
+  }
+  const requested = Number(body.max_tokens ?? body.max_completion_tokens)
+  payload.max_tokens =
+    Number.isFinite(requested) && requested > 0
+      ? Math.min(Math.floor(requested), MAX_COMPLETION_TOKENS)
+      : MAX_COMPLETION_TOKENS
+  if (stream) payload.stream_options = { include_usage: true }
+  return payload
 }
 
 function meterFromUsage(

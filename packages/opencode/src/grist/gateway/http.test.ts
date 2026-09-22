@@ -3,7 +3,7 @@ import os from "os"
 import path from "path"
 import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generateApiKeySecret, generateDeviceUserCode, generateInviteCode } from "./codes"
 import { usdForUsage } from "./prices"
-import { createGateway, DEFAULT_ADMIN_EMAIL } from "./http"
+import { createGateway, DEFAULT_ADMIN_EMAIL, MAX_COMPLETION_TOKENS } from "./http"
 import { openGatewayStore } from "./store"
 import { RUNG_MODELS } from "../rung"
 
@@ -616,6 +616,51 @@ describe("gateway HTTP", () => {
     })
     expect(cheapest.status).toBe(200)
     expect(forwarded[1]).toBe(RUNG_MODELS.cheapest.modelID)
+  })
+
+  test("whitelists upstream fields and clamps max_tokens", async () => {
+    const forwarded: Record<string, unknown>[] = []
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async (_input, init) => {
+        forwarded.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>)
+        return new Response(JSON.stringify({ choices: [], usage: { prompt_tokens: 0, completion_tokens: 0 } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      },
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: {
+        model: "cheapest",
+        messages: [{ role: "user", content: "hi" }],
+        temperature: 0.2,
+        provider: { order: ["MostExpensive"] },
+        models: ["expensive/model"],
+        reasoning: { effort: "high" },
+        plugins: [{ id: "web" }],
+        max_tokens: MAX_COMPLETION_TOKENS * 10,
+        stream: false,
+      },
+    })
+    expect(response.status).toBe(200)
+    const payload = forwarded[0]!
+    expect(payload.model).toBe(RUNG_MODELS.cheapest.modelID)
+    expect(payload.messages).toBeDefined()
+    expect(payload.temperature).toBe(0.2)
+    expect(payload.max_tokens).toBe(MAX_COMPLETION_TOKENS)
+    expect("provider" in payload).toBe(false)
+    expect("models" in payload).toBe(false)
+    expect("reasoning" in payload).toBe(false)
+    expect("plugins" in payload).toBe(false)
   })
 
   test("strips vendor model ids from streamed completions", async () => {
