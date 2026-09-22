@@ -22,6 +22,10 @@ export type GatewayOptions = {
   alert?: (message: string) => void
   globalBudgetUsd?: number
   siteRoot?: string
+  /** Comma-separated IPs/CIDRs allowed to set X-Forwarded-For; see clientIp. */
+  trustedProxies?: string
+  /** Test hook: override rate-limit windows without hammering the defaults. */
+  rateLimits?: Partial<Record<"validate" | "keyMint" | "completions" | "deviceStart" | "gateRoute", { limit: number; windowMs: number }>>
 }
 
 /** Sign-in identity for /admin (Google or email/password). Public mailto is admin@grist.lol. */
@@ -60,10 +64,20 @@ const PUBLIC_MAC_DMGS: Record<string, string> = {
     "https://github.com/pranav6226/grist-downloads/releases/latest/download/grist-desktop-mac-arm64.dmg",
 }
 
-const VALIDATE_LIMIT = 10
-const VALIDATE_WINDOW_MS = 60_000
-const GATE_ROUTE_LIMIT = 30
-const GATE_ROUTE_WINDOW_MS = 60_000
+/**
+ * Rate-limit windows. `validate` guards the invite/device/access-request
+ * endpoints per IP; `keyMint` caps API key creation per account (spec:
+ * 10/hr); `completions` bounds the money path per account on top of spend
+ * caps; `deviceStart` throttles device-flow initiation per IP; `gateRoute`
+ * bounds Jev scoring calls per account.
+ */
+const RATE_LIMITS = {
+  validate: { limit: 10, windowMs: 60_000 },
+  keyMint: { limit: 10, windowMs: 3_600_000 },
+  completions: { limit: 300, windowMs: 10 * 60_000 },
+  deviceStart: { limit: 10, windowMs: 60_000 },
+  gateRoute: { limit: 30, windowMs: 60_000 },
+}
 /**
  * Flat debit per Jev `scoreTask` call. Jev bills per request rather than per
  * token, so the gateway charges a small fixed amount when it actually reaches
@@ -112,6 +126,8 @@ export function createGateway(opts: GatewayOptions = {}) {
     .trim()
     .toLowerCase()
   const globalBudget = opts.globalBudgetUsd ?? Number(process.env.GRIST_GLOBAL_BUDGET_USD ?? DEFAULT_GLOBAL_BUDGET)
+  const trustedProxies = parseTrustedProxies(opts.trustedProxies ?? process.env.GRIST_TRUSTED_PROXIES ?? "")
+  const limits = { ...RATE_LIMITS, ...opts.rateLimits }
   const alert =
     opts.alert ??
     ((message: string) => {
@@ -125,16 +141,19 @@ export function createGateway(opts: GatewayOptions = {}) {
       })
     })
 
-  async function handle(req: Request): Promise<Response> {
+  async function handle(req: Request, serverOrPeer?: Bun.Server<undefined> | string): Promise<Response> {
+    // Bun.serve passes its Server as the second fetch arg; tests and other
+    // callers may pass a peer IP string directly.
+    const peerIp = typeof serverOrPeer === "string" ? serverOrPeer : serverOrPeer?.requestIP(req)?.address
     try {
-      return await route(req)
+      return await route(req, peerIp)
     } catch (error) {
       if (error instanceof PayloadTooLargeError) return json(413, { error: "payload too large" })
       throw error
     }
   }
 
-  async function route(req: Request): Promise<Response> {
+  async function route(req: Request, peerIp?: string): Promise<Response> {
     const url = new URL(req.url)
     const pathname = url.pathname.replace(/\/+$/, "") || "/"
 
@@ -143,16 +162,16 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
 
     if (req.method === "POST" && pathname === "/v1/invite/validate") {
-      return validate(req)
+      return validate(req, peerIp)
     }
     if (req.method === "POST" && pathname === "/v1/auth/device/approve") {
-      return approveDevice(req)
+      return approveDevice(req, peerIp)
     }
     if (req.method === "POST" && pathname === "/v1/auth/device/poll") {
       return pollDevice(req)
     }
     if (req.method === "POST" && pathname === "/v1/auth/device") {
-      return startDevice()
+      return startDevice(clientIp(req, peerIp, trustedProxies))
     }
     if (req.method === "GET" && pathname === "/v1/auth/config") {
       return authConfig()
@@ -161,22 +180,22 @@ export function createGateway(opts: GatewayOptions = {}) {
       return firebaseSession(req)
     }
     if (req.method === "POST" && pathname === "/v1/auth/session/bind") {
-      return firebaseBind(req)
+      return firebaseBind(req, peerIp)
     }
     if (req.method === "POST" && pathname === "/v1/gate/route") {
       return gateRoute(req)
     }
     if (req.method === "POST" && (pathname === "/v1/completions" || pathname === "/v1/chat/completions")) {
-      return completions(req)
+      return completions(req, peerIp)
     }
     if (req.method === "GET" && pathname === "/v1/usage") {
       return usage(req)
     }
     if (pathname === "/v1/api-keys" || pathname.startsWith("/v1/api-keys/")) {
-      return apiKeys(req, pathname)
+      return apiKeys(req, pathname, peerIp)
     }
     if (req.method === "POST" && pathname === "/v1/access/requests") {
-      return accessRequest(req)
+      return accessRequest(req, peerIp)
     }
     if (pathname.startsWith("/v1/admin/")) {
       return admin(req, pathname)
@@ -185,8 +204,8 @@ export function createGateway(opts: GatewayOptions = {}) {
     return json(404, { error: "not found" })
   }
 
-  async function accessRequest(req: Request): Promise<Response> {
-    if (!allowValidate(`access:${clientIp(req)}`)) return json(429, { ok: false })
+  async function accessRequest(req: Request, peerIp?: string): Promise<Response> {
+    if (!allowValidate(`access:${clientIp(req, peerIp, trustedProxies)}`)) return json(429, { ok: false })
     const body = await readJson(req)
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : ""
     if (!validEmail(email)) return json(400, { ok: false })
@@ -235,8 +254,8 @@ export function createGateway(opts: GatewayOptions = {}) {
       })
   }
 
-  async function validate(req: Request): Promise<Response> {
-    if (!allowValidate(clientIp(req))) {
+  async function validate(req: Request, peerIp?: string): Promise<Response> {
+    if (!allowValidate(clientIp(req, peerIp, trustedProxies))) {
       return json(401, { valid: false })
     }
     const body = await readJson(req)
@@ -248,7 +267,10 @@ export function createGateway(opts: GatewayOptions = {}) {
     return json(200, publicInvite(invite))
   }
 
-  function startDevice(): Response {
+  function startDevice(ip: string): Response {
+    if (!allowWindow(`devicestart:${ip}`, limits.deviceStart.limit, limits.deviceStart.windowMs)) {
+      return json(429, { error: "too many device login attempts" })
+    }
     const login = store.createCliLogin({ expiresAt: now() + DEVICE_TTL_MS })
     return json(200, {
       device_code: login.device_code,
@@ -259,8 +281,8 @@ export function createGateway(opts: GatewayOptions = {}) {
     })
   }
 
-  async function approveDevice(req: Request): Promise<Response> {
-    if (!allowValidate(clientIp(req))) {
+  async function approveDevice(req: Request, peerIp?: string): Promise<Response> {
+    if (!allowValidate(clientIp(req, peerIp, trustedProxies))) {
       return json(401, { ok: false })
     }
     const body = await readJson(req)
@@ -316,8 +338,8 @@ export function createGateway(opts: GatewayOptions = {}) {
     return json(200, { ok: true, admin: false, needs_invite: false, email: user.email, code: invite.code })
   }
 
-  async function firebaseBind(req: Request): Promise<Response> {
-    if (!allowValidate(clientIp(req))) return json(401, { ok: false })
+  async function firebaseBind(req: Request, peerIp?: string): Promise<Response> {
+    if (!allowValidate(clientIp(req, peerIp, trustedProxies))) return json(401, { ok: false })
     const body = await readJson(req)
     const token = typeof body?.id_token === "string" ? body.id_token : ""
     const raw = typeof body?.code === "string" ? body.code : ""
@@ -334,7 +356,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
     if (invite.spent_usd >= invite.cap_usd) return capHit(invite)
-    if (!allowWindow(`gate:${invite.code}`, GATE_ROUTE_LIMIT, GATE_ROUTE_WINDOW_MS)) {
+    if (!allowWindow(`gate:${invite.code}`, limits.gateRoute.limit, limits.gateRoute.windowMs)) {
       return json(429, { error: "too many routing requests" })
     }
     const body = await readJson(req, MAX_GATE_BYTES)
@@ -384,7 +406,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     return json(200, decision)
   }
 
-  async function completions(req: Request): Promise<Response> {
+  async function completions(req: Request, peerIp?: string): Promise<Response> {
     const started = now()
     const invite = await resolveInvite(req)
     const authMs = now() - started
@@ -393,6 +415,9 @@ export function createGateway(opts: GatewayOptions = {}) {
       return invite
     }
     if (invite.spent_usd >= invite.cap_usd) return capHit(invite)
+    if (!allowWindow(`completions:${invite.code}`, limits.completions.limit, limits.completions.windowMs)) {
+      return json(429, { error: "too many requests" })
+    }
 
     const body = await readJson(req, MAX_JSON_BYTES)
     const rawModel = typeof body?.model === "string" ? body.model : ""
@@ -464,7 +489,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     })
   }
 
-  async function apiKeys(req: Request, pathname: string): Promise<Response> {
+  async function apiKeys(req: Request, pathname: string, peerIp?: string): Promise<Response> {
     const invite = await requireAccount(req)
     if (invite instanceof Response) return invite
 
@@ -473,6 +498,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
 
     if (req.method === "POST" && pathname === "/v1/api-keys") {
+      if (!allowWindow(`keymint:${invite.code}`, limits.keyMint.limit, limits.keyMint.windowMs)) {
+        return json(429, { error: "too many key requests" })
+      }
       const body = await readJson(req)
       const name = typeof body?.name === "string" ? body.name : undefined
       const created = store.createApiKey({ inviteCode: invite.code, name })
@@ -558,7 +586,7 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   function allowValidate(ip: string): boolean {
-    return allowWindow(ip, VALIDATE_LIMIT, VALIDATE_WINDOW_MS)
+    return allowWindow(ip, limits.validate.limit, limits.validate.windowMs)
   }
 
   function allowWindow(bucket: string, limit: number, windowMs: number): boolean {
@@ -981,8 +1009,78 @@ function cleanText(value: unknown, max: number) {
   return text.slice(0, max)
 }
 
-function clientIp(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "local"
+/**
+ * Best-effort client IP for rate limiting. `X-Forwarded-For` / `X-Real-IP`
+ * are only trusted when the socket peer is a known proxy: an entry in
+ * `trusted` (from GRIST_TRUSTED_PROXIES, IPs or IPv4 CIDRs) or — when no
+ * list is configured — a private/loopback peer, which is how the Railway
+ * edge proxy reaches the gateway. Otherwise the socket peer is used, so a
+ * client connecting directly cannot spoof its way around rate limits.
+ * When no peer is known (tests, non-Bun runtimes) falls back to the
+ * legacy header-first behavior.
+ */
+function clientIp(req: Request, peer: string | undefined, trusted: string[]): string {
+  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+  const realIp = req.headers.get("x-real-ip")?.trim()
+  if (peer && proxyTrusted(peer, trusted)) return forwarded || realIp || peer
+  if (peer) return peer
+  return forwarded || realIp || "local"
+}
+
+function parseTrustedProxies(value: string): string[] {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function proxyTrusted(peer: string, trusted: string[]): boolean {
+  if (trusted.length > 0) return trusted.some((entry) => matchProxyEntry(peer, entry))
+  return isPrivateAddress(peer)
+}
+
+function matchProxyEntry(peer: string, entry: string): boolean {
+  if (!entry.includes("/")) return peer.toLowerCase() === entry.toLowerCase()
+  return ipv4InCidr(peer, entry)
+}
+
+function ipv4ToInt(ip: string): number | undefined {
+  const parts = ip.split(".")
+  if (parts.length !== 4) return undefined
+  let n = 0
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return undefined
+    const b = Number(part)
+    if (b > 255) return undefined
+    n = n * 256 + b
+  }
+  return n
+}
+
+function ipv4InCidr(peer: string, cidr: string): boolean {
+  const slash = cidr.indexOf("/")
+  const base = ipv4ToInt(cidr.slice(0, slash))
+  const mask = Number(cidr.slice(slash + 1))
+  const addr = ipv4ToInt(peer)
+  if (base === undefined || addr === undefined || !Number.isInteger(mask) || mask < 0 || mask > 32) return false
+  const maskInt = mask === 0 ? 0 : (0xffffffff << (32 - mask)) >>> 0
+  return (addr & maskInt) >>> 0 === (base & maskInt) >>> 0
+}
+
+function isPrivateAddress(ip: string): boolean {
+  let v = ip.toLowerCase().trim()
+  if (v.startsWith("::ffff:")) v = v.slice("::ffff:".length)
+  if (v.includes(":")) {
+    return v === "::1" || v.startsWith("fc") || v.startsWith("fd") || v.startsWith("fe80")
+  }
+  const n = ipv4ToInt(v)
+  if (n === undefined) return false
+  return (
+    (n & 0xff000000) === 0x0a000000 || // 10/8
+    (n & 0xfff00000) === 0xac100000 || // 172.16/12
+    (n & 0xffff0000) === 0xc0a80000 || // 192.168/16
+    (n & 0xff000000) === 0x7f000000 // 127/8
+  )
 }
 
 function roundUsd(n: number) {
