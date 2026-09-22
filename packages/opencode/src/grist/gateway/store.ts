@@ -160,7 +160,13 @@ export function openGatewayStore(filePath = ":memory:") {
   )
   const selectInvite = db.prepare(`SELECT * FROM invites WHERE code = ?`)
   const revokeInvite = db.prepare(`UPDATE invites SET revoked = 1 WHERE code = ?`)
-  const addSpent = db.prepare(`UPDATE invites SET spent_usd = spent_usd + ? WHERE code = ?`)
+  const addSpent = db.prepare(
+    `UPDATE invites SET spent_usd = spent_usd + ?
+     WHERE code = ? AND spent_usd + ? <= cap_usd`,
+  )
+  const markCapHit = db.prepare(
+    `UPDATE invites SET spent_usd = cap_usd WHERE code = ? AND spent_usd < cap_usd`,
+  )
   const insertUsage = db.prepare(
     `INSERT INTO usage_events (code, at, model, rung, input_tokens, output_tokens, usd)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -271,7 +277,12 @@ export function openGatewayStore(filePath = ":memory:") {
           input.outputTokens,
           input.usd,
         )
-        addSpent.run(input.usd, input.code)
+        // Atomic cap enforcement: only debit when the new total stays within
+        // the cap. Concurrent requests that would push over the cap are
+        // absorbed by clamping the account to its cap so the next request 402s
+        // instead of letting N parallel requests all spend.
+        const applied = addSpent.run(input.usd, input.code, input.usd).changes > 0
+        if (!applied) markCapHit.run(input.code)
       })()
       return selectInvite.get(input.code) as InviteRow
     },
