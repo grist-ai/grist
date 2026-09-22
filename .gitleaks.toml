@@ -20,12 +20,14 @@ regexes = [
   '''prt_key_0[123]_(read|glob|grep)''',
   # Stripe *publishable* test key in a dev npm script — public by design (packages/console/app/package.json)
   '''VITE_STRIPE_PUBLISHABLE_KEY=pk_test_51RtuLNE7fOCwHSD4''',
-  # Translated UI prose mentioning "Responses API" (packages/console/app/src/i18n/*.ts, 13 locales)
-  '''Responses API''',
+  # Translated UI prose mentioning "Responses API" (packages/console/app/src/i18n/*.ts, 13 locales).
+  # Scoped to the full ZDR sentence so a real secret merely co-located with the
+  # words "Responses API" is not suppressed.
+  '''ZDR.*Responses API.*Files and Collections.*Batch API''',
   # Docs curl example whose bearer token is the literal placeholder YOUR_API_KEY
-  # (packages/docs/ai-tools/cursor.mdx). Matches the fence line so a real token
-  # added on the -H line would still be flagged.
-  '''^ *```curl''',
+  # (packages/docs/ai-tools/cursor.mdx). Matches only this exact fence line, so a
+  # real token on the -H line (or any other ```curl line) is still flagged.
+  '''^```curl cURL$''',
   # Secret-redactor test fixtures with deliberately fake values
   # (packages/http-recorder/test/record-replay.test.ts)
   '''sk-123456789012345678901234''',
