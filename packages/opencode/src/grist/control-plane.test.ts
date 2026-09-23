@@ -57,7 +57,7 @@ describe("shadowContinue", () => {
     clearSessionControl("s1")
   })
 
-  test("stops when edits landed on an easy task", () => {
+  test("does not stop when edits landed on an easy task", () => {
     const d = shadowContinue({
       step: 4,
       control: {
@@ -72,121 +72,27 @@ describe("shadowContinue", () => {
       },
       tools: { count: 3, failed: 0, names: ["grep", "edit"] },
     })
-    expect(d.action).toBe("stop")
-  })
-
-  test("keeps going on an easy task when checklist items are still open", () => {
-    const d = shadowContinue({
-      step: 4,
-      control: {
-        rung: "cheapest",
-        difficulty: 0.2,
-        sensitivity: 0.1,
-        underspecified: 0.1,
-        task: "rename helper",
-        exploratory: 3,
-        edits: 1,
-        escalated: false,
-      },
-      tools: { count: 3, failed: 0, names: ["grep", "edit"], pendingTodos: 2 },
-    })
     expect(d.action).toBe("continue")
   })
 
-  test("does not declare step budget complete before verification", () => {
-    const d = shadowContinue({
-      step: 12,
-      control: {
-        rung: "cheapest",
-        difficulty: 0.6,
-        sensitivity: 0.1,
-        underspecified: 0.1,
-        task: "update pricing across files",
-        exploratory: 3,
-        edits: 2,
-        escalated: false,
-      },
-      tools: { count: 4, failed: 0, names: ["edit", "edit", "bash", "grep"], verified: false },
-    })
-    expect(d.action).toBe("continue")
-  })
-
-  test("stops at the step budget once the last edit is verified", () => {
-    const d = shadowContinue({
-      step: 12,
-      control: {
-        rung: "cheapest",
-        difficulty: 0.6,
-        sensitivity: 0.1,
-        underspecified: 0.1,
-        task: "update pricing across files",
-        exploratory: 3,
-        edits: 2,
-        escalated: false,
-      },
-      tools: { count: 5, failed: 0, names: ["edit", "edit", "bash"], verified: true },
-    })
-    expect(d.action).toBe("stop")
-    expect(d.reasons).toContain("step_budget_complete")
-  })
-
-  test("keeps going at the step budget while checklist items are open even when verified", () => {
-    const d = shadowContinue({
-      step: 12,
-      control: {
-        rung: "cheapest",
-        difficulty: 0.6,
-        sensitivity: 0.1,
-        underspecified: 0.1,
-        task: "update pricing across files",
-        exploratory: 3,
-        edits: 2,
-        escalated: false,
-      },
-      tools: { count: 5, failed: 0, names: ["edit", "edit", "bash"], verified: true, pendingTodos: 1 },
-    })
-    expect(d.action).toBe("continue")
-  })
-
-  test("hard ceiling stops a stuck run regardless of verification", () => {
-    const d = shadowContinue({
-      step: 24,
-      control: {
-        rung: "cheapest",
-        difficulty: 0.6,
-        sensitivity: 0.1,
-        underspecified: 0.1,
-        task: "update pricing across files",
-        exploratory: 3,
-        edits: 2,
-        escalated: false,
-      },
-      tools: { count: 4, failed: 0, names: ["edit", "edit"], verified: false, pendingTodos: 3 },
-    })
-    expect(d.action).toBe("stop")
-    expect(d.reasons).toContain("step_budget_hard_stop")
-  })
-
-  test("hard ceiling respects GRIST_CTRL_STEP_HARD_CAP", () => {
-    process.env.GRIST_CTRL_STEP_HARD_CAP = "30"
-    try {
+  test("only ever continues or escalates, even past the old step budgets", () => {
+    const control = {
+      rung: "cheapest" as const,
+      difficulty: 0.6,
+      sensitivity: 0.1,
+      underspecified: 0.1,
+      task: "update pricing across files",
+      exploratory: 3,
+      edits: 2,
+      escalated: false,
+    }
+    for (const step of [12, 24, 48]) {
       const d = shadowContinue({
-        step: 24,
-        control: {
-          rung: "cheapest",
-          difficulty: 0.6,
-          sensitivity: 0.1,
-          underspecified: 0.1,
-          task: "update pricing across files",
-          exploratory: 3,
-          edits: 2,
-          escalated: false,
-        },
-        tools: { count: 4, failed: 0, names: ["edit", "edit"], verified: false },
+        step,
+        control,
+        tools: { count: 5, failed: 0, names: ["edit", "edit", "bash"], verified: true },
       })
       expect(d.action).toBe("continue")
-    } finally {
-      delete process.env.GRIST_CTRL_STEP_HARD_CAP
     }
   })
 })
@@ -310,7 +216,7 @@ function toolPart(
   return { type: "tool", tool, state }
 }
 
-describe("decideContinue completion gating", () => {
+describe("decideContinue without deterministic stops", () => {
   function setup(edits: number) {
     delete process.env.TYPESAFE_API_KEY
     delete process.env.GRIST_CTRL
@@ -328,18 +234,7 @@ describe("decideContinue completion gating", () => {
     }
   }
 
-  test("regression: clean edits but no verification must not stop at step 12", async () => {
-    setup(2)
-    const d = await decideContinue({
-      sessionID: "sess",
-      step: 12,
-      parts: [toolPart("edit", { status: "completed" }), toolPart("edit", { status: "completed" })],
-    })
-    expect(d.action).toBe("continue")
-    clearSessionControl("sess")
-  })
-
-  test("stops once a verify command follows the last edit", async () => {
+  test("continues at step 12 with verified edits (no shadow step budget)", async () => {
     setup(2)
     const d = await decideContinue({
       sessionID: "sess",
@@ -349,98 +244,30 @@ describe("decideContinue completion gating", () => {
         toolPart("bash", { status: "completed", input: { command: "bun test src/grist/" } }),
       ],
     })
-    expect(d.action).toBe("stop")
-    expect(d.reasons).toContain("step_budget_complete")
+    expect(d.action).toBe("continue")
     clearSessionControl("sess")
   })
 
-  test("an edit after verification invalidates it", async () => {
+  test("continues past the old hard ceiling of step 24", async () => {
     setup(2)
     const d = await decideContinue({
       sessionID: "sess",
-      step: 12,
-      parts: [
-        toolPart("bash", { status: "completed", input: { command: "bun test src/grist/" } }),
-        toolPart("edit", { status: "completed" }),
-      ],
+      step: 30,
+      parts: [toolPart("edit", { status: "completed" })],
     })
     expect(d.action).toBe("continue")
     clearSessionControl("sess")
   })
 
-  test("edit_verify counts as verification", async () => {
-    setup(2)
+  test("still escalates on repeated tool failure", async () => {
+    setup(0)
     const d = await decideContinue({
       sessionID: "sess",
-      step: 12,
-      parts: [
-        toolPart("edit", { status: "completed" }),
-        toolPart("edit_verify", { status: "completed" }),
-      ],
+      step: 3,
+      parts: [toolPart("edit", { status: "error" }), toolPart("bash", { status: "error" })],
     })
-    expect(d.action).toBe("stop")
-    expect(d.reasons).toContain("step_budget_complete")
-    clearSessionControl("sess")
-  })
-
-  test("a failed verify command does not count", async () => {
-    setup(2)
-    const d = await decideContinue({
-      sessionID: "sess",
-      step: 12,
-      parts: [
-        toolPart("edit", { status: "completed" }),
-        toolPart("bash", { status: "error", input: { command: "bun test src/grist/" } }),
-      ],
-    })
-    expect(d.action).toBe("continue")
-    clearSessionControl("sess")
-  })
-
-  test("pending todowrite items block completion", async () => {
-    setup(2)
-    const d = await decideContinue({
-      sessionID: "sess",
-      step: 12,
-      parts: [
-        toolPart("edit", { status: "completed" }),
-        toolPart("bash", { status: "completed", input: { command: "bun test src/grist/" } }),
-        toolPart("todowrite", {
-          status: "completed",
-          metadata: {
-            todos: [
-              { content: "edit pricing", status: "completed", priority: "high" },
-              { content: "commit", status: "pending", priority: "high" },
-              { content: "push", status: "pending", priority: "high" },
-            ],
-          },
-        }),
-      ],
-    })
-    expect(d.action).toBe("continue")
-    clearSessionControl("sess")
-  })
-
-  test("completed todowrite list does not block", async () => {
-    setup(2)
-    const d = await decideContinue({
-      sessionID: "sess",
-      step: 12,
-      parts: [
-        toolPart("edit", { status: "completed" }),
-        toolPart("bash", { status: "completed", input: { command: "bun test src/grist/" } }),
-        toolPart("todowrite", {
-          status: "completed",
-          metadata: {
-            todos: [
-              { content: "edit pricing", status: "completed", priority: "high" },
-              { content: "commit", status: "completed", priority: "high" },
-            ],
-          },
-        }),
-      ],
-    })
-    expect(d.action).toBe("stop")
+    expect(d.action).toBe("escalate")
+    expect(d.rung).toBe("medium")
     clearSessionControl("sess")
   })
 })
