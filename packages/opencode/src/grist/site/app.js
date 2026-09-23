@@ -39,7 +39,7 @@ const views = {
 }
 
 const titles = {
-  "/": "Grist — the coding agent that learns your codebase",
+  "/": "Grist — a coding agent that gets smarter and cheaper on your project",
   "/login": "Sign in — Grist",
   "/dashboard": "Usage — Grist",
   "/dashboard/api": "API keys — Grist",
