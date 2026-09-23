@@ -68,7 +68,7 @@ function parse(tip: string): TipPart[] {
   return parts
 }
 
-const NO_MODELS_TIP = "Set {highlight}OPENROUTER_API_KEY{/highlight} and restart Grist to start coding"
+const NO_MODELS_TIP = "Run {highlight}/login{/highlight} with your invite code to start coding"
 const NO_MODELS_PARTS = parse(NO_MODELS_TIP)
 
 function shortcutText(value: string) {
@@ -171,7 +171,8 @@ const TIPS: Tip[] = [
   "Drag and drop images or PDFs into the terminal as context",
   (shortcuts) => press(shortcuts.inputPaste(), "to paste images from your clipboard into the prompt"),
   (shortcuts) => `Use ${commandText("/editor", shortcuts.editorOpen())} to compose messages in your external editor`,
-  "Run {highlight}/init{/highlight} to auto-generate project rules based on your codebase",
+  "Run {highlight}/init{/highlight} to scaffold the Grist workspace in this project",
+  "Run {highlight}/bootstrap{/highlight} to mine ownership history and build the code map",
   (shortcuts) => undefined,
   (shortcuts) => `Use ${commandText("/themes", shortcuts.themeList())} to switch between ${themeCount} built-in themes`,
   (shortcuts) => `Use ${commandText("/new", shortcuts.sessionNew())} to start a fresh conversation session`,

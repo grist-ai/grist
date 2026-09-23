@@ -218,7 +218,7 @@ export function Prompt(props: PromptProps) {
     toast.show({
       variant: "warning",
       message: HIDE_MODEL_UI
-        ? "Grist is not ready yet — check OPENROUTER_API_KEY in your environment"
+        ? "Grist is not ready yet — run /login to sign in"
         : "Connect a provider to send prompts",
       duration: 3000,
     })
