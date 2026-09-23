@@ -306,6 +306,7 @@ describe("gateway HTTP", () => {
     expect(html).toContain("view-docs-skills")
     expect(html).toContain("Create key")
     expect(html).toContain("npx skills add grist-ai/grist-skills")
+    expect(html).toContain("Read more")
     expect(html).not.toContain("Three steps")
     expect(html.toLowerCase()).not.toContain("deepseek")
     expect(html.toLowerCase()).not.toContain("kimi")
