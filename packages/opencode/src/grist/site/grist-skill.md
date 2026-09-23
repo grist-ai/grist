@@ -32,7 +32,7 @@ grist run --format json --auto --dir /path/to/repo -m openrouter/deepseek/deepse
 Always pass an explicit `-m` ladder model id. Without `-m`, the CLI defaults
 to `openrouter/medium`, which the gateway rejects with "Model not found".
 Ladder ids: `openrouter/deepseek/deepseek-v4.1-flash` (cheapest),
-`openrouter/moonshotai/kimi-k3` (medium), `openrouter/openai/gpt-5.6-sol`
+`openrouter/moonshotai/kimi-k3` (medium), `openrouter/openai/gpt-6-sol`
 (frontier).
 
 Two headless gotchas:
