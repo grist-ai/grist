@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { SOL_PROMO_END_MS, isPeakHourUTC, usdForUsage } from "./prices"
+import { isPeakHourUTC, usdForUsage } from "./prices"
 
 const MONDAY_NOON = Date.UTC(2026, 8, 21, 12, 0, 0)
 const MONDAY_PEAK = Date.UTC(2026, 8, 21, 2, 0, 0)
@@ -35,14 +35,15 @@ describe("Kimi cached input pricing", () => {
   })
 })
 
-describe("Sol effective-date pricing", () => {
-  test("uses the 4/20 promo through 2026-11-21", () => {
-    expect(usdForUsage("openai/gpt-6-sol", 1_000_000, 0, { at: Date.parse("2026-11-21T12:00:00Z") })).toBeCloseTo(4)
-    expect(usdForUsage("frontier", 0, 1_000_000, { at: Date.parse("2026-11-21T12:00:00Z") })).toBeCloseTo(20)
+describe("GPT-6 Sol permanent pricing", () => {
+  test("bills the frontier rung at a flat 2/10", () => {
+    expect(usdForUsage("openai/gpt-6-sol", 1_000_000, 0)).toBeCloseTo(2)
+    expect(usdForUsage("frontier", 0, 1_000_000)).toBeCloseTo(10)
+    expect(usdForUsage("openrouter/frontier", 1_000_000, 1_000_000)).toBeCloseTo(12)
   })
 
-  test("switches to 5/30 after 2026-11-21", () => {
-    expect(usdForUsage("openai/gpt-6-sol", 1_000_000, 0, { at: SOL_PROMO_END_MS })).toBeCloseTo(5)
-    expect(usdForUsage("openrouter/frontier", 0, 1_000_000, { at: SOL_PROMO_END_MS + 1 })).toBeCloseTo(30)
+  test("holds the 2/10 rate across the old promo boundary", () => {
+    expect(usdForUsage("openai/gpt-6-sol", 1_000_000, 0, { at: Date.parse("2026-11-21T12:00:00Z") })).toBeCloseTo(2)
+    expect(usdForUsage("openai/gpt-6-sol", 0, 1_000_000, { at: Date.parse("2026-11-22T00:00:00Z") })).toBeCloseTo(10)
   })
 })
