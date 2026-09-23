@@ -61,6 +61,39 @@ describe("metering", () => {
     expect(usdForUsage("medium", 1_000_000, 1_000_000, { at: offPeak })).toBeCloseTo(18)
     expect(usdForUsage("openrouter/frontier", 0, 1_000_000, { at: offPeak })).toBeCloseTo(10)
   })
+
+  test("bills cached input tokens at the cached rate end to end", async () => {
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: {
+              prompt_tokens: 1000,
+              completion_tokens: 500,
+              prompt_tokens_details: { cached_tokens: 900 },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "medium", messages: [], stream: false },
+    })
+    expect(response.status).toBe(200)
+    // Kimi K3: 900 cached at 0.30/M + 100 fresh at 3/M + 500 output at 15/M = 0.00807.
+    // Without the fix this bills 1000 fresh at 3/M = 0.0105.
+    expect(gateway.store.getInvite(code)?.spent_usd).toBeCloseTo(0.00807, 5)
+  })
 })
 
 describe("atomic spend cap", () => {
