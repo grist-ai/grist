@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { composeRung, routeTask, shadowScores } from "./jev-gate"
+import { composeRung, normalizeTaskText, routeTask, scoreTask, shadowScores } from "./jev-gate"
 import { GatewayHttpError } from "./invite/client"
 
 class MockGatewayHttpError extends Error {
@@ -74,6 +74,37 @@ describe("shadowScores", () => {
     )
     expect(s.difficulty).toBeGreaterThan(0.7)
     expect(s.sensitivity).toBeGreaterThan(0.4)
+  })
+})
+
+describe("verbosity normalization", () => {
+  const concise = "Change the login button label from 'Log in' to 'Sign in' in src/ui/LoginButton.tsx."
+  const verbose = [
+    "Change the login button label from 'Log in' to 'Sign in' in src/ui/LoginButton.tsx. " +
+      "This is a small, well-scoped wording update on one component. ".repeat(12).trim(),
+    "Background: the design team wants the wording aligned with the new brand guide. " +
+      "The button already exists, the file path is known, and no behavior changes. " +
+      "There are snapshots covering this component, so updating the label is the whole job. ".repeat(
+        4,
+      ),
+    "Acceptance criteria: the button renders 'Sign in', existing snapshots are refreshed, " +
+      "and no other copy on the page changes. Nothing about routing, state, or styling moves.",
+  ].join("\n\n")
+
+  test("normalizeTaskText keeps the first paragraph and caps at 500 chars", () => {
+    const essence = normalizeTaskText(verbose)
+    expect(essence.length).toBeLessThanOrEqual(500)
+    expect(essence.startsWith("Change the login button label")).toBe(true)
+    expect(essence).not.toContain("Acceptance criteria")
+    expect(normalizeTaskText(concise)).toBe(concise)
+  })
+
+  test("verbose and concise versions of the same task score within epsilon and land the same rung", async () => {
+    const conciseResult = await scoreTask(concise, "")
+    const verboseResult = await scoreTask(verbose, "")
+    expect(Math.abs(conciseResult.scores.difficulty - verboseResult.scores.difficulty)).toBeLessThanOrEqual(0.05)
+    expect(Math.abs(conciseResult.scores.underspecified - verboseResult.scores.underspecified)).toBeLessThanOrEqual(0.05)
+    expect(composeRung(conciseResult.scores).rung).toBe(composeRung(verboseResult.scores).rung)
   })
 })
 
