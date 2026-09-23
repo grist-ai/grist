@@ -95,14 +95,6 @@ function exploratoryCap(env: NodeJS.ProcessEnv = process.env) {
   return DEFAULT_EXPLORATORY_CAP
 }
 
-const DEFAULT_STEP_HARD_CAP = 24
-
-function stepHardCap(env: NodeJS.ProcessEnv = process.env) {
-  const n = Number(env.GRIST_CTRL_STEP_HARD_CAP)
-  if (!Number.isNaN(n) && n > 0) return Math.floor(n)
-  return DEFAULT_STEP_HARD_CAP
-}
-
 export function rememberSessionControl(
   sessionID: string,
   input: {
@@ -209,7 +201,7 @@ function toolSummary(parts: ReadonlyArray<ToolPartLike>) {
   }
 }
 
-/** Shadow: stop when many successful edits and few failures; escalate on repeated tool failure. */
+/** Shadow: escalate on repeated tool failure; otherwise keep going. Runaway protection is left to the agent loop's own limits. */
 export function shadowContinue(input: {
   step: number
   control?: SessionControl
@@ -227,14 +219,7 @@ export function shadowContinue(input: {
     }
   }
 
-  const failed = input.tools.failed
-  const edits = input.control?.edits ?? 0
-  const exploratory = input.control?.exploratory ?? 0
-  const difficulty = input.control?.difficulty ?? 0.3
-  const pendingTodos = input.tools.pendingTodos ?? 0
-  const verified = input.tools.verified ?? false
-
-  if (failed >= 2 && !input.control?.escalated) {
+  if (input.tools.failed >= 2 && !input.control?.escalated) {
     const up = input.control ? nextRung(input.control.rung) : "medium"
     if (up) {
       reasons.push("repeated_tool_failure")
@@ -247,46 +232,6 @@ export function shadowContinue(input: {
         model: publicModelRef(up),
         latencyMs: Date.now() - started,
       }
-    }
-  }
-
-  // Clear scoped task: edits landed and exploration already happened → stop thrashing.
-  // Never stop while a checklist item is still open.
-  if (edits >= 1 && failed === 0 && exploratory >= 2 && difficulty < 0.45 && input.step >= 3 && pendingTodos === 0) {
-    reasons.push("task_likely_complete")
-    return {
-      action: "stop",
-      provider: "shadow",
-      reasons,
-      confidence: 0.65,
-      latencyMs: Date.now() - started,
-    }
-  }
-
-  // Step budget only counts as complete once the last edit has been verified and
-  // no checklist item remains. The incident this guards against stopped at
-  // step 12 with tests, commit, and push still outstanding.
-  if (input.step >= 12 && failed === 0 && edits >= 2 && pendingTodos === 0 && verified) {
-    reasons.push("step_budget_complete")
-    return {
-      action: "stop",
-      provider: "shadow",
-      reasons,
-      confidence: 0.6,
-      latencyMs: Date.now() - started,
-    }
-  }
-
-  // Hard ceiling: anti-thrash backstop. Stops regardless of verify/todo state so
-  // a stuck run can never loop forever, but sits well above the soft budget.
-  if (input.step >= stepHardCap()) {
-    reasons.push("step_budget_hard_stop")
-    return {
-      action: "stop",
-      provider: "shadow",
-      reasons,
-      confidence: 0.5,
-      latencyMs: Date.now() - started,
     }
   }
 
