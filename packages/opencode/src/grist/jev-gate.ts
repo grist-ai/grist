@@ -93,6 +93,17 @@ export function composeRung(
   return { rung: modeCap.rung, reasons, mode }
 }
 
+/**
+ * Reduce a prompt to its task essence so verbosity cannot inflate difficulty.
+ * First paragraph, capped at ~500 chars; a long well-specified prompt is an
+ * easy task, not a hard one.
+ */
+export function normalizeTaskText(text: string): string {
+  const trimmed = text.trim()
+  const firstParagraph = trimmed.split(/\n\s*\n/)[0] ?? trimmed
+  return firstParagraph.slice(0, 500)
+}
+
 /** Heuristic shadow evaluator when TYPESAFE_API_KEY is absent. */
 export function shadowScores(text: string): {
   difficulty: number
@@ -129,12 +140,13 @@ export async function scoreTask(
   scores: { difficulty: number; sensitivity: number; underspecified: number }
   provider: "jev" | "shadow"
 }> {
-  if (!apiKey) return { scores: shadowScores(text), provider: "shadow" }
+  const essence = normalizeTaskText(text)
+  if (!apiKey) return { scores: shadowScores(essence), provider: "shadow" }
   try {
-    return { scores: await evaluateWithJev(text, apiKey), provider: "jev" }
+    return { scores: await evaluateWithJev(essence, apiKey), provider: "jev" }
   } catch (error) {
     gristWarn("[grist] Jev call failed; using shadow gate", error)
-    return { scores: shadowScores(text), provider: "shadow" }
+    return { scores: shadowScores(essence), provider: "shadow" }
   }
 }
 
@@ -153,7 +165,8 @@ async function evaluateWithJev(text: string, apiKey: string): Promise<{
     questions: {
       difficulty: {
         type: "score",
-        instructions: "How hard is this coding task for a capable agent with repo tools?",
+        instructions:
+          "How hard is this coding task for a capable agent with repo tools? Judge the task's inherent difficulty only, never the prompt's length or level of detail. A long, well-specified prompt is an easy task, not a hard one.",
         criteria: [
           "Trivial scoped edit or question",
           "Routine change with clear files",
