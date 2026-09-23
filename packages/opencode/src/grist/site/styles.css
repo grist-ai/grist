@@ -217,6 +217,40 @@ nav a:visited,
   color: var(--fg);
 }
 
+.hero-install.is-fold:not(.is-open) pre {
+  max-height: 4.4rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 58%, transparent);
+}
+
+.hero-install.is-fold:not(.is-open) .install-hint {
+  display: none;
+}
+
+.fold-toggle {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.2rem 1rem 0.85rem;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fold-toggle:hover {
+  color: var(--fg);
+}
+
+.hero-install.is-open .fold-toggle {
+  padding-top: 0.15rem;
+}
+
 .apple {
   width: 0.95rem;
   height: 0.95rem;
@@ -227,6 +261,10 @@ nav a:visited,
   display: flex;
   flex-wrap: wrap;
   gap: 0.7rem;
+}
+
+.hero .actions {
+  margin: 0 0 1.2rem;
 }
 
 .actions.center {

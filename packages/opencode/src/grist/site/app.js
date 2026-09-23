@@ -856,6 +856,16 @@ const COPIES = {
   agent: AGENT_PROMPT,
 }
 
+for (const node of document.querySelectorAll("[data-fold]")) {
+  node.addEventListener("click", () => {
+    const box = node.closest(".hero-install")
+    if (!box) return
+    const open = box.classList.toggle("is-open")
+    node.setAttribute("aria-expanded", open ? "true" : "false")
+    node.textContent = open ? "Show less" : "Read more"
+  })
+}
+
 for (const node of document.querySelectorAll("[data-copy]")) {
   node.addEventListener("click", async () => {
     const key = node.getAttribute("data-copy") || "npm"
