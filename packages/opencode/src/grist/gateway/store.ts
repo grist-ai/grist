@@ -176,6 +176,7 @@ export function openGatewayStore(filePath = ":memory:") {
   const markCapHit = db.prepare(
     `UPDATE invites SET spent_usd = cap_usd WHERE code = ? AND spent_usd < cap_usd`,
   )
+  const resetSpent = db.prepare(`UPDATE invites SET spent_usd = 0 WHERE code = ?`)
   const insertUsage = db.prepare(
     `INSERT INTO usage_events (code, key_id, at, model, rung, input_tokens, output_tokens, usd)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -261,6 +262,15 @@ export function openGatewayStore(filePath = ":memory:") {
     return selectInvite.get(code) as InviteRow | undefined
   }
 
+  /** Resolve an API key to its invite code without touching last_used_at. */
+  function apiKeyToInviteCode(raw: string): string | undefined {
+    const secret = canonicalApiKey(raw)
+    if (!secret) return
+    const key = selectApiKeyByHash.get(hashApiKey(secret)) as ApiKeyRow | undefined
+    if (!key || key.revoked) return
+    return key.invite_code
+  }
+
   return {
     createInvite(input?: { capUsd?: number; expiresAt?: number; note?: string }): InviteRow {
       const created_at = Date.now()
@@ -314,6 +324,18 @@ export function openGatewayStore(filePath = ":memory:") {
         if (!applied) markCapHit.run(input.code)
       })()
       return selectInvite.get(input.code) as InviteRow
+    },
+
+    /**
+     * One-time spend reset for an invite, addressed by invite code or API key.
+     * Usage history is kept for audit; only the running total is zeroed.
+     */
+    resetSpend(raw: string): { code: string; previousUsd: number } | undefined {
+      const code = lookup(raw)?.code ?? apiKeyToInviteCode(raw)
+      if (!code) return
+      const before = (selectInvite.get(code) as InviteRow).spent_usd
+      resetSpent.run(code)
+      return { code, previousUsd: before }
     },
 
     usageFor(raw: string): UsageRow[] {

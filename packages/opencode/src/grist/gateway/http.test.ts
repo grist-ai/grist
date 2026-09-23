@@ -118,6 +118,48 @@ describe("atomic spend cap", () => {
   })
 })
 
+describe("one-time spend reset", () => {
+  test("zeroes an invite's spend by code and reports the previous total", () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite({ capUsd: 5 })
+    store.addSpend({ code: invite.code, model: "m", rung: "cheapest", inputTokens: 1, outputTokens: 0, usd: 4 })
+    expect(store.getInvite(invite.code)?.spent_usd).toBeCloseTo(4)
+    const reset = store.resetSpend(invite.code)
+    expect(reset?.previousUsd).toBeCloseTo(4)
+    expect(store.getInvite(invite.code)?.spent_usd).toBe(0)
+    expect(store.resetSpend("grist-0000-0000")).toBeUndefined()
+    store.close()
+  })
+
+  test("resolves an API key to its invite", () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite({ capUsd: 5 })
+    const created = store.createApiKey({ inviteCode: invite.code, name: "reset-test" })
+    store.addSpend({ code: invite.code, model: "m", rung: "cheapest", inputTokens: 1, outputTokens: 0, usd: 2 })
+    const reset = store.resetSpend(created!.secret)
+    expect(reset?.code).toBe(invite.code)
+    expect(store.getInvite(invite.code)?.spent_usd).toBe(0)
+    store.close()
+  })
+
+  test("runs once at gateway startup when GRIST_RESET_SPEND is set", () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite({ capUsd: 5 })
+    store.addSpend({ code: invite.code, model: "m", rung: "cheapest", inputTokens: 1, outputTokens: 0, usd: 3 })
+    const alerts: string[] = []
+    process.env.GRIST_RESET_SPEND = invite.code
+    try {
+      createGateway({ store, adminToken: "secret", alert: (message: string) => alerts.push(message) })
+    } finally {
+      delete process.env.GRIST_RESET_SPEND
+    }
+    expect(store.getInvite(invite.code)?.spent_usd).toBe(0)
+    expect(alerts.some((message) => message.includes("one-time spend reset"))).toBe(true)
+    expect(alerts.some((message) => message.includes(invite.code))).toBe(false)
+    store.close()
+  })
+})
+
 describe("api key last_used_at", () => {
   test("does not write last_used_at on every request", () => {
     const store = openGatewayStore()
