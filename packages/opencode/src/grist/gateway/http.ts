@@ -773,18 +773,21 @@ function upstreamPayload(
   return payload
 }
 
+/** Usage parsed from an upstream response: cached tokens are a subset of input. */
+type ParsedUsage = { input: number; output: number; cachedInput: number }
+
 function meterFromUsage(
   store: GatewayStore,
   invite: ResolvedInvite,
   model: string,
-  usage: { input: number; output: number } | undefined,
+  usage: ParsedUsage | undefined,
   alert: (message: string) => void,
   globalBudget: number,
   now: () => number,
 ) {
   if (!usage) return
   const price = priceForModel(model)
-  const usd = usdForUsage(model, usage.input, usage.output)
+  const usd = usdForUsage(model, usage.input, usage.output, { cachedInputTokens: usage.cachedInput })
   if (usd <= 0) return
   const updated = store.addSpend({
     code: invite.code,
@@ -884,7 +887,7 @@ function meteredSse(
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let leftover = ""
-  let usage: { input: number; output: number } | undefined
+  let usage: ParsedUsage | undefined
   // Meter exactly once: normal completion, mid-stream upstream error, or
   // client disconnect (cancel) must not double-bill.
   let metered = false
@@ -959,13 +962,22 @@ function usageFromSse(line: string) {
   }
 }
 
-function usageFromUnknown(value: unknown): { input: number; output: number } | undefined {
+function usageFromUnknown(value: unknown): ParsedUsage | undefined {
   if (!value || typeof value !== "object") return
   const rec = value as Record<string, unknown>
   const input = Number(rec.prompt_tokens ?? rec.input_tokens ?? 0)
   const output = Number(rec.completion_tokens ?? rec.output_tokens ?? 0)
   if (!Number.isFinite(input) || !Number.isFinite(output)) return
-  return { input, output }
+  return { input, output, cachedInput: cachedInputFrom(rec) }
+}
+
+/** Cached prompt tokens are a subset of input, billed at the cheaper cached rate. */
+function cachedInputFrom(rec: Record<string, unknown>): number {
+  const details = rec.prompt_tokens_details
+  const openai = details && typeof details === "object" ? Number((details as Record<string, unknown>).cached_tokens ?? 0) : 0
+  const anthropic = Number(rec.cache_read_input_tokens ?? 0)
+  const cached = openai > 0 ? openai : anthropic
+  return Number.isFinite(cached) && cached > 0 ? cached : 0
 }
 
 /**
