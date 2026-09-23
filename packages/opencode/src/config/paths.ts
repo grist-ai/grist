@@ -20,19 +20,22 @@ export const files = Effect.fn("ConfigPaths.projectFiles")(function* (
   })).toReversed()
 })
 
+export const gristConfigDir = path.join(path.dirname(Global.Path.config), "grist")
+
 export const directories = Effect.fn("ConfigPaths.directories")(function* (directory: string, worktree?: string) {
   const afs = yield* FSUtil.Service
   return unique([
     Global.Path.config,
+    gristConfigDir,
     ...(!Flag.OPENCODE_DISABLE_PROJECT_CONFIG
       ? yield* afs.up({
-          targets: [".opencode"],
+          targets: [".grist", ".opencode"],
           start: directory,
           stop: worktree,
         })
       : []),
     ...(yield* afs.up({
-      targets: [".opencode"],
+      targets: [".grist", ".opencode"],
       start: Global.Path.home,
       stop: Global.Path.home,
     })),
