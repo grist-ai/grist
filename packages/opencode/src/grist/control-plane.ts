@@ -303,7 +303,14 @@ export function shadowContinue(input: {
 async function jevContinue(input: {
   step: number
   control: SessionControl
-  tools: { count: number; failed: number; names: string[]; snippet: string }
+  tools: {
+    count: number
+    failed: number
+    names: string[]
+    snippet: string
+    verified?: boolean
+    pendingTodos?: number
+  }
   apiKey: string
 }): Promise<ContinueDecision> {
   const started = Date.now()
@@ -322,6 +329,8 @@ async function jevContinue(input: {
       recent_output: input.tools.snippet,
       edits: input.control.edits,
       exploratory: input.control.exploratory,
+      verified: input.tools.verified ?? false,
+      pending_todos: input.tools.pendingTodos ?? 0,
     },
     questions: {
       next: {
@@ -382,7 +391,7 @@ async function jevContinue(input: {
 export async function decideContinue(input: {
   sessionID: string
   step: number
-  parts: ReadonlyArray<{ type: string; tool?: string; state?: { status?: string; error?: string; output?: string } }>
+  parts: ReadonlyArray<ToolPartLike>
 }): Promise<ContinueDecision> {
   const started = Date.now()
   if (!controlPlaneEnabled()) {
