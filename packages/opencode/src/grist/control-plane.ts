@@ -76,6 +76,15 @@ export type SessionControl = {
 
 const EXPLORATORY = new Set(["grep", "glob", "list", "search", "webfetch", "websearch", "codesearch"])
 
+const EDIT_TOOLS = new Set(["edit", "write", "apply_patch"])
+
+/**
+ * Shell commands that count as verification. `edit_verify` is handled
+ * separately because it combines an edit and a check in one tool call.
+ */
+const VERIFY_COMMAND =
+  /\b(bun\s+(test|typecheck)|bun\s+run\s+[^\s;&|]*(test|lint|typecheck|check|build)|tsc\b|vitest|jest|pytest|cargo\s+test|go\s+test|npm\s+(test|run\s+[^\s;&|]*(test|lint|typecheck|check|build))|yarn\s+(test|run\s+\S+)|pnpm\s+(test|run\s+\S+)|eslint|ruff|biome|oxlint|make\s+test)\b/i
+
 const sessions = new Map<string, SessionControl>()
 
 const DEFAULT_EXPLORATORY_CAP = 8
@@ -84,6 +93,14 @@ function exploratoryCap(env: NodeJS.ProcessEnv = process.env) {
   const n = Number(env.GRIST_CTRL_EXPLORE_CAP)
   if (!Number.isNaN(n) && n > 0) return Math.floor(n)
   return DEFAULT_EXPLORATORY_CAP
+}
+
+const DEFAULT_STEP_HARD_CAP = 24
+
+function stepHardCap(env: NodeJS.ProcessEnv = process.env) {
+  const n = Number(env.GRIST_CTRL_STEP_HARD_CAP)
+  if (!Number.isNaN(n) && n > 0) return Math.floor(n)
+  return DEFAULT_STEP_HARD_CAP
 }
 
 export function rememberSessionControl(
@@ -128,7 +145,32 @@ export function isExploratoryTool(toolID: string) {
   return EXPLORATORY.has(toolID)
 }
 
-function toolSummary(parts: ReadonlyArray<{ type: string; tool?: string; state?: { status?: string; error?: string; output?: string } }>) {
+type ToolPartLike = {
+  type: string
+  tool?: string
+  state?: {
+    status?: string
+    error?: string
+    output?: string
+    input?: Record<string, unknown>
+    metadata?: Record<string, unknown>
+  }
+}
+
+function isVerifyCommand(state: ToolPartLike["state"]) {
+  const command = typeof state?.input?.command === "string" ? state.input.command : ""
+  return command.length > 0 && VERIFY_COMMAND.test(command)
+}
+
+function pendingTodoCount(metadata: Record<string, unknown> | undefined) {
+  const todos = metadata?.todos
+  if (!Array.isArray(todos)) return 0
+  return todos.filter(
+    (todo) => todo !== null && typeof todo === "object" && (todo as { status?: unknown }).status !== "completed",
+  ).length
+}
+
+function toolSummary(parts: ReadonlyArray<ToolPartLike>) {
   const tools = parts.filter((p) => p.type === "tool")
   const failed = tools.filter((p) => p.state?.status === "error" || Boolean(p.state?.error)).length
   const names = tools.map((p) => p.tool ?? "?").slice(-12)
@@ -137,11 +179,33 @@ function toolSummary(parts: ReadonlyArray<{ type: string; tool?: string; state?:
     .filter(Boolean)
     .slice(-4)
     .join(" | ")
+
+  // `verified` means a successful check ran after the most recent edit, so an
+  // edit always invalidates an earlier verification. `pendingTodos` reflects the
+  // latest checklist written in this turn; absent todowrite it stays 0.
+  let verified = false
+  let pendingTodos = 0
+  for (const part of tools) {
+    const tool = part.tool ?? ""
+    if (tool === "edit_verify") {
+      verified = true
+      continue
+    }
+    if (EDIT_TOOLS.has(tool)) {
+      verified = false
+      continue
+    }
+    if (tool === "bash" && part.state?.status !== "error" && isVerifyCommand(part.state)) verified = true
+    if (tool === "todowrite") pendingTodos = pendingTodoCount(part.state?.metadata)
+  }
+
   return {
     count: tools.length,
     failed,
     names,
     snippet: outputs.slice(0, 500),
+    verified,
+    pendingTodos,
   }
 }
 
@@ -149,7 +213,7 @@ function toolSummary(parts: ReadonlyArray<{ type: string; tool?: string; state?:
 export function shadowContinue(input: {
   step: number
   control?: SessionControl
-  tools: { count: number; failed: number; names: string[] }
+  tools: { count: number; failed: number; names: string[]; verified?: boolean; pendingTodos?: number }
 }): ContinueDecision {
   const started = Date.now()
   const reasons: string[] = []
@@ -167,6 +231,8 @@ export function shadowContinue(input: {
   const edits = input.control?.edits ?? 0
   const exploratory = input.control?.exploratory ?? 0
   const difficulty = input.control?.difficulty ?? 0.3
+  const pendingTodos = input.tools.pendingTodos ?? 0
+  const verified = input.tools.verified ?? false
 
   if (failed >= 2 && !input.control?.escalated) {
     const up = input.control ? nextRung(input.control.rung) : "medium"
@@ -185,7 +251,8 @@ export function shadowContinue(input: {
   }
 
   // Clear scoped task: edits landed and exploration already happened → stop thrashing.
-  if (edits >= 1 && failed === 0 && exploratory >= 2 && difficulty < 0.45 && input.step >= 3) {
+  // Never stop while a checklist item is still open.
+  if (edits >= 1 && failed === 0 && exploratory >= 2 && difficulty < 0.45 && input.step >= 3 && pendingTodos === 0) {
     reasons.push("task_likely_complete")
     return {
       action: "stop",
@@ -196,13 +263,29 @@ export function shadowContinue(input: {
     }
   }
 
-  if (input.step >= 12 && failed === 0 && edits >= 2) {
+  // Step budget only counts as complete once the last edit has been verified and
+  // no checklist item remains. The incident this guards against stopped at
+  // step 12 with tests, commit, and push still outstanding.
+  if (input.step >= 12 && failed === 0 && edits >= 2 && pendingTodos === 0 && verified) {
     reasons.push("step_budget_complete")
     return {
       action: "stop",
       provider: "shadow",
       reasons,
       confidence: 0.6,
+      latencyMs: Date.now() - started,
+    }
+  }
+
+  // Hard ceiling: anti-thrash backstop. Stops regardless of verify/todo state so
+  // a stuck run can never loop forever, but sits well above the soft budget.
+  if (input.step >= stepHardCap()) {
+    reasons.push("step_budget_hard_stop")
+    return {
+      action: "stop",
+      provider: "shadow",
+      reasons,
+      confidence: 0.5,
       latencyMs: Date.now() - started,
     }
   }
