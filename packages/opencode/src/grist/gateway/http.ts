@@ -165,6 +165,22 @@ export function createGateway(opts: GatewayOptions = {}) {
       })
     })
 
+  // One-time spend reset: set GRIST_RESET_SPEND to an invite code or API key
+  // and the gateway zeroes that account's running spend once at startup, then
+  // logs it. Remove the env var after the deploy; it is read nowhere else.
+  const resetSpendRaw = process.env.GRIST_RESET_SPEND?.trim()
+  if (resetSpendRaw) {
+    const reset = store.resetSpend(resetSpendRaw)
+    if (reset) {
+      alert(
+        `one-time spend reset: invite ${inviteFingerprint(reset.code)} ` +
+          `$${reset.previousUsd.toFixed(2)} -> $0.00 (remove GRIST_RESET_SPEND)`,
+      )
+    } else {
+      alert("one-time spend reset: no invite found for GRIST_RESET_SPEND (remove the env var)")
+    }
+  }
+
   async function handle(req: Request, serverOrPeer?: Bun.Server<undefined> | string): Promise<Response> {
     // Bun.serve passes its Server as the second fetch arg; tests and other
     // callers may pass a peer IP string directly.
