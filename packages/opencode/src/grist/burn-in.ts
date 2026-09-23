@@ -9,7 +9,7 @@ export type BurnInDecision = {
   rung: Rung
   provider: string
   mode?: OperatingMode
-  mechanisms?: Pick<MechanismSet, "resolved" | "observationPack" | "actionFusion">
+  mechanisms?: Pick<MechanismSet, "resolved" | "observationPack" | "observationPackCompressor" | "actionFusion">
   difficulty: number
   sensitivity: number
   underspecified: number
@@ -179,6 +179,7 @@ export function createBurnInLog(input?: {
                 mechanisms: {
                   resolved: mech.resolved,
                   observationPack: mech.observationPack,
+                  observationPackCompressor: mech.observationPackCompressor,
                   actionFusion: mech.actionFusion,
                 },
               }

@@ -438,6 +438,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       reasons,
       mechanisms: {
         observation_pack: mechanisms.observationPack,
+        observation_pack_compressor: mechanisms.observationPackCompressor,
         action_fusion: mechanisms.actionFusion,
       },
       provider,

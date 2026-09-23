@@ -47,7 +47,11 @@ export async function fetchGateRoute(
     sensitivity: number
     underspecified: number
     reasons: string[]
-    mechanisms: { observation_pack: boolean; action_fusion: boolean }
+    mechanisms: {
+      observation_pack: boolean
+      observation_pack_compressor?: boolean
+      action_fusion: boolean
+    }
     provider?: "jev" | "shadow"
     mode?: "normal" | "capped" | "cheapest"
     latency_ms?: number

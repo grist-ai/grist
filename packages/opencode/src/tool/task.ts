@@ -14,6 +14,9 @@ import { Effect, Exit, Schema, Scope } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Database } from "@opencode-ai/core/database/database"
+import { runCompressed, estimateTokens } from "@/grist/observation-pack-compressor"
+import { gristLog } from "@/grist/debug"
+import { recordGristEvent } from "@/grist/usage-log"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -221,7 +224,32 @@ export const TaskTool = Tool.define(
         if (failed?.type === "tool" && failed.state.status === "error") {
           return yield* Effect.fail(new Error(`Subagent failed (task_id: ${nextSession.id}): ${failed.state.error}`))
         }
-        return result.parts.findLast((item) => item.type === "text")?.text ?? ""
+        const text = result.parts.findLast((item) => item.type === "text")?.text ?? ""
+        const steps = result.parts.filter((item) => item.type === "tool").length
+        // ObservationPack compressor: exploration traces are packed to a capped
+        // digest before they reach the parent context; non-exploration passes through.
+        const compressed = yield* Effect.promise(() =>
+          runCompressed({
+            sessionID: ctx.sessionID,
+            task: `${params.description}\n${params.prompt}`,
+            run: () => ({ text, steps, tokens: estimateTokens(text) }),
+          }),
+        )
+        if (compressed.compressed) {
+          gristLog(
+            `[grist:compress] task=${nextSession.id} steps=${compressed.steps} saved~${compressed.savingsBytes}B digest=${compressed.digestBytes}B reason=${compressed.reason}`,
+          )
+          recordGristEvent("grist-observation-compress", {
+            sessionID: ctx.sessionID,
+            taskSessionID: nextSession.id,
+            savingsBytes: compressed.savingsBytes,
+            digestBytes: compressed.digestBytes,
+            steps: compressed.steps,
+            budgetExceeded: compressed.budgetExceeded,
+            reason: compressed.reason,
+          })
+        }
+        return compressed.output
       })
 
       const inject = Effect.fn("TaskTool.injectBackgroundResult")(function* (

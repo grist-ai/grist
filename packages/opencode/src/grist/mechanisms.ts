@@ -3,13 +3,14 @@
  *
  * Per-task set of harness mechanisms, routable via the gate:
  * - ObservationPack — pack large tool outputs
+ * - ObservationPack compressor — run exploration in a subagent, return a digest
  * - Action Fusion — prefer edit_verify over edit→bash
  *
  * Profiles mirror SoL-Pi [Efficiency] vs [Performance]:
- * - efficiency — both on (token cuts)
+ * - efficiency — all on (token cuts, incl. exploration compressor)
  * - performance — ObservationPack off (full fidelity); fusion still on
- * - auto — pick from task text (default)
- * - off — both off
+ * - auto — pick from task text (default); exploration uses the compressor
+ * - off — all off
  */
 
 export type MechanismProfile = "auto" | "efficiency" | "performance" | "off"
@@ -18,6 +19,7 @@ export type MechanismSet = {
   profile: MechanismProfile
   resolved: "efficiency" | "performance" | "off"
   observationPack: boolean
+  observationPackCompressor: boolean
   actionFusion: boolean
   reasons: string[]
 }
@@ -36,25 +38,26 @@ export function loadMechanismProfile(raw = process.env.GRIST_MECH): MechanismPro
 /** Heuristic when profile is auto (or Jev Choice unavailable). */
 export function shadowMechanismChoice(text: string): {
   resolved: "efficiency" | "performance"
+  exploration: boolean
   reasons: string[]
 } {
   const lower = text.toLowerCase()
   const reasons: string[] = []
 
-  // Exploration / diagnosis benefits from full tool output fidelity.
+  // Exploration is the token sink: compress the subagent trace to a digest.
   if (/(explor|investigat|diagnos|why is|what does|trace|profil|debug hang)/i.test(lower)) {
-    reasons.push("exploration_performance")
-    return { resolved: "performance", reasons }
+    reasons.push("exploration_compressor")
+    return { resolved: "efficiency", exploration: true, reasons }
   }
 
   // Build/test/edit loops benefit from packing + fusion.
   if (/(test|build|lint|ci|fix|edit|implement|add|refactor)/i.test(lower)) {
     reasons.push("build_test_efficiency")
-    return { resolved: "efficiency", reasons }
+    return { resolved: "efficiency", exploration: false, reasons }
   }
 
   reasons.push("default_efficiency")
-  return { resolved: "efficiency", reasons }
+  return { resolved: "efficiency", exploration: false, reasons }
 }
 
 export function composeMechanisms(
@@ -66,6 +69,7 @@ export function composeMechanisms(
       profile,
       resolved: "off",
       observationPack: false,
+      observationPackCompressor: false,
       actionFusion: false,
       reasons: ["mech_off"],
     }
@@ -76,6 +80,7 @@ export function composeMechanisms(
       profile,
       resolved: "efficiency",
       observationPack: true,
+      observationPackCompressor: true,
       actionFusion: true,
       reasons: ["mech_efficiency"],
     }
@@ -86,6 +91,7 @@ export function composeMechanisms(
       profile,
       resolved: "performance",
       observationPack: false,
+      observationPackCompressor: false,
       actionFusion: true,
       reasons: ["mech_performance"],
     }
@@ -96,6 +102,7 @@ export function composeMechanisms(
     profile: "auto",
     resolved: choice.resolved,
     observationPack: choice.resolved === "efficiency",
+    observationPackCompressor: choice.exploration,
     actionFusion: true,
     reasons: choice.reasons,
   }
@@ -115,6 +122,13 @@ export function sessionAllowsObservationPack(sessionID: string | undefined): boo
   const set = sessions.get(sessionID)
   if (!set) return true
   return set.observationPack
+}
+
+export function sessionAllowsObservationPackCompressor(sessionID: string | undefined): boolean {
+  if (!sessionID) return true
+  const set = sessions.get(sessionID)
+  if (!set) return true
+  return set.observationPackCompressor
 }
 
 export function sessionAllowsActionFusion(sessionID: string | undefined): boolean {
