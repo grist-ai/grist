@@ -2,13 +2,13 @@ import { RUNG_MODELS } from "./ladder"
 import type { Rung } from "../rung"
 
 /**
- * Gateway metering prices (USD per 1M tokens), verified 2026-09-21.
+ * Gateway metering prices (USD per 1M tokens), verified 2026-09-22.
  *
  * - DeepSeek V4.1 Flash is time-of-day priced: off-peak `$0.15/$0.60`, peak 2x
  *   (`$0.30/$1.20`). Peak windows are documented in `docs/providers.md`:
  *   UTC weekdays 01:00–04:00 and 06:00–10:00.
  * - Kimi K3 charges cached input tokens at `$0.30/M` instead of `$3/M`.
- * - Sol runs at the `$4/$20` promo through 2026-11-21, then `$5/$30`.
+ * - GPT-6 Sol (frontier, launched 2026-09-22) is permanently `$2/$10`.
  */
 export type TokenPrice = { input: number; output: number; cachedInput?: number }
 export type ModelPrice = TokenPrice & { rung: Rung }
@@ -23,13 +23,9 @@ export const PEAK_HOURS_UTC: ReadonlyArray<readonly [number, number]> = [
 ]
 export const PEAK_MULTIPLIER = 2
 
-/** Sol promo is active before this instant; standard pricing at/after it. */
-export const SOL_PROMO_END_MS = Date.parse("2026-11-22T00:00:00Z")
-
 const FLASH_OFFPEAK: TokenPrice = { input: 0.15, output: 0.6 }
 const KIMI_PRICE: TokenPrice = { input: 3, output: 15, cachedInput: 0.3 }
-const SOL_PROMO: TokenPrice = { input: 4, output: 20 }
-const SOL_STANDARD: TokenPrice = { input: 5, output: 30 }
+const SOL_PRICE: TokenPrice = { input: 2, output: 10 }
 
 /** True during a DeepSeek weekday peak window (UTC). */
 export function isPeakHourUTC(at: number): boolean {
@@ -80,7 +76,7 @@ export function priceForRung(rung: Rung, at = Date.now()): ModelPrice {
     }
   }
   if (rung === "medium") return { ...KIMI_PRICE, rung }
-  return { ...(at < SOL_PROMO_END_MS ? SOL_PROMO : SOL_STANDARD), rung }
+  return { ...SOL_PRICE, rung }
 }
 
 export function priceForModel(model: string, at = Date.now()): ModelPrice | undefined {

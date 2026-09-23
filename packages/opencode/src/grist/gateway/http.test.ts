@@ -56,10 +56,10 @@ describe("metering", () => {
   test("prices Flash tokens in USD", () => {
     expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 0, { at: offPeak })).toBeCloseTo(0.15)
     expect(usdForUsage("moonshotai/kimi-k3", 1_000_000, 1_000_000, { at: offPeak })).toBeCloseTo(18)
-    expect(usdForUsage("openai/gpt-6-sol", 0, 1_000_000, { at: offPeak })).toBeCloseTo(20)
+    expect(usdForUsage("openai/gpt-6-sol", 0, 1_000_000, { at: offPeak })).toBeCloseTo(10)
     expect(usdForUsage("cheapest", 1_000_000, 0, { at: offPeak })).toBeCloseTo(0.15)
     expect(usdForUsage("medium", 1_000_000, 1_000_000, { at: offPeak })).toBeCloseTo(18)
-    expect(usdForUsage("openrouter/frontier", 0, 1_000_000, { at: offPeak })).toBeCloseTo(20)
+    expect(usdForUsage("openrouter/frontier", 0, 1_000_000, { at: offPeak })).toBeCloseTo(10)
   })
 })
 
