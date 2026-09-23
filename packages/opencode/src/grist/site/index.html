@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css?v=stitch11" />
+    <link rel="stylesheet" href="/styles.css?v=stitch12" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -63,19 +63,6 @@
 grist</pre>
             <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Pick Grist. Invite or a dashboard <code>grist_sk_</code> key. We hold the inference key.</p>
           </div>
-          <div class="hero-install">
-            <div class="diagram-bar">
-              <span><b>✦</b> paste into your AI agent</span>
-              <button type="button" class="copy" data-copy="agent">Copy</button>
-            </div>
-            <pre>Use Grist for my coding tasks from now on. Grist is an agentic coding-harness CLI.
-
-1. Install the Grist agent skill by running: npx skills add grist-ai/grist-skills (built for personal AI agents and agentic CLIs like Muse, OpenClaw, Hermes, and OpenCode). Read the installed skill file in full before doing anything else.
-2. Install the CLI if it is missing: npm install -g grist-ai.
-3. Ask me for my Grist API key if you do not have it (it starts with grist_sk_). Never print it, log it, or write it into any file — pass it via environment variable only.
-4. For multi-step coding work (features, bug fixes, refactors across files), delegate to Grist exactly as the skill describes. Report back what changed, the branch name, test results, and cost.</pre>
-            <p class="install-hint">For Muse, OpenClaw, Hermes, or any personal AI agent with its own shell. The agent installs the skill and takes it from there.</p>
-          </div>
           <div class="actions">
             <a
               class="btn btn-mac"
@@ -91,6 +78,20 @@ grist</pre>
               Download for macOS
             </a>
             <a class="btn" href="/#waitlist">Request access</a>
+          </div>
+          <div class="hero-install is-fold">
+            <div class="diagram-bar">
+              <span><b>✦</b> paste into your AI agent</span>
+              <button type="button" class="copy" data-copy="agent">Copy</button>
+            </div>
+            <pre id="agent-prompt">Use Grist for my coding tasks from now on. Grist is an agentic coding-harness CLI.
+
+1. Install the Grist agent skill by running: npx skills add grist-ai/grist-skills (built for personal AI agents and agentic CLIs like Muse, OpenClaw, Hermes, and OpenCode). Read the installed skill file in full before doing anything else.
+2. Install the CLI if it is missing: npm install -g grist-ai.
+3. Ask me for my Grist API key if you do not have it (it starts with grist_sk_). Never print it, log it, or write it into any file — pass it via environment variable only.
+4. For multi-step coding work (features, bug fixes, refactors across files), delegate to Grist exactly as the skill describes. Report back what changed, the branch name, test results, and cost.</pre>
+            <p class="install-hint">For Muse, OpenClaw, Hermes, or any personal AI agent with its own shell. Copy pastes the full prompt.</p>
+            <button type="button" class="fold-toggle" data-fold aria-expanded="false" aria-controls="agent-prompt">Read more</button>
           </div>
           <p class="hero-meta">
             <span><i></i> Local tree execution</span>
@@ -1362,6 +1363,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
         for (const main of document.querySelectorAll("main")) main.hidden = main.id !== id
       })()
     </script>
-    <script src="/app.js?v=invite-mail" type="module"></script>
+    <script src="/app.js?v=hero-fold" type="module"></script>
   </body>
 </html>
