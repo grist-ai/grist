@@ -803,8 +803,9 @@ function meterFromUsage(
   now: () => number,
 ) {
   if (!usage) return
-  const price = priceForModel(model)
-  const usd = usdForUsage(model, usage.input, usage.output, { cachedInputTokens: usage.cachedInput })
+  const at = now()
+  const price = priceForModel(model, at)
+  const usd = usdForUsage(model, usage.input, usage.output, { cachedInputTokens: usage.cachedInput, at })
   if (usd <= 0) return
   const updated = store.addSpend({
     code: invite.code,
