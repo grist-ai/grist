@@ -6,7 +6,7 @@
     <title>Grist ‚Äî a coding agent that gets smarter and cheaper on your project</title>
     <meta
       name="description"
-      content="Grist is a coding agent for your project. It remembers what shipped, and routes more of the work to the cheapest model that can handle it. Invite-only beta."
+      content="Grist is a coding agent for your project. It remembers what shipped, and routes more of the work to the cheapest model that can handle it. Open to everyone."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -36,7 +36,7 @@
         <a href="/#product">Product</a>
         <a href="/docs">Docs</a>
         <a href="/plans">Pricing</a>
-        <a class="btn" href="/#waitlist" data-auth="out">Request access</a>
+        <a class="btn" href="/#get-started" data-auth="out">Get started</a>
         <a class="btn btn-light" href="/login" data-auth="out">Sign in</a>
         <a href="/admin" data-auth="admin" hidden>Admin</a>
         <a href="/dashboard" data-auth="in" hidden>Dashboard</a>
@@ -61,7 +61,7 @@
             </div>
             <pre>npm install -g grist-ai
 grist</pre>
-            <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Pick Grist. Invite or a dashboard <code>grist_sk_</code> key. We hold the inference key.</p>
+            <p class="install-hint">First <code>grist</code> prompts <code>auth login</code>. Pick Grist and sign in ‚Äî your account is created on the spot. Bring your own provider key for inference, or use a dashboard <code>grist_sk_</code> key.</p>
           </div>
           <div class="actions">
             <a
@@ -77,7 +77,7 @@ grist</pre>
               </svg>
               Download for macOS
             </a>
-            <a class="btn" href="/#waitlist">Request access</a>
+            <a class="btn" href="/#get-started">Get started</a>
           </div>
           <div class="hero-install is-fold">
             <div class="diagram-bar">
@@ -148,7 +148,7 @@ grist</pre>
         <span class="dot">¬∑</span>
         <span>SoL-Pi inside</span>
         <span class="dot">¬∑</span>
-        <span class="hi">Invite-only beta</span>
+        <span class="hi">Open beta</span>
       </p>
 
       <section class="band" id="product">
@@ -345,41 +345,28 @@ grist</pre>
         <p class="bound-receipt">3 files ¬∑ tests passed ¬∑ $0.012</p>
       </section>
 
-      <section class="waitlist" id="waitlist">
+      <section class="waitlist" id="get-started">
         <div>
-          <p class="eyebrow">[ waitlist ]</p>
-          <h2>No invite yet? Request access.</h2>
+          <p class="eyebrow">[ get started ]</p>
+          <h2>Open to everyone.</h2>
           <p class="lede">
-            Beta is invite-only. Leave your email. If there‚Äôs room, we‚Äôll send a code.
+            Sign in with Google and your account is created on the spot.
+            Bring your own provider key ‚Äî OpenRouter, Vercel AI Gateway, or
+            any OpenAI-compatible endpoint ‚Äî and Grist runs inference on it.
           </p>
         </div>
-        <div>
-          <form id="request-form" class="request-form">
-            <label for="request-email">Email</label>
-            <input id="request-email" name="email" type="email" autocomplete="email" required />
-            <label for="request-name">Name</label>
-            <input id="request-name" name="name" autocomplete="name" maxlength="80" />
-            <label for="request-note">What are you building?</label>
-            <textarea id="request-note" name="note" maxlength="500" rows="3"></textarea>
-            <button class="btn" type="submit">Request access</button>
-            <p class="error" id="request-error" hidden></p>
-          </form>
-          <p class="muted legal-agree" id="request-legal">
-            By submitting this form you agree to the
-            <a href="/terms">Terms of Use</a>,
-            <a href="/privacy">Privacy Policy</a>, and
-            <a href="/acceptable-use">Acceptable Use Policy</a>.
-          </p>
-          <p id="request-done" hidden>Request received. If there‚Äôs room, we‚Äôll email a code to that address.</p>
+        <div class="actions">
+          <a class="btn" href="/login">Sign in</a>
+          <a class="btn btn-ghost" href="/docs#sign-in">How sign-in works</a>
         </div>
       </section>
 
       <section class="cta">
         <p class="eyebrow">[ beta ]</p>
         <h2>Stop re-teaching the agent your codebase.</h2>
-        <p class="lede">Invite-only. Inference included. Your code stays on your machine.</p>
+        <p class="lede">Open to everyone. Bring your own key. Your code stays on your machine.</p>
         <div class="actions center">
-          <a class="btn" href="/#waitlist">Request access</a>
+          <a class="btn" href="/#get-started">Get started</a>
           <a class="btn btn-ghost" href="/login">Sign in</a>
         </div>
       </section>
@@ -390,8 +377,8 @@ grist</pre>
         <p class="eyebrow">[ docs ]</p>
         <h1>Using Grist</h1>
         <p class="lede">
-          Beta is invite-only. Inference is included. The CLI is the product ‚Äî
-          this page is how you get from an invite to a running agent.
+          Open to everyone. Bring your own provider key for inference. The CLI
+          is the product ‚Äî this page is how you get from sign-in to a running agent.
         </p>
         <nav class="docs-tabs" aria-label="Docs">
           <a href="/docs" class="is-on">Using Grist</a>
@@ -426,18 +413,18 @@ grist</pre>
         <h2 id="sign-in">Sign in</h2>
         <p>
           <code>grist auth login</code> lists providers with Grist first.
-          You can paste a dashboard API key (<code>grist_sk_‚Ä¶</code>) or use
-          an invite (opens this site). We hold the inference key ‚Äî you never
-          paste a model API key.
+          Sign in on this site and your account is created on the spot, or
+          paste a dashboard API key (<code>grist_sk_‚Ä¶</code>). After login,
+          add your own provider key ‚Äî OpenRouter, Vercel AI Gateway, or any
+          OpenAI-compatible endpoint ‚Äî and Grist runs inference on it.
         </p>
         <pre>grist auth login --provider grist
 # or, with a key from the dashboard:
 grist auth login --provider grist --api-key grist_sk_‚Ä¶</pre>
         <p>
-          Invite path: the CLI opens this site. Sign in with Google. The first
-          time, enter the invite you were given. After the account exists,
-          Google is enough ‚Äî you do not enter the code again. The terminal
-          polls until the site approves it.
+          Browser path: the CLI opens this site. Sign in with Google ‚Äî the
+          first sign-in creates your account. The terminal polls until the
+          site approves it, then asks for your provider key.
         </p>
         <p>
           Usage, remaining spend, and the current plan live on the
@@ -494,10 +481,10 @@ GRIST_OBS_PACK=off       # pack only</pre>
 
         <h2 id="spend">Spend</h2>
         <p>
-          Completions are metered against your invite cap. At the cap the CLI
+          Completions are metered against your spend cap. At the cap the CLI
           stops. The dashboard shows remaining USD, rung mix, and expiry.
-          Agent API keys spend against the same cap. We hold the inference key.
-          You never paste a model API key. We do not train on tester repos.
+          Agent API keys spend against the same cap. Inference runs on your
+          own provider key. We do not train on tester repos.
         </p>
 
         <h2 id="agents">Agents</h2>
@@ -625,8 +612,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <p class="eyebrow" id="login-kicker">[ sign in ]</p>
         <h1 id="login-title">Sign in</h1>
         <p class="lede" id="login-lede">
-          Sign in with Google. First time, enter your invite. After that, this
-          account is enough.
+          Sign in with Google to create your account. After that, signing in is enough.
         </p>
         <div id="login-methods">
           <button class="btn btn-google" type="button" id="google-btn">
@@ -648,8 +634,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           </form>
         </div>
         <form id="invite-form" hidden>
-          <p class="muted" id="login-who" hidden></p>
-          <label for="code">Invite code</label>
+          <label for="code">Account code</label>
           <input
             id="code"
             name="code"
@@ -658,15 +643,11 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
             placeholder="grist-XXXX-XXXX"
             required
           />
-          <button class="btn" type="submit" id="login-submit">Enter beta</button>
-          <button class="text-btn" type="button" id="switch-account">Use a different account</button>
+          <button class="btn" type="submit" id="login-submit">Continue</button>
         </form>
         <p class="error" id="login-error" hidden></p>
         <p class="muted" id="firebase-missing" hidden>
-          Firebase is not configured on this gateway yet. You can still enter an invite.
-        </p>
-        <p class="muted" id="login-waitlist">
-          No invite yet? <a href="/#waitlist">Request access</a>
+          Google sign-in is not configured on this gateway yet. Enter the account code your operator gave you.
         </p>
         <p class="muted legal-agree">
           By signing in you agree to the
@@ -746,7 +727,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       <section class="dash-head">
         <div>
           <p class="eyebrow">[ admin ]</p>
-          <h1 id="admin-title">Beta codes</h1>
+          <h1 id="admin-title">Account codes</h1>
         </div>
         <div class="dash-actions">
           <a href="/dashboard">Usage</a>
@@ -756,12 +737,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       <p class="lede" id="admin-token-row">Admin API token
         <input id="admin-token" type="password" placeholder="grist_admin_‚Ä¶" autocomplete="off" />
       </p>
-      <nav class="dash-tabs" aria-label="Admin">
-        <a href="/admin" data-admin="codes">Codes</a>
-        <a href="/admin/requests" data-admin="requests">Requests</a>
-      </nav>
-      <div id="admin-panel-codes">
-      <p class="lede">Only codes you generate here can enter the beta. Testers bind one after they sign in.</p>
+      <p class="lede">Account codes with preset spend caps, for testers or special cases. Most users just sign in ‚Äî their account is created automatically.</p>
       <p class="remain" id="admin-spent">‚Äî</p>
       <p class="muted" id="admin-cap-line"></p>
       <form id="mint-form" class="mint">
@@ -782,17 +758,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <button type="button" class="copy" id="copy-mint-mail">Copy email</button>
       </section>
       <section class="admin-list" id="admin-invites"></section>
-      </div>
-      <div id="admin-panel-requests" hidden>
-        <p class="lede">Generate a code, copy the email, and send it yourself. Nothing is emailed from here.</p>
-        <p class="error" id="admin-request-error" hidden></p>
-        <section class="minted" id="request-mail" hidden>
-          <h2>Email</h2>
-          <pre id="request-mail-body"></pre>
-          <button type="button" class="copy" id="copy-request-mail">Copy email</button>
-        </section>
-        <section class="admin-list" id="admin-requests"></section>
-      </div>
     </main>
 
     <main id="view-plans" hidden>
@@ -808,7 +773,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           <p class="eyebrow">Current</p>
           <h2>Beta</h2>
           <p class="price">$5 included</p>
-          <p>Invite-gated. Stops at the cap. Sign in with Google; first time, bind your invite.</p>
+          <p>Open to everyone. Stops at the cap. Sign in with Google and you‚Äôre in.</p>
         </article>
         <article class="plan">
           <p class="eyebrow">After beta</p>
@@ -823,7 +788,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       <article class="docs">
         <p class="eyebrow">[ legal ]</p>
         <h1>Privacy Policy</h1>
-        <p class="legal-meta">Effective 20 September 2026 ¬∑ Last updated 21 September 2026</p>
+        <p class="legal-meta">Effective 24 September 2026 ¬∑ Last updated 24 September 2026</p>
         <nav class="legal-nav" aria-label="Legal pages">
           <a href="/privacy" aria-current="page">Privacy</a>
           <a href="/terms">Terms</a>
@@ -847,7 +812,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
 
         <h2>2. Scope</h2>
         <p>
-          This policy covers the website, waitlist, sign-in, dashboard, invite
+          This policy covers the website, sign-in, dashboard, account
           gateway, and the Grist CLI / desktop client when they talk to our
           servers. It does not cover third-party sites we link to, or software
           you run that is not Grist.
@@ -860,7 +825,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           <li>We do not sell personal information.</li>
           <li>We do not use tester repositories to train Grist or any model we operate.</li>
           <li>We do not run advertising pixels or sell access to your identity.</li>
-          <li>We do not require you to bring a model API key. The inference key stays on our gateway. A Grist dashboard key (<code>grist_sk_‚Ä¶</code>) is optional agent auth and spends against your invite cap.</li>
+          <li>We do not sell your provider API key. It is stored encrypted on the gateway and only used to run inference for your account. A Grist dashboard key (<code>grist_sk_‚Ä¶</code>) is optional agent auth and spends against your account cap.</li>
         </ul>
         <p>
           Tools execute on your machine. Source files stay on your disk unless
@@ -875,17 +840,13 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <ul>
           <li>Google account identifiers and email when you sign in with Google.</li>
           <li>Email and password credentials if you use email sign-in (stored by our authentication provider, not as a plaintext password on our gateway).</li>
-          <li>Invite code binding to your account.</li>
-          <li>Admin-entered invite notes, which may include an email or name.</li>
+          <li>Account code issued to your account.</li>
+          <li>Admin-entered account notes, which may include an email or name.</li>
         </ul>
-        <h3>Waitlist</h3>
-        <ul>
-          <li>Email, name, and note you submit on the access request form. We store that on the gateway so a code can be sent by hand.</li>
-        </ul>
-        <h3>Usage and metering</h3>
+                <h3>Usage and metering</h3>
         <ul>
           <li>Token counts, model rung, timestamp, and estimated USD spend per completion.</li>
-          <li>Invite cap, remaining balance, expiry, and revocation state.</li>
+          <li>Spend cap, remaining balance, expiry, and revocation state.</li>
           <li>CLI device-login codes, which expire and are deleted after use or timeout.</li>
         </ul>
         <h3>Inference payload</h3>
@@ -895,24 +856,23 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         </ul>
         <h3>Technical data</h3>
         <ul>
-          <li>IP address used for short-window rate limiting of invite validation.</li>
+          <li>IP address used for short-window rate limiting of auth endpoints.</li>
           <li>Standard request metadata on our host (time, path, status). We do not use this for advertising.</li>
-          <li>A local invite token in your browser <code>localStorage</code> after you bind a code.</li>
+          <li>A local account token in your browser <code>localStorage</code> after you sign in.</li>
         </ul>
 
         <h2>5. Why we collect it</h2>
         <ul>
-          <li>To authenticate you and enforce invite-only access.</li>
+          <li>To authenticate you and operate your account.</li>
           <li>To run the agent: send prompts to model providers and return completions.</li>
           <li>To meter included inference against your cap and stop work at the cap.</li>
           <li>To operate, secure, and debug the gateway.</li>
-          <li>To decide whether to grant waitlist access.</li>
-          <li>To comply with law and to prevent abuse.</li>
+                    <li>To comply with law and to prevent abuse.</li>
         </ul>
         <p>
           Legal bases where GDPR or UK GDPR apply: contract (providing the
           beta), legitimate interests (security, metering, abuse prevention),
-          consent (access request form and non-essential cookies, if any), and legal
+          consent (non-essential cookies, if any), and legal
           obligation.
         </p>
 
@@ -944,12 +904,11 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
 
         <h2>8. Retention</h2>
         <ul>
-          <li>Account and invite binding: until you ask us to delete the account, or we revoke / expire the invite and delete stale records in the ordinary course of operating the beta.</li>
+          <li>Account and account-code binding: until you ask us to delete the account, or we revoke the code and delete stale records in the ordinary course of operating the beta.</li>
           <li>Usage events: retained to meter spend, detect abuse, and operate the beta. We may aggregate or delete raw events after they are no longer needed for those purposes.</li>
           <li>Device login codes: minutes, then deleted.</li>
           <li>Rate-limit IP windows: minutes.</li>
-          <li>Waitlist submissions: until we reject, admit, or delete them on request.</li>
-          <li>Inference payloads are processed to complete a turn. We do not operate a product feature that lets others browse your repo. Logs sufficient to debug a failure or abuse report may exist for a limited time.</li>
+                    <li>Inference payloads are processed to complete a turn. We do not operate a product feature that lets others browse your repo. Logs sufficient to debug a failure or abuse report may exist for a limited time.</li>
         </ul>
 
         <h2>9. Your rights</h2>
@@ -973,7 +932,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <h2>10. Children</h2>
         <p>
           Grist is not directed at children. You must be at least 18 to
-          request access, create an account, or use the agent. We do not
+          create an account, or use the agent. We do not
           knowingly collect personal information from anyone under 18. If we
           learn that we have, we will delete it.
         </p>
@@ -988,8 +947,8 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
 
         <h2>12. Security</h2>
         <p>
-          We use HTTPS, invite-gated access, hashed/provider-managed
-          credentials, and we keep the inference API key on the server. No
+          We use HTTPS, authenticated accounts, hashed/provider-managed
+          credentials, and we keep provider API keys encrypted on the server. No
           method of transmission or storage is perfectly secure. You are
           responsible for protecting your machine, your git remotes, and
           anything the agent can execute locally.
@@ -1020,7 +979,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
       <article class="docs">
         <p class="eyebrow">[ legal ]</p>
         <h1>Terms of Use</h1>
-        <p class="legal-meta">Effective 20 September 2026 ¬∑ Last updated 20 September 2026</p>
+        <p class="legal-meta">Effective 24 September 2026 ¬∑ Last updated 24 September 2026</p>
         <nav class="legal-nav" aria-label="Legal pages">
           <a href="/privacy">Privacy</a>
           <a href="/terms" aria-current="page">Terms</a>
@@ -1030,7 +989,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <p class="lede">
           These terms are the contract for the Grist beta. They are written to
           be enforceable, not decorative. If you do not agree, do not use the
-          site, waitlist, CLI, or desktop app.
+          site, CLI, or desktop app.
         </p>
 
         <h2>1. Agreement</h2>
@@ -1044,20 +1003,20 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           <a href="https://grist.lol">grist.lol</a> (‚ÄúGrist,‚Äù ‚Äúwe,‚Äù ‚Äúus‚Äù).
         </p>
 
-        <h2>2. Invite-only beta</h2>
+        <h2>2. Open beta</h2>
         <p>
-          Grist is an invite-gated beta. An invite is a revocable license to
-          use the service during the beta, not a subscription, not a sale of
-          software, and not a guarantee of capacity, uptime, or future
-          pricing. We may refuse, delay, cap, pause, or revoke access at any
-          time, including when included inference is exhausted or we suspect
-          abuse.
+          Grist is an open beta: anyone may create an account and use the
+          service. Beta access is a revocable license to use the service
+          during the beta, not a subscription, not a sale of software, and not
+          a guarantee of capacity, uptime, or future pricing. We may refuse,
+          delay, cap, pause, or revoke access at any time, including when we
+          suspect abuse.
         </p>
         <p>
-          Included inference (currently described as a small USD cap on the
-          site) is a courtesy funded by us. It is not a purchased credit
-          balance. Unused cap has no cash value. There are no refunds for
-          beta access.
+          Inference runs on your own provider key. A courtesy fallback on
+          our key may apply where you have not added one; it is not a
+          purchased credit balance. Unused cap has no cash value. There are
+          no refunds for beta access.
         </p>
 
         <h2>3. Eligibility</h2>
@@ -1065,15 +1024,15 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           You must be at least 18 years old and able to form a binding
           contract. You must not use Grist if you are barred from receiving
           US services or if your use would violate export or sanctions law.
-          You may not share an invite, account, or dashboard session.
+          You may not share an account, account code, or dashboard session.
         </p>
 
         <h2>4. Accounts and security</h2>
         <p>
           You are responsible for the Google or email account you use to sign
-          in, for the invite bound to it, and for every action the agent
+          in, for the account code issued to it, and for every action the agent
           takes while authenticated as you. Notify us immediately if you
-          believe the invite or account is compromised. We may invalidate
+          believe the account code or account is compromised. We may invalidate
           codes and sessions.
         </p>
 
@@ -1082,7 +1041,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           The CLI, desktop app, and related client software are licensed to
           you, not sold. Upstream OpenCode components remain under their
           existing licenses (including MIT where applicable). These Terms
-          govern your use of our hosted gateway, branding, invite system, and
+          govern your use of our hosted gateway, branding, account system, and
           the Grist service. You may not scrape, probe, overload, or reverse
           engineer the gateway except as allowed by mandatory law.
         </p>
@@ -1120,7 +1079,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
 
         <h2>9. Third parties</h2>
         <p>
-          Sign-in, waitlist, hosting, routing, and model inference are provided
+          Sign-in, hosting, routing, and model inference are provided
           in part by third parties. Their outages, policies, and content
           filters are outside our control. Your use of Google Sign-In is also
           subject to Google‚Äôs terms.
@@ -1189,7 +1148,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <p>
           These Terms are the entire agreement for the service. If a section
           is unenforceable, the rest remains in effect. Failure to enforce a
-          provision is not a waiver. You may not assign your invite or these
+          provision is not a waiver. You may not assign your account or these
           Terms. We may assign them in connection with a transfer of the
           project. Headings are for convenience only.
         </p>
@@ -1223,7 +1182,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
           <li>Use Grist only on systems, repos, and data you are allowed to modify.</li>
           <li>Review agent output before you commit, deploy, or ship it.</li>
           <li>Keep secrets out of prompts when you can. Treat anything sent for inference as potentially logged by a model provider.</li>
-          <li>Stay within your invite cap. Do not attempt to bypass metering, routing, or authentication.</li>
+          <li>Stay within your spend cap. Do not attempt to bypass metering, routing, or authentication.</li>
           <li>Comply with law and with third-party terms that apply to your work (licenses, employer policy, cloud provider rules).</li>
         </ul>
 
@@ -1231,7 +1190,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <ul>
           <li>Use Grist to probe, exploit, or gain unauthorized access to any system, account, or data ‚Äî including ‚Äúresearch,‚Äù CTF, or classroom framing that you are not explicitly authorized to attack.</li>
           <li>Generate, improve, or operationalize malware, ransomware, spyware, credential stealers, or attack tooling.</li>
-          <li>Share, sell, or publish invite codes, or allow others to consume your included inference.</li>
+          <li>Share, sell, or publish account codes, or allow others to consume your inference quota.</li>
           <li>Scrape, flood, or reverse the gateway, or interfere with other testers.</li>
           <li>Attempt to extract our system prompts, keys, or other testers‚Äô data.</li>
           <li>Submit others‚Äô personal data into prompts without a lawful basis.</li>
@@ -1249,7 +1208,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
 
         <h2>Enforcement</h2>
         <p>
-          We may investigate, throttle, revoke invites, delete accounts, and
+          We may investigate, throttle, revoke account codes, delete accounts, and
           preserve logs needed to respond to abuse or to law enforcement.
           We are not obligated to monitor every session.
         </p>
@@ -1287,7 +1246,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: ‚
         <h2>2. Strictly necessary</h2>
         <ul>
           <li><strong>Authentication.</strong> Google Sign-In and Firebase Auth set cookies or storage required to keep you signed in and to complete OAuth. Without them, Sign in does not work.</li>
-          <li><strong>Invite token.</strong> After you bind an invite, the site stores <code>grist_invite</code> in <code>localStorage</code> so the dashboard and CLI approval can function on this browser. You can clear it by signing out or clearing site data.</li>
+          <li><strong>Account token.</strong> After you sign in, the site stores <code>grist_invite</code> in <code>localStorage</code> so the dashboard and CLI approval can function on this browser. You can clear it by signing out or clearing site data.</li>
           <li><strong>Security and rate limits.</strong> We may use transient IP-based counters on the server. Those are not browser cookies.</li>
         </ul>
 

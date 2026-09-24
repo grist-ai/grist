@@ -76,16 +76,6 @@ export type PublicApiKey = {
   revoked: boolean
 }
 
-export type AccessRequestRow = {
-  id: string
-  email: string
-  name: string | null
-  note: string | null
-  status: string
-  invite_code: string | null
-  created_at: number
-}
-
 export type ProviderCredentialRow = {
   code: string
   provider: string
@@ -118,6 +108,8 @@ export type ProviderCredentialSummary = {
 
 const DEFAULT_CAP = 5
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000
+/** Auto-minted account codes don't expire on a human timescale. */
+export const ACCOUNT_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000
 const MAX_API_KEYS = 20
 const TOUCH_API_KEY_MS = 60_000
 
@@ -182,16 +174,6 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       revoked INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS api_keys_invite ON api_keys(invite_code);
-    CREATE TABLE IF NOT EXISTS access_requests (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL,
-      name TEXT,
-      note TEXT,
-      status TEXT NOT NULL,
-      invite_code TEXT,
-      created_at INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS access_requests_email ON access_requests(email);
     CREATE TABLE IF NOT EXISTS provider_credentials (
       code TEXT PRIMARY KEY,
       provider TEXT NOT NULL,
@@ -261,17 +243,6 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   )
   const selectAccount = db.prepare(`SELECT * FROM accounts WHERE firebase_uid = ?`)
   const selectAccountByInvite = db.prepare(`SELECT * FROM accounts WHERE invite_code = ?`)
-  // B6 single-use: when an account binds a code, revoke its other unclaimed
-  // request codes so spares can't be handed to a second account.
-  const revokeSiblingCodes = db.prepare(`
-    UPDATE invites SET revoked = 1
-    WHERE code IN (
-      SELECT invite_code FROM access_requests
-      WHERE email = ? AND invite_code IS NOT NULL AND invite_code != ?
-    )
-    AND code NOT IN (SELECT invite_code FROM accounts)
-    AND revoked = 0
-  `)
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
     `INSERT INTO api_keys (id, invite_code, hash, prefix, name, created_at, last_used_at, revoked)
@@ -287,21 +258,6 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `UPDATE api_keys SET revoked = 1 WHERE id = ? AND invite_code = ? AND revoked = 0`,
   )
   const touchApiKey = db.prepare(`UPDATE api_keys SET last_used_at = ? WHERE id = ?`)
-  const insertRequest = db.prepare(
-    `INSERT INTO access_requests (id, email, name, note, status, invite_code, created_at)
-     VALUES (?, ?, ?, ?, 'open', NULL, ?)`,
-  )
-  const selectRequest = db.prepare(`SELECT * FROM access_requests WHERE id = ?`)
-  const selectOpenRequest = db.prepare(
-    `SELECT * FROM access_requests WHERE email = ? AND status IN ('open', 'coded') LIMIT 1`,
-  )
-  const listRequests = db.prepare(
-    `SELECT * FROM access_requests WHERE status != 'dismissed' ORDER BY created_at DESC`,
-  )
-  const setRequestStatus = db.prepare(`UPDATE access_requests SET status = ? WHERE id = ?`)
-  const setRequestCode = db.prepare(
-    `UPDATE access_requests SET status = 'coded', invite_code = ? WHERE id = ? AND invite_code IS NULL`,
-  )
   const upsertCredential = db.prepare(
     `INSERT INTO provider_credentials (code, provider, key_blob, key_fingerprint, base_url, custom_models, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -531,11 +487,6 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       }
     },
 
-    revokeSiblingRequestCodes(input: { email: string; exceptCode: string }): number {
-      const result = revokeSiblingCodes.run(input.email.trim().toLowerCase(), input.exceptCode)
-      return Number(result.changes)
-    },
-
     createApiKey(input: { inviteCode: string; name?: string }): { secret: string; key: PublicApiKey } | undefined {
       const invite = lookup(input.inviteCode)
       if (!invite) return
@@ -630,39 +581,6 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       const invite = lookup(inviteCode)
       if (!invite) return false
       return deleteCredential.run(invite.code).changes > 0
-    },
-
-    createAccessRequest(input: { email: string; name?: string; note?: string }): AccessRequestRow {
-      const email = input.email.trim().toLowerCase()
-      const pending = selectOpenRequest.get(email) as AccessRequestRow | undefined
-      if (pending) return pending
-      const id = crypto.randomUUID()
-      insertRequest.run(id, email, input.name ?? null, input.note ?? null, Date.now())
-      return selectRequest.get(id) as AccessRequestRow
-    },
-
-    listAccessRequests(): AccessRequestRow[] {
-      return listRequests.all() as AccessRequestRow[]
-    },
-
-    getAccessRequest(id: string): AccessRequestRow | undefined {
-      return selectRequest.get(id) as AccessRequestRow | undefined
-    },
-
-    attachRequestCode(id: string, code: string): AccessRequestRow | undefined {
-      const row = selectRequest.get(id) as AccessRequestRow | undefined
-      if (!row || row.status === "dismissed" || row.status === "sent") return
-      if (row.invite_code) return row
-      setRequestCode.run(code, id)
-      return selectRequest.get(id) as AccessRequestRow
-    },
-
-    setAccessRequestStatus(id: string, status: "sent" | "dismissed"): AccessRequestRow | undefined {
-      const row = selectRequest.get(id) as AccessRequestRow | undefined
-      if (!row || row.status === "dismissed") return
-      if (status === "sent" && !row.invite_code) return
-      setRequestStatus.run(status, id)
-      return selectRequest.get(id) as AccessRequestRow
     },
 
     inviteForApiKey(raw: string, now: number): (InviteRow & { keyId: string }) | undefined {

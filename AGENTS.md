@@ -6,8 +6,9 @@ Do not introduce a separate “mill” CLI that shells out to OpenCode — Grist
 Default model ladder is served by the **gateway** (cheapest → medium → frontier → premium).
 Grist is BYOK: users hold their own provider keys (OpenRouter, Vercel AI Gateway,
 or any OpenAI-compatible endpoint) and inference bills to their provider account.
-`grist_sk_...` API keys identify the *user*; invite codes are optional onboarding
-gating. The Jev gate rides the user's provider key — no separate gate key.
+`grist_sk_...` API keys identify the *user*; accounts are open — anyone can sign in
+and get an account code, no invite needed.
+The Jev gate rides the user's provider key — no separate gate key.
 Default GitHub branch for this fork is `main`; upstream OpenCode’s default is `dev`.
 
 # OpenCode (upstream agent notes)

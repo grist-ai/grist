@@ -61,7 +61,7 @@ institutional memory that survives turnover.
 
 The gateway holds the ladder config, the gate, and per-user provider keys
 (encrypted at rest, never logged, never returned by any API). `grist_sk_...`
-API keys identify the *user*; invite codes are optional onboarding gating.
+API keys identify the *user*; accounts are open — anyone can sign in and get an account code, no invite needed.
 
 ```bash
 bun install

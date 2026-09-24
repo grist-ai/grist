@@ -149,7 +149,7 @@ describe("atomic spend cap", () => {
 })
 
 describe("one-time spend reset", () => {
-  test("zeroes an invite's spend by code and reports the previous total", () => {
+  test("zeroes an account's spend by code and reports the previous total", () => {
     const store = openGatewayStore()
     const invite = store.createInvite({ capUsd: 5 })
     store.addSpend({ code: invite.code, model: "m", rung: "cheapest", inputTokens: 1, outputTokens: 0, usd: 4 })
@@ -317,8 +317,8 @@ describe("gateway HTTP", () => {
     expect(html).toContain("npm install -g grist-ai")
     expect(html).toContain("Download for macOS")
     expect(html).not.toContain("tally.so")
-    expect(html).toContain('id="request-form"')
-    expect(html).toContain("Request access")
+    expect(html).toContain('id="get-started"')
+    expect(html).toContain("Open to everyone")
     expect(html).toContain('href="/privacy"')
     expect(html).toContain("Privacy Policy")
     expect(html).toContain("Terms of Use")
@@ -341,7 +341,6 @@ describe("gateway HTTP", () => {
     expect(html.toLowerCase()).not.toContain("deepseek")
     expect(html.toLowerCase()).not.toContain("kimi")
     expect(html.toLowerCase()).not.toContain("moonshot")
-    expect(html.toLowerCase()).not.toContain("openrouter")
     expect(html.toLowerCase()).not.toContain("gpt-5")
     expect(html).not.toContain("Necora")
     expect(html).not.toContain("Pranav")
@@ -388,11 +387,10 @@ describe("gateway HTTP", () => {
     expect(privacyHtml.toLowerCase()).not.toContain("deepseek")
     expect(privacyHtml.toLowerCase()).not.toContain("kimi")
     expect(privacyHtml.toLowerCase()).not.toContain("moonshot")
-    expect(privacyHtml.toLowerCase()).not.toContain("openrouter")
     expect(privacyHtml).not.toContain("Tally")
 
     const terms = await gateway.fetch(new Request("http://gateway.test/terms"))
-    expect(await terms.text()).toContain("Invite-only beta")
+    expect(await terms.text()).toContain("Open beta")
 
     const aup = await gateway.fetch(new Request("http://gateway.test/acceptable-use"))
     expect(await aup.text()).toContain("Local execution")
@@ -408,7 +406,7 @@ describe("gateway HTTP", () => {
     const adminPage = await gateway.fetch(new Request("http://gateway.test/admin"))
     const adminHtml = await adminPage.text()
     expect(adminHtml).toContain("Generate codes")
-    expect(adminHtml).toContain('href="/admin/requests"')
+    expect(adminHtml).not.toContain('href="/admin/requests"')
     expect(adminHtml).toContain("Copy email")
     expect(adminHtml).toContain('path === "/admin"')
     expect(adminHtml).toContain("main.hidden = true")
@@ -456,13 +454,11 @@ describe("gateway HTTP", () => {
     expect(again.status).toBe(401)
   })
 
-  test("exposes firebase config and binds a uid to an invite", async () => {
+  test("exposes firebase config and auto-creates an account on first session", async () => {
     process.env.FIREBASE_API_KEY = "test-key"
     process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
     process.env.FIREBASE_PROJECT_ID = "grist-test"
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
-    // This test exercises the invite-gated flow explicitly.
-    process.env.GRIST_REQUIRE_INVITE = "1"
     const gateway = createGateway({
       adminToken: "secret",
       fetch: async () =>
@@ -474,22 +470,15 @@ describe("gateway HTTP", () => {
     const config = await call(gateway.fetch, "GET", "/v1/auth/config")
     expect((config.json as { enabled: boolean }).enabled).toBe(true)
 
-    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
-      headers: { "X-Grist-Admin": "secret" },
-      body: { note: "fb" },
-    })
-    const code = (minted.json as { code: string }).code
+    // First sign-in mints the account code automatically — no invite step.
     const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
       body: { id_token: "tok" },
     })
-    expect((session.json as { needs_invite: boolean }).needs_invite).toBe(true)
+    expect((session.json as { needs_invite: boolean }).needs_invite).toBe(false)
+    const code = (session.json as { code: string }).code
+    expect(code).toMatch(/^grist-/)
 
-    const bound = await call(gateway.fetch, "POST", "/v1/auth/session/bind", {
-      body: { id_token: "tok", code },
-    })
-    expect((bound.json as { ok: boolean; code: string }).ok).toBe(true)
-    expect((bound.json as { code: string }).code).toBe(code)
-
+    // Second sign-in returns the same code.
     const again = await call(gateway.fetch, "POST", "/v1/auth/session", {
       body: { id_token: "tok" },
     })
@@ -504,7 +493,6 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_AUTH_DOMAIN
     delete process.env.FIREBASE_PROJECT_ID
     delete process.env.FIREBASE_APP_ID
-    delete process.env.GRIST_REQUIRE_INVITE
   })
 
   test("single-use binding: 409 on taken code, 400 on rebind, idempotent retry", async () => {
@@ -555,58 +543,6 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_APP_ID
   })
 
-  test("binding revokes the account's other unclaimed request codes", async () => {
-    process.env.FIREBASE_API_KEY = "test-key"
-    process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
-    process.env.FIREBASE_PROJECT_ID = "grist-test"
-    process.env.FIREBASE_APP_ID = "1:1:web:abc"
-    const gateway = createGateway({
-      adminToken: "secret",
-      fetch: async () =>
-        new Response(JSON.stringify({ users: [{ localId: "uid_s", email: "sib@x.co" }] }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-    })
-    const adminHeaders = { "X-Grist-Admin": "secret" }
-    const requestCode = async () => {
-      await call(gateway.fetch, "POST", "/v1/access/requests", {
-        body: { email: "sib@x.co", name: "Sib" },
-      })
-      const listed = await call(gateway.fetch, "GET", "/v1/admin/requests", {
-        headers: adminHeaders,
-      })
-      const requests = (listed.json as { requests: { id: string; status: string }[] }).requests
-      const open = requests.find((r) => r.status === "open")
-      const minted = await call(gateway.fetch, "POST", `/v1/admin/requests/${open?.id}/code`, {
-        headers: adminHeaders,
-      })
-      const code = (minted.json as { code: string }).code
-      // Mark sent so a later request for the same email opens a fresh row.
-      await call(gateway.fetch, "POST", `/v1/admin/requests/${open?.id}/sent`, {
-        headers: adminHeaders,
-      })
-      return code
-    }
-    // Two separate requests for the same email -> two request-linked codes.
-    const code1 = await requestCode()
-    const code2 = await requestCode()
-    expect(code1).not.toBe(code2)
-
-    const bound = await call(gateway.fetch, "POST", "/v1/auth/session/bind", {
-      body: { id_token: "tok", code: code1 },
-    })
-    expect((bound.json as { ok: boolean }).ok).toBe(true)
-    // Bound code stays usable; the sibling spare is revoked (single-use).
-    expect(gateway.store.getInvite(code1)?.revoked).toBe(0)
-    expect(gateway.store.getInvite(code2)?.revoked).toBe(1)
-
-    delete process.env.FIREBASE_API_KEY
-    delete process.env.FIREBASE_AUTH_DOMAIN
-    delete process.env.FIREBASE_PROJECT_ID
-    delete process.env.FIREBASE_APP_ID
-  })
-
   test("rejects codes that were never minted", async () => {
     const gateway = createGateway({ adminToken: "secret" })
     const valid = await call(gateway.fetch, "POST", "/v1/invite/validate", {
@@ -620,8 +556,6 @@ describe("gateway HTTP", () => {
     process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
     process.env.FIREBASE_PROJECT_ID = "grist-test"
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
-    // This test exercises the invite-gated flow explicitly.
-    process.env.GRIST_REQUIRE_INVITE = "1"
     const gateway = createGateway({
       adminToken: "secret",
       adminEmail: "pranavmm25@gmail.com",
@@ -676,13 +610,13 @@ describe("gateway HTTP", () => {
       body: { id_token: "tester-tok" },
     })
     expect((tester.json as { admin: boolean; needs_invite: boolean }).admin).toBe(false)
-    expect((tester.json as { needs_invite: boolean }).needs_invite).toBe(true)
+    expect((tester.json as { needs_invite: boolean }).needs_invite).toBe(false)
+    expect((tester.json as { code: string }).code).toMatch(/^grist-/)
 
     delete process.env.FIREBASE_API_KEY
     delete process.env.FIREBASE_AUTH_DOMAIN
     delete process.env.FIREBASE_PROJECT_ID
     delete process.env.FIREBASE_APP_ID
-    delete process.env.GRIST_REQUIRE_INVITE
   })
 
   test("serves the Apple Silicon dmg from /download", async () => {
@@ -703,7 +637,7 @@ describe("gateway HTTP", () => {
     expect(redirect.headers.get("location")).toContain("grist-downloads")
   })
 
-  test("mints agent API keys that spend against the invite", async () => {
+  test("mints agent API keys that spend against the account", async () => {
     const gateway = createGateway({
       adminToken: "secret",
       openrouterKey: "or-test",
@@ -978,66 +912,6 @@ describe("gateway HTTP", () => {
     expect(text).toContain("cheapest")
   })
 
-  test("keeps access requests for the admin to mint and send", async () => {
-    const gateway = createGateway({ adminToken: "secret" })
-    const bad = await call(gateway.fetch, "POST", "/v1/access/requests", { body: { email: "nope" } })
-    expect(bad.status).toBe(400)
-
-    const created = await call(gateway.fetch, "POST", "/v1/access/requests", {
-      body: { email: "Ada@Example.com", name: "Ada", note: "a compiler" },
-    })
-    expect(created.status).toBe(200)
-
-    const again = await call(gateway.fetch, "POST", "/v1/access/requests", {
-      body: { email: "ada@example.com", name: "Ada again" },
-    })
-    expect(again.status).toBe(200)
-
-    const denied = await call(gateway.fetch, "GET", "/v1/admin/requests")
-    expect(denied.status).toBe(401)
-
-    const listed = await call(gateway.fetch, "GET", "/v1/admin/requests", {
-      headers: { "X-Grist-Admin": "secret" },
-    })
-    expect(listed.status).toBe(200)
-    const requests = (listed.json as { requests: { id: string; email: string; name: string; status: string }[] }).requests
-    expect(requests).toHaveLength(1)
-    expect(requests[0]?.email).toBe("ada@example.com")
-    expect(requests[0]?.name).toBe("Ada")
-    expect(requests[0]?.status).toBe("open")
-
-    const minted = await call(gateway.fetch, "POST", `/v1/admin/requests/${requests[0]?.id}/code`, {
-      headers: { "X-Grist-Admin": "secret" },
-    })
-    expect(minted.status).toBe(200)
-    const mintedBody = minted.json as { code: string; cap_usd: number; days: number; email: string }
-    const code = mintedBody.code
-    expect(code).toMatch(/^grist-/)
-    expect(mintedBody.email).toBe("ada@example.com")
-    expect(mintedBody.cap_usd).toBe(5)
-    expect(mintedBody.days).toBe(30)
-
-    const second = await call(gateway.fetch, "POST", `/v1/admin/requests/${requests[0]?.id}/code`, {
-      headers: { "X-Grist-Admin": "secret" },
-    })
-    expect((second.json as { code: string }).code).toBe(code)
-
-    const usable = await call(gateway.fetch, "POST", "/v1/invite/validate", { body: { code } })
-    expect((usable.json as { valid: boolean }).valid).toBe(true)
-
-    const sent = await call(gateway.fetch, "POST", `/v1/admin/requests/${requests[0]?.id}/sent`, {
-      headers: { "X-Grist-Admin": "secret" },
-    })
-    expect(sent.status).toBe(200)
-
-    const after = await call(gateway.fetch, "GET", "/v1/admin/requests", {
-      headers: { "X-Grist-Admin": "secret" },
-    })
-    const row = (after.json as { requests: { status: string; code: string }[] }).requests[0]
-    expect(row?.status).toBe("sent")
-    expect(row?.code).toBe(code)
-  })
-
   test("rate-limits gate/route per account", async () => {
     const gateway = createGateway({ adminToken: "secret", typesafeKey: "" })
     const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
@@ -1142,7 +1016,7 @@ describe("gateway HTTP", () => {
     expect(viaDirect.status).toBe(429)
   })
 
-  test("alerts on invite fingerprint, never the code", async () => {
+  test("alerts on account-code fingerprint, never the code", async () => {
     const alerts: string[] = []
     const gateway = createGateway({
       adminToken: "secret",

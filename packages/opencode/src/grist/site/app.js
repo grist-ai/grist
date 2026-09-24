@@ -16,7 +16,6 @@ const state = {
   admin: false,
   uid: "",
   sessionKnown: false,
-  needsInvite: false,
 }
 let sessionTicket = 0
 let renderChain = Promise.resolve()
@@ -28,7 +27,6 @@ const views = {
   "/dashboard": "view-dashboard",
   "/dashboard/api": "view-dashboard",
   "/admin": "view-admin",
-  "/admin/requests": "view-admin",
   "/plans": "view-plans",
   "/docs": "view-docs",
   "/docs/skills": "view-docs-skills",
@@ -44,7 +42,6 @@ const titles = {
   "/dashboard": "Usage — Grist",
   "/dashboard/api": "API keys — Grist",
   "/admin": "Admin — Grist",
-  "/admin/requests": "Requests — Grist",
   "/plans": "Plans — Grist",
   "/docs": "Docs — Grist",
   "/docs/skills": "Agent skills — Grist",
@@ -79,40 +76,22 @@ function setLoginCopy(input) {
 function showAuthStep() {
   document.getElementById("login-methods").hidden = false
   document.getElementById("invite-form").hidden = true
-  document.getElementById("login-who").hidden = true
   document.getElementById("firebase-missing").hidden = true
   setLoginCopy({
     kicker: "[ sign in ]",
     title: "Sign in",
-    lede: "Sign in with Google. First time, enter your invite. After that, this account is enough.",
-  })
-}
-
-function showInviteStep(email) {
-  document.getElementById("login-methods").hidden = true
-  document.getElementById("invite-form").hidden = false
-  document.getElementById("switch-account").hidden = !state.auth?.currentUser
-  document.getElementById("firebase-missing").hidden = true
-  const who = document.getElementById("login-who")
-  who.hidden = !email
-  if (email) who.textContent = `Signed in as ${email}. First time only — this account keeps the invite.`
-  setLoginCopy({
-    kicker: "[ invite ]",
-    title: "Enter your invite",
-    lede: "New accounts need a code. After this, Sign in with Google will not ask again.",
+    lede: "Sign in with Google to create your account. After that, signing in is enough.",
   })
 }
 
 function showInviteOnly() {
   document.getElementById("login-methods").hidden = true
   document.getElementById("invite-form").hidden = false
-  document.getElementById("switch-account").hidden = true
-  document.getElementById("login-who").hidden = true
   document.getElementById("firebase-missing").hidden = false
   setLoginCopy({
-    kicker: "[ invite ]",
-    title: "Enter your invite",
-    lede: "Google sign-in is not configured on this gateway yet. Paste the code you were given.",
+    kicker: "[ account code ]",
+    title: "Enter your account code",
+    lede: "Google sign-in is not configured on this gateway yet. Enter the account code your operator gave you.",
   })
 }
 
@@ -143,7 +122,6 @@ async function bootFirebase() {
       }
       state.uid = uid
       state.sessionKnown = false
-      state.needsInvite = false
       if (!state.ready) return
       void render()
     })
@@ -162,14 +140,12 @@ async function confirmSignedOut(gen) {
     if (uid === state.uid) return
     state.uid = uid
     state.sessionKnown = false
-    state.needsInvite = false
     if (state.ready) void render()
     return
   }
   state.uid = ""
   state.admin = false
   state.sessionKnown = false
-  state.needsInvite = false
   showAuthStep()
   if (state.ready) void render()
 }
@@ -180,7 +156,6 @@ async function afterFirebase() {
   if (!user) {
     if (ticket !== sessionTicket) return
     state.admin = false
-    state.needsInvite = false
     state.sessionKnown = true
     showAuthStep()
     return false
@@ -202,11 +177,9 @@ async function afterFirebase() {
   if (ticket !== sessionTicket) return
   if (!data || !data.ok) return false
   state.admin = Boolean(data.admin)
-  state.needsInvite = !state.admin && Boolean(data.needs_invite)
   state.sessionKnown = true
   if (data.code) localStorage.setItem(KEY, data.code)
-  if (state.needsInvite) showInviteStep(data.email || user.email)
-  return !state.needsInvite
+  return true
 }
 
 function setAuthNav() {
@@ -295,13 +268,12 @@ async function route() {
     if (admitted === undefined) return
   }
   const path = pathOf()
-  if (path === "/login" && state.auth?.currentUser && !device() && state.sessionKnown && !state.needsInvite) {
+  if (path === "/login" && state.auth?.currentUser && !device() && state.sessionKnown) {
     history.replaceState(null, "", state.admin ? "/admin" : "/dashboard")
     show(state.admin ? "view-admin" : "view-dashboard")
     setAuthNav()
     if (state.admin) {
       wireAdminToken()
-      setAdminTab("codes")
       void loadAdmin()
       return
     }
@@ -309,7 +281,7 @@ async function route() {
     void loadDashboard()
     return
   }
-  if (path === "/admin" || path === "/admin/requests") {
+  if (path === "/admin") {
     if (!state.admin) {
       history.replaceState(null, "", "/login")
       show("view-login")
@@ -319,10 +291,7 @@ async function route() {
     show("view-admin")
     setAuthNav()
     wireAdminToken()
-    const requests = path === "/admin/requests"
-    setAdminTab(requests ? "requests" : "codes")
-    if (requests) void loadRequests()
-    else void loadAdmin()
+    void loadAdmin()
     return
   }
   if (path === "/dashboard" || path === "/dashboard/api") {
@@ -362,16 +331,6 @@ function scrollHash() {
   window.scrollTo(0, 0)
 }
 
-function setAdminTab(tab) {
-  const requests = tab === "requests"
-  document.getElementById("admin-title").textContent = requests ? "Requests" : "Beta codes"
-  document.getElementById("admin-panel-codes").hidden = requests
-  document.getElementById("admin-panel-requests").hidden = !requests
-  for (const node of document.querySelectorAll("[data-admin]")) {
-    node.classList.toggle("is-on", node.getAttribute("data-admin") === tab)
-  }
-}
-
 async function loadDashboard() {
   const error = document.getElementById("dash-error")
   error.hidden = true
@@ -381,8 +340,8 @@ async function loadDashboard() {
     fail(
       error,
       response.status === 402
-        ? "Invite spend cap reached. Ask the founder for a top-up."
-        : "Sign in again, then bind your invite.",
+        ? "Spend cap reached. Ask the founder for a top-up."
+        : "Sign in again.",
     )
     if (response.status === 401) render()
     return
@@ -477,75 +436,6 @@ async function loadAdmin() {
     .join("")
 }
 
-async function loadRequests() {
-  const error = document.getElementById("admin-request-error")
-  error.hidden = true
-  const response = await fetch("/v1/admin/requests", { headers: await headers() })
-  if (response.status !== 200) {
-    fail(error, "Admin API needs the admin token: paste it above, then reload.")
-    return
-  }
-  const data = await response.json()
-  const rows = data.requests ?? []
-  if (!rows.length) {
-    document.getElementById("admin-requests").innerHTML = `<p class="muted">No requests.</p>`
-    return
-  }
-  document.getElementById("admin-requests").innerHTML = rows
-    .map((row) => {
-      const when = new Date(row.created_at).toLocaleDateString()
-      const detail = [row.name, row.note, when].filter(Boolean).join(" · ")
-      const code = row.code ? `<code>${escapeHtml(row.code)}</code>` : "waiting"
-      const copy = row.code
-        ? `<button class="text-btn" type="button" data-copy-mail data-mail-email="${escapeHtml(row.email)}" data-mail-name="${escapeHtml(row.name || "")}" data-mail-code="${escapeHtml(row.code)}" data-mail-cap="${escapeHtml(row.cap_usd ?? 5)}" data-mail-days="${escapeHtml(row.days ?? 30)}">Copy email</button>`
-        : ""
-      const generate =
-        row.status === "open"
-          ? `<button class="text-btn" type="button" data-mint-request="${escapeHtml(row.id)}">Generate</button>`
-          : ""
-      const sent =
-        row.status === "coded"
-          ? `<button class="text-btn" type="button" data-sent-request="${escapeHtml(row.id)}">Sent</button>`
-          : ""
-      const dismiss =
-        row.status === "open"
-          ? `<button class="text-btn" type="button" data-dismiss-request="${escapeHtml(row.id)}">Dismiss</button>`
-          : ""
-      return `<article class="admin-row${row.status === "sent" ? " is-revoked" : ""}">
-        <span>${escapeHtml(row.email)}</span>
-        <span>${escapeHtml(detail)}</span>
-        <span>${code}</span>
-        <span class="row-actions">${generate}${copy}${sent}${dismiss}</span>
-      </article>`
-    })
-    .join("")
-}
-
-document.getElementById("request-form")?.addEventListener("submit", async (event) => {
-  event.preventDefault()
-  const error = document.getElementById("request-error")
-  error.hidden = true
-  const email = document.getElementById("request-email").value.trim()
-  const name = document.getElementById("request-name").value.trim()
-  const note = document.getElementById("request-note").value.trim()
-  const response = await fetch("/v1/access/requests", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, name, note }),
-  })
-  if (response.status === 429) {
-    fail(error, "Too many requests. Try again in a minute.")
-    return
-  }
-  if (response.status !== 200) {
-    fail(error, "Enter a real email.")
-    return
-  }
-  document.getElementById("request-form").hidden = true
-  document.getElementById("request-legal").hidden = true
-  document.getElementById("request-done").hidden = false
-})
-
 document.getElementById("google-btn")?.addEventListener("click", async () => {
   const error = document.getElementById("login-error")
   error.hidden = true
@@ -597,23 +487,9 @@ document.getElementById("invite-form")?.addEventListener("submit", async (event)
   event.preventDefault()
   const error = document.getElementById("login-error")
   error.hidden = true
+  // No-Firebase gateways only: validate the operator-issued account code.
+  // With Firebase, the session mints the account automatically.
   const value = document.getElementById("code").value.trim()
-  const user = state.auth?.currentUser
-  if (user) {
-    const response = await fetch("/v1/auth/session/bind", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id_token: await user.getIdToken(), code: value }),
-    })
-    const data = await response.json()
-    if (!data.ok) {
-      fail(error, "That code doesn’t work.")
-      return
-    }
-    localStorage.setItem(KEY, value)
-    goAuthed()
-    return
-  }
   const response = await fetch("/v1/invite/validate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -662,66 +538,6 @@ document.getElementById("copy-mint-mail")?.addEventListener("click", async (even
   if (ok) flashCopied(event.currentTarget)
 })
 
-document.getElementById("copy-request-mail")?.addEventListener("click", async (event) => {
-  const ok = await copyText(document.getElementById("request-mail-body").textContent)
-  if (ok) flashCopied(event.currentTarget)
-})
-
-document.getElementById("admin-requests")?.addEventListener("click", async (event) => {
-  const error = document.getElementById("admin-request-error")
-  error.hidden = true
-  const copy = event.target.closest("[data-copy-mail]")
-  if (copy) {
-    const text = inviteMail({
-      email: copy.getAttribute("data-mail-email") || "",
-      name: copy.getAttribute("data-mail-name") || "",
-      code: copy.getAttribute("data-mail-code") || "",
-      capUsd: copy.getAttribute("data-mail-cap"),
-      days: copy.getAttribute("data-mail-days"),
-    })
-    showRequestMail(text)
-    const ok = await copyText(text)
-    if (ok) flashCopied(copy)
-    return
-  }
-  const mint = event.target.closest("[data-mint-request]")
-  const sent = event.target.closest("[data-sent-request]")
-  const dismiss = event.target.closest("[data-dismiss-request]")
-  const id = mint?.getAttribute("data-mint-request") || sent?.getAttribute("data-sent-request") || dismiss?.getAttribute("data-dismiss-request")
-  if (!id) return
-  const action = mint ? "code" : sent ? "sent" : "dismiss"
-  const response = await fetch(`/v1/admin/requests/${encodeURIComponent(id)}/${action}`, {
-    method: "POST",
-    headers: await headers(),
-  })
-  const data = await response.json().catch(() => ({}))
-  if (response.status !== 200) {
-    fail(error, "Couldn’t update that request.")
-    return
-  }
-  if (action === "code" && data.code) {
-    const text = inviteMail({
-      email: data.email,
-      name: data.name,
-      code: data.code,
-      capUsd: data.cap_usd,
-      days: data.days,
-    })
-    showRequestMail(text)
-    const copied = await copyText(text)
-    const button = document.getElementById("copy-request-mail")
-    if (copied && button) flashCopied(button)
-  }
-  void loadRequests()
-  if (action === "code") void loadAdmin()
-})
-
-function showRequestMail(text) {
-  const box = document.getElementById("request-mail")
-  box.hidden = false
-  document.getElementById("request-mail-body").textContent = text
-}
-
 function looksLikeEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
@@ -733,11 +549,11 @@ function inviteMail(input) {
   const dollars = Number.isFinite(cap) ? (Number.isInteger(cap) ? String(cap) : cap.toFixed(2)) : "5"
   const days = Number(input.days) || 30
   const to = input.email ? `To: ${input.email}\n` : ""
-  return `${to}Subject: Your Grist invite
+  return `${to}Subject: Your Grist account
 
 ${greeting}
 
-You’re in the Grist beta. Your invite code is:
+Your Grist account code is:
 
 ${input.code}
 
@@ -820,7 +636,6 @@ async function signOutLocal() {
   localStorage.removeItem(KEY)
   state.admin = false
   state.sessionKnown = false
-  state.needsInvite = false
   if (state.auth) await signOut(state.auth)
   showAuthStep()
 }
@@ -832,12 +647,6 @@ for (const node of document.querySelectorAll(".sign-out")) {
     render()
   })
 }
-
-document.getElementById("switch-account")?.addEventListener("click", async () => {
-  document.getElementById("login-error").hidden = true
-  await signOutLocal()
-  setAuthNav()
-})
 
 const NPM_INSTALL = "npm install -g grist-ai\ngrist"
 

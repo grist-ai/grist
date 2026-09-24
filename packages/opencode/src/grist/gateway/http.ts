@@ -9,7 +9,7 @@ import { parseByokProvider, providerEndpoints, resolveUpstream, type ByokProvide
 import { applyModeCap, type OperatingMode } from "../mode"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase"
 import { isLadderModel, publicLadderID, priceForModel, usdForUsage } from "./prices"
-import { openGatewayStore, type GatewayStore, type InviteRow } from "./store"
+import { ACCOUNT_TTL_MS, openGatewayStore, type GatewayStore, type InviteRow } from "./store"
 import { canonicalApiKey } from "./codes"
 import { parseMasterKey } from "./provider-keys"
 import type { ProviderCredential } from "./store"
@@ -45,7 +45,6 @@ const SITE_PAGES = new Set([
   "/dashboard/api",
   "/plans",
   "/admin",
-  "/admin/requests",
   "/docs",
   "/docs/skills",
   "/privacy",
@@ -68,8 +67,7 @@ const PUBLIC_MAC_DMGS: Record<string, string> = {
 }
 
 /**
- * Rate-limit windows. `validate` guards the invite/device/access-request
- * endpoints per IP; `keyMint` caps API key creation per account (spec:
+ * Rate-limit windows. `validate` guards the invite/device endpoints per IP; `keyMint` caps API key creation per account (spec:
  * 10/hr); `completions` bounds the money path per account on top of spend
  * caps; `deviceStart` throttles device-flow initiation per IP; `gateRoute`
  * bounds Jev scoring calls per account.
@@ -123,10 +121,6 @@ class PayloadTooLargeError extends Error {}
 export function createGateway(opts: GatewayOptions = {}) {
   const masterKey = opts.masterKey ?? parseMasterKey(process.env.GRIST_MASTER_KEY)
   const store = opts.store ?? openGatewayStore(opts.dbPath ?? ":memory:", { masterKey })
-  /** BYOK open source: invite codes gate onboarding only when this is set. */
-  const inviteRequired = ["1", "true", "yes"].includes(
-    (process.env.GRIST_REQUIRE_INVITE ?? "").trim().toLowerCase(),
-  )
   const windows = new Map<string, { count: number; reset: number }>()
   const fetchImpl = opts.fetch ?? globalThis.fetch
   const now = opts.now ?? Date.now
@@ -370,64 +364,11 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (pathname === "/v1/provider") {
       return providerCredentials(req)
     }
-    if (req.method === "POST" && pathname === "/v1/access/requests") {
-      return accessRequest(req, peerIp)
-    }
     if (pathname.startsWith("/v1/admin/")) {
       return admin(req, pathname)
     }
     if (req.method === "GET") return serveSite(opts.siteRoot ?? SITE_ROOT, pathname)
     return json(404, { error: "not found" })
-  }
-
-  async function accessRequest(req: Request, peerIp?: string): Promise<Response> {
-    if (!allowValidate(`access:${clientIp(req, peerIp, trustedProxies)}`)) return json(429, { ok: false })
-    const body = await readJson(req)
-    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : ""
-    if (!validEmail(email)) return json(400, { ok: false })
-    store.createAccessRequest({
-      email,
-      name: cleanText(body?.name, 80),
-      note: cleanText(body?.note, 500),
-    })
-    return json(200, { ok: true })
-  }
-
-  function mintForRequest(id: string): Response {
-    const row = store.getAccessRequest(id)
-    if (!row || row.status === "dismissed" || row.status === "sent") return json(404, { error: "not found" })
-    if (row.invite_code) return json(200, issuedInvite(row, store.getInvite(row.invite_code)))
-    const invite = store.createInvite({ note: row.email })
-    const next = store.attachRequestCode(id, invite.code)
-    if (!next?.invite_code) return json(404, { error: "not found" })
-    return json(200, issuedInvite(next, invite))
-  }
-
-  function markRequest(id: string, status: "sent" | "dismissed"): Response {
-    const next = store.setAccessRequestStatus(id, status)
-    if (!next) return json(400, { error: "not found" })
-    return json(200, { ok: true })
-  }
-
-  function publicRequests() {
-    return store
-      .listAccessRequests()
-      .slice()
-      .sort((a, b) => requestRank(a.status) - requestRank(b.status) || b.created_at - a.created_at)
-      .map((row) => {
-        const invite = row.invite_code ? store.getInvite(row.invite_code) : undefined
-        return {
-          id: row.id,
-          email: row.email,
-          name: row.name,
-          note: row.note,
-          status: row.status,
-          code: row.invite_code,
-          cap_usd: invite?.cap_usd ?? null,
-          days: invite ? inviteDays(invite) : null,
-          created_at: new Date(row.created_at).toISOString(),
-        }
-      })
   }
 
   async function validate(req: Request, peerIp?: string): Promise<Response> {
@@ -464,8 +405,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     const body = await readJson(req)
     const user_code = typeof body?.user_code === "string" ? body.user_code : ""
     const raw = typeof body?.code === "string" ? body.code : ""
-    // BYOK open source: mint an account code on the fly when invites are off.
-    const invite = store.getInvite(raw) ?? (!inviteRequired ? store.createInvite({ note: "byok" }) : undefined)
+    // Open accounts: a pasted code reuses that account; otherwise mint one.
+    const invite =
+      store.getInvite(raw) ?? store.createInvite({ note: "account", expiresAt: now() + ACCOUNT_TTL_MS })
     if (!invite || !inviteUsable(invite, now())) {
       return json(200, { ok: false })
     }
@@ -506,30 +448,23 @@ export function createGateway(opts: GatewayOptions = {}) {
         code: account.invite_code,
       })
     }
-    const account = store.getAccount(user.uid)
-    if (!account)
-      return json(200, {
-        ok: true,
-        admin: false,
-        needs_invite: inviteRequired,
-        invite_required: inviteRequired,
-        email: user.email,
-      })
+    // Open accounts: first sign-in mints the account on the fly, so the
+    // session always carries a usable code.
+    let account = store.getAccount(user.uid)
+    if (!account) {
+      const fresh = store.createInvite({ note: "account", expiresAt: now() + ACCOUNT_TTL_MS })
+      const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: fresh.code })
+      if (!result.ok) return json(500, { error: "account setup failed" })
+      account = result.account
+    }
     const invite = store.getInvite(account.invite_code)
     if (!invite || !inviteUsable(invite, now())) {
-      return json(200, {
-        ok: true,
-        admin: false,
-        needs_invite: inviteRequired,
-        invite_required: inviteRequired,
-        email: user.email,
-      })
+      return json(500, { error: "account setup failed" })
     }
     return json(200, {
       ok: true,
       admin: false,
       needs_invite: false,
-      invite_required: inviteRequired,
       email: user.email,
       code: invite.code,
     })
@@ -542,18 +477,19 @@ export function createGateway(opts: GatewayOptions = {}) {
     const raw = typeof body?.code === "string" ? body.code : ""
     const user = await verifyFirebaseIdToken(token, fetchImpl)
     if (!user) return json(401, { ok: false })
-    // BYOK open source: mint an account code on the fly when invites are off.
-    const invite = store.getInvite(raw) ?? (!inviteRequired ? store.createInvite({ note: "byok" }) : undefined)
+    // Open accounts: a pasted code binds that account; otherwise mint one.
+    const invite =
+      store.getInvite(raw) ?? store.createInvite({ note: "account", expiresAt: now() + ACCOUNT_TTL_MS })
     if (!invite || !inviteUsable(invite, now())) return json(200, { ok: false })
     const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code })
     if (!result.ok) {
-      // B6: single-use binding. A code already bound to another account is a
-      // 409; an account trying to bind a second code is a 400.
+      // One code -> one account, one account -> one code. A code already
+      // bound to another account is a 409; an account trying to bind a
+      // second code is a 400.
       return result.reason === "code_taken"
-        ? json(409, { ok: false, error: "invite code already used" })
-        : json(400, { ok: false, error: "account already bound to a different invite code" })
+        ? json(409, { ok: false, error: "account code already used" })
+        : json(400, { ok: false, error: "account already bound to a different code" })
     }
-    if (user.email) store.revokeSiblingRequestCodes({ email: user.email, exceptCode: invite.code })
     return json(200, { ok: true, code: invite.code })
   }
 
@@ -836,20 +772,6 @@ export function createGateway(opts: GatewayOptions = {}) {
       return json(200, adminOverview())
     }
 
-    if (req.method === "GET" && pathname === "/v1/admin/requests") {
-      return json(200, { requests: publicRequests() })
-    }
-
-    if (pathname.startsWith("/v1/admin/requests/")) {
-      const rest = pathname.slice("/v1/admin/requests/".length)
-      const slash = rest.indexOf("/")
-      const id = decodeURIComponent(slash === -1 ? rest : rest.slice(0, slash))
-      const action = slash === -1 ? "" : rest.slice(slash + 1)
-      if (req.method === "POST" && action === "code") return mintForRequest(id)
-      if (req.method === "POST" && action === "sent") return markRequest(id, "sent")
-      if (req.method === "POST" && action === "dismiss") return markRequest(id, "dismissed")
-    }
-
     if (req.method === "POST" && pathname === "/v1/admin/mode") {
       const body = await readJson(req)
       const mode = body?.mode
@@ -928,7 +850,7 @@ export function createGateway(opts: GatewayOptions = {}) {
   function ensureAdminAccount(user: FirebaseUser) {
     const existing = store.getAccount(user.uid)
     if (existing) return existing
-    const invite = store.createInvite({ note: "admin", capUsd: 50 })
+    const invite = store.createInvite({ note: "admin", capUsd: 50, expiresAt: now() + ACCOUNT_TTL_MS })
     const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code })
     // The code was just minted, so code_taken is impossible; already_bound is
     // impossible because getAccount just returned undefined. Anything else is
@@ -1356,42 +1278,6 @@ function json(status: number, body: unknown): Response {
     status,
     headers: { "Content-Type": "application/json" },
   })
-}
-
-function issuedInvite(
-  row: { email: string; name: string | null; invite_code: string | null },
-  invite: { code: string; cap_usd: number; created_at: number; expires_at: number } | undefined,
-) {
-  return {
-    ok: true,
-    code: invite?.code ?? row.invite_code,
-    email: row.email,
-    name: row.name,
-    cap_usd: invite?.cap_usd ?? 5,
-    days: invite ? inviteDays(invite) : 30,
-  }
-}
-
-function inviteDays(invite: { created_at: number; expires_at: number }) {
-  return Math.max(1, Math.round((invite.expires_at - invite.created_at) / 86_400_000))
-}
-
-function requestRank(status: string) {
-  if (status === "open") return 0
-  if (status === "coded") return 1
-  if (status === "sent") return 2
-  return 9
-}
-
-function validEmail(email: string) {
-  return email.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
-
-function cleanText(value: unknown, max: number) {
-  if (typeof value !== "string") return
-  const text = value.replace(/[\u0000-\u001F\u007F]/g, "").trim()
-  if (!text) return
-  return text.slice(0, max)
 }
 
 /**
