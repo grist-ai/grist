@@ -65,6 +65,7 @@ API keys identify the *user*; invite codes are optional onboarding gating.
 
 ```bash
 bun install
+export GRIST_MASTER_KEY=$(openssl rand -hex 32)  # encrypts user provider keys at rest
 # provider endpoints the gateway may route to are configured server-side;
 # each user supplies their own key via `grist auth login` / the dashboard
 bun run --cwd packages/opencode src/index.ts gateway
