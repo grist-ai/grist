@@ -43,7 +43,9 @@ before persisting any rows to memory.
 
 - **Jev gate** ([TypeSafe Jev](https://typesafe.ai)): scores task difficulty/confidence
   and routes to the cheapest rung that can handle it. The gate rides *your*
-  provider key — no second API dependency, no separate gate key.
+  provider key — no second API dependency, no separate gate key. Subagents re-gate
+  on their delegation text with the parent's rung as a ceiling, so decomposed work
+  can only shed cost, never gain it.
 - **Code map**: AST graph (Graphify) + a custom tree-sitter rule that extracts
   Express route registrations, so the gate sees the real call graph on hard tasks.
 - **Memory**: Supermemory sidecar (self-hosted, MIT) or `.grist/memory.json`;
