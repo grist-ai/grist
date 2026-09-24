@@ -14,7 +14,8 @@ import { Effect, Record } from "effect"
 import { jsonSchema, tool as aiTool, type ModelMessage, type Tool } from "ai"
 import type { Plugin } from "@/plugin"
 import { mergeDeep } from "remeda"
-import { surgicalEngineer } from "@/grist/doctrine"
+import { identityDoctrine, sessionNudges, surgicalEngineer } from "@/grist/doctrine"
+import { CacheLayout } from "@/grist/cache-layout"
 
 const USER_AGENT = `opencode/${InstallationVersion}`
 
@@ -56,16 +57,28 @@ const mergeOptions = (target: Record<string, any>, source: Record<string, any> |
 
 export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: PrepareInput) {
   const isOpenaiOauth = input.provider.id === "openai" && input.auth?.type === "oauth"
-  const system = [
-    [
-      ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
-      surgicalEngineer(input.sessionID),
-      ...input.system,
-      ...(input.user.system ? [input.user.system] : []),
-    ]
-      .filter((x) => x)
-      .join("\n"),
-  ]
+  const identity = input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)
+  const assembled = CacheLayout.layoutEnabled()
+    ? CacheLayout.assemble({
+        identity,
+        doctrine: identityDoctrine(),
+        setup: input.system,
+        nudges: sessionNudges(input.sessionID),
+        userSystem: input.user.system,
+      })
+    : undefined
+  const system = assembled
+    ? [assembled.prefix, assembled.setup].filter((part) => part.length > 0)
+    : [
+        [
+          ...identity,
+          surgicalEngineer(input.sessionID),
+          ...input.system,
+          ...(input.user.system ? [input.user.system] : []),
+        ]
+          .filter((x) => x)
+          .join("\n"),
+      ]
 
   const header = system[0]
   yield* input.plugin.trigger(
@@ -183,7 +196,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
   return {
     system,
     messages,
-    tools: Object.fromEntries(Object.entries(tools).toSorted(([a], [b]) => a.localeCompare(b))),
+    tools: CacheLayout.sortTools(tools),
     params,
     messageTransformOptions: options,
     headers: {

@@ -88,9 +88,11 @@ const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
 
 /**
- * Fields the gateway forwards upstream. Everything else is dropped so clients
- * cannot smuggle `provider`, `models`, `reasoning`, or `plugins` and shift
- * spend onto providers/paths the metered ladder price does not cover.
+ * Fields the gateway forwards upstream. Nested `cache_control` on `messages`
+ * and `tools` is preserved (OpenRouter Claude breakpoints). Everything else
+ * is dropped so clients cannot smuggle `provider`, `models`, `reasoning`, or
+ * `plugins` and shift spend onto providers/paths the metered ladder price
+ * does not cover.
  */
 const UPSTREAM_FIELDS = [
   "messages",
@@ -498,15 +500,20 @@ export function createGateway(opts: GatewayOptions = {}) {
       body: JSON.stringify(payload),
     })
     const upstreamMs = now() - upstreamStarted
-    console.info(
-      `[grist-gateway] completions rung=${publicID} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs}`,
-    )
 
     if (!stream) {
       const data = (await upstream.json()) as Record<string, unknown>
-      meterFromUsage(store, invite, upstreamModel, usageFromUnknown(data.usage), alert, globalBudget, now)
+      const usage = usageFromUnknown(data.usage)
+      console.info(
+        `[grist-gateway] completions rung=${publicID} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs} ${cacheHitLabel(usage)}`,
+      )
+      meterFromUsage(store, invite, upstreamModel, usage, alert, globalBudget, now)
       return json(upstream.status, redactCompletion(data, publicID))
     }
+
+    console.info(
+      `[grist-gateway] completions rung=${publicID} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs}`,
+    )
 
     if (!upstream.body) return new Response(null, { status: upstream.status })
     return new Response(meteredSse(upstream.body, store, invite, upstreamModel, publicID, alert, globalBudget, now), {
@@ -912,6 +919,9 @@ function meteredSse(
     if (metered) return
     metered = true
     meterFromUsage(store, invite, model, usage, alert, globalBudget, now)
+    if (usage) {
+      console.info(`[grist-gateway] completions cache ${cacheHitLabel(usage)}`)
+    }
   }
   return new ReadableStream({
     async pull(controller) {
@@ -986,6 +996,11 @@ function usageFromUnknown(value: unknown): ParsedUsage | undefined {
   const output = Number(rec.completion_tokens ?? rec.output_tokens ?? 0)
   if (!Number.isFinite(input) || !Number.isFinite(output)) return
   return { input, output, cachedInput: cachedInputFrom(rec) }
+}
+
+function cacheHitLabel(usage: ParsedUsage | undefined) {
+  if (!usage || usage.input <= 0) return "cache_hit=-"
+  return `cache_hit=${(usage.cachedInput / usage.input).toFixed(3)} cached=${usage.cachedInput} input=${usage.input}`
 }
 
 /** Cached prompt tokens are a subset of input, billed at the cheaper cached rate. */

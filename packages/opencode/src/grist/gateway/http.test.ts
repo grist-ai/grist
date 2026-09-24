@@ -773,6 +773,7 @@ describe("gateway HTTP", () => {
     expect(log).toContain("auth_ms=")
     expect(log).toContain("upstream_ms=")
     expect(log).toContain("rung=cheapest")
+    expect(log).toContain("cache_hit=")
     expect(log).not.toContain("DeepSeek")
     expect(log).not.toContain("deepseek")
     const upstreamMs = Number(log?.match(/upstream_ms=(\d+)/)?.[1])
@@ -867,6 +868,45 @@ describe("gateway HTTP", () => {
     expect("models" in payload).toBe(false)
     expect("reasoning" in payload).toBe(false)
     expect("plugins" in payload).toBe(false)
+  })
+
+  test("forwards nested cache_control on messages and tools", async () => {
+    const forwarded: Record<string, unknown>[] = []
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async (_input, init) => {
+        forwarded.push(JSON.parse(String(init?.body ?? "{}")))
+        return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), { status: 200 })
+      },
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const cache = { type: "ephemeral" }
+    await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: {
+        model: "cheapest",
+        messages: [
+          { role: "system", content: "identity", cache_control: cache },
+          { role: "system", content: "setup date", cache_control: cache },
+          { role: "user", content: "hi" },
+        ],
+        tools: [{ type: "function", function: { name: "read" }, cache_control: cache }],
+        stream: false,
+      },
+    })
+    const payload = forwarded[0]!
+    expect(payload.messages).toEqual([
+      { role: "system", content: "identity", cache_control: cache },
+      { role: "system", content: "setup date", cache_control: cache },
+      { role: "user", content: "hi" },
+    ])
+    expect(payload.tools).toEqual([{ type: "function", function: { name: "read" }, cache_control: cache }])
   })
 
   test("strips vendor model ids from streamed completions", async () => {

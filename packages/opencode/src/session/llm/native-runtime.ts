@@ -3,6 +3,7 @@ import type { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
 import { errorMessage } from "@/util/error"
 import { isRecord } from "@/util/record"
+import { CacheLayout } from "@/grist/cache-layout"
 import { asSchema, type ModelMessage, type Tool } from "ai"
 import { Cause, Effect, FiberSet, Queue } from "effect"
 import * as Stream from "effect/Stream"
@@ -168,7 +169,7 @@ function nativeSchema(value: unknown): JsonSchema {
 
 export function nativeTools(tools: Record<string, Tool>, input: Pick<StreamInput, "messages" | "abort">) {
   return Object.fromEntries(
-    Object.entries(tools).map(([name, item]) => [
+    Object.entries(CacheLayout.sortTools(tools)).map(([name, item]) => [
       name,
       // Tool execution remains opencode-owned. The native runtime only adapts
       // the @opencode-ai/llm tool call back into the AI SDK Tool.execute shape.
