@@ -313,3 +313,130 @@ describe("POST /v1/provider", () => {
     expect(set.status).toBe(503)
   })
 })
+
+describe("BYOK request routing", () => {
+  async function call(
+    fetch: (req: Request, peerIp?: string) => Promise<Response>,
+    method: string,
+    path: string,
+    input?: { headers?: Record<string, string>; body?: unknown },
+  ) {
+    const response = await fetch(
+      new Request(`http://gateway.test${path}`, {
+        method,
+        headers: { "Content-Type": "application/json", ...input?.headers },
+        body: method === "GET" ? undefined : JSON.stringify(input?.body ?? {}),
+      }),
+    )
+    const text = await response.text()
+    return { status: response.status, json: (text ? JSON.parse(text) : undefined) as Record<string, unknown> }
+  }
+
+  type SeenRequest = { url: string; auth: string | null; body: unknown }
+  function captureFetch(seen: SeenRequest[]) {
+    return async (input: string | URL | Request, init?: RequestInit) => {
+      seen.push({
+        url: String(input),
+        auth: new Headers(init?.headers).get("authorization"),
+        body: JSON.parse(String(init?.body ?? "{}")),
+      })
+      return new Response(JSON.stringify({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 5 } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+  }
+
+  async function gatewayWithCredential(credential: { provider: string; apiKey: string }) {
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite()
+    store.setProviderCredential({ inviteCode: invite.code, provider: credential.provider as "vercel", apiKey: credential.apiKey })
+    const seen: SeenRequest[] = []
+    const gateway = createGateway({ store, openrouterKey: "or-house-key", fetch: captureFetch(seen) })
+    return { gateway, headers: { "X-Grist-Invite": invite.code }, seen }
+  }
+
+  test("completions ride the caller's provider key and endpoint", async () => {
+    const { gateway, headers, seen } = await gatewayWithCredential({ provider: "vercel", apiKey: "vck_user_key" })
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers,
+      body: { model: "cheapest", messages: [{ role: "user", content: "hi" }], stream: false },
+    })
+    expect(response.status).toBe(200)
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.url).toBe("https://ai-gateway.vercel.sh/v1/chat/completions")
+    expect(seen[0]?.auth).toBe("Bearer vck_user_key")
+    expect((seen[0]?.body as { model: string }).model).toBe("deepseek/deepseek-v4.1-flash")
+  })
+
+  test("completions fall back to the house key without a credential", async () => {
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite()
+    const seen: SeenRequest[] = []
+    const gateway = createGateway({ store, openrouterKey: "or-house-key", fetch: captureFetch(seen) })
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": invite.code },
+      body: { model: "medium", messages: [{ role: "user", content: "hi" }], stream: false },
+    })
+    expect(response.status).toBe(200)
+    expect(seen[0]?.url).toBe("https://openrouter.ai/api/v1/chat/completions")
+    expect(seen[0]?.auth).toBe("Bearer or-house-key")
+    expect((seen[0]?.body as { model: string }).model).toBe("moonshotai/kimi-k3")
+  })
+
+  test("completions 503 with no credential and no house key", async () => {
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite()
+    const gateway = createGateway({ store, fetch: captureFetch([]) })
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": invite.code },
+      body: { model: "cheapest", messages: [{ role: "user", content: "hi" }], stream: false },
+    })
+    expect(response.status).toBe(503)
+  })
+
+  test("custom credential without a model for the rung is a 503, not a silent fallback", async () => {
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite()
+    store.setProviderCredential({
+      inviteCode: invite.code,
+      provider: "custom",
+      apiKey: "custom-key",
+      baseURL: "https://llm.example.com/v1",
+      // no customModels: nothing to resolve the rung to
+    })
+    const gateway = createGateway({ store, openrouterKey: "or-house-key", fetch: captureFetch([]) })
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": invite.code },
+      body: { model: "cheapest", messages: [{ role: "user", content: "hi" }], stream: false },
+    })
+    expect(response.status).toBe(503)
+    expect(response.json.error).toBe("provider is misconfigured for this rung")
+  })
+
+  test("gate route scores on the caller's key at their Jev endpoint", async () => {
+    const { gateway, headers, seen } = await gatewayWithCredential({ provider: "openrouter", apiKey: "sk-or-user-key" })
+    const response = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      headers,
+      body: { text: "refactor the auth module to use the new session store" },
+    })
+    expect(response.status).toBe(200)
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.url).toContain("openrouter.ai")
+    expect(seen[0]?.auth).toBe("Bearer sk-or-user-key")
+  })
+
+  test("gate route falls back to the house Jev route without a credential", async () => {
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite()
+    const seen: SeenRequest[] = []
+    const gateway = createGateway({ store, openrouterKey: "or-house-key", fetch: captureFetch(seen) })
+    const response = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      headers: { "X-Grist-Invite": invite.code },
+      body: { text: "refactor the auth module to use the new session store" },
+    })
+    expect(response.status).toBe(200)
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.auth).toBe("Bearer or-house-key")
+  })
+})

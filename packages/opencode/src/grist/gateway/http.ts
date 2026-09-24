@@ -4,14 +4,15 @@ import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
 import { publicModelRef, PUBLIC_RUNGS, type Rung } from "../rung"
 import { typesafeKey } from "../jev-client"
-import { resolveJevRoute, resolveProviderKey, type JevProvider } from "../jev-route"
+import { resolveJevRoute, resolveProviderKey, type JevProvider, type JevRoute } from "../jev-route"
+import { parseByokProvider, providerEndpoints, resolveUpstream, type ByokProvider } from "./providers"
 import { applyModeCap, type OperatingMode } from "../mode"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase"
-import { isLadderModel, publicLadderID, upstreamLadderID, priceForModel, usdForUsage } from "./prices"
+import { isLadderModel, publicLadderID, priceForModel, usdForUsage } from "./prices"
 import { openGatewayStore, type GatewayStore, type InviteRow } from "./store"
 import { canonicalApiKey } from "./codes"
-import { parseByokProvider, type ByokProvider } from "./providers"
 import { parseMasterKey } from "./provider-keys"
+import type { ProviderCredential } from "./store"
 
 export type GatewayOptions = {
   store?: GatewayStore
@@ -175,6 +176,68 @@ export function createGateway(opts: GatewayOptions = {}) {
         }
       },
     })
+
+  /** Resolved upstream for one request, or a machine-readable failure. */
+  type UpstreamResolution =
+    | { ok: true; provider: ByokProvider; url: string; key: string; model: string }
+    | { ok: false; reason: "no_key" | "master_key_missing" | "provider_misconfigured" }
+
+  /**
+   * Resolve (account, rung) → upstream endpoint + key + model. A stored BYOK
+   * credential wins and the request rides the caller's key; otherwise the
+   * founder's OpenRouter key serves as the house provider. Fails closed when
+   * a stored credential cannot be decrypted — never silently bills the house.
+   */
+  function resolveRequestUpstream(inviteCode: string, rung: Rung): UpstreamResolution {
+    let credential: ProviderCredential | undefined
+    try {
+      credential = store.getProviderCredential(inviteCode)
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("GRIST_MASTER_KEY")) {
+        return { ok: false, reason: "master_key_missing" }
+      }
+      throw error
+    }
+    if (!credential) {
+      if (!openrouterKey) return { ok: false, reason: "no_key" }
+      const house = resolveUpstream({ provider: "openrouter", rung })
+      if (!house) return { ok: false, reason: "no_key" }
+      return { ok: true, provider: "openrouter", url: house.chatCompletionsURL, key: openrouterKey, model: house.model }
+    }
+    const resolved = resolveUpstream({
+      provider: credential.provider,
+      rung,
+      customBaseURL: credential.baseURL ?? undefined,
+      customModels: credential.customModels,
+    })
+    if (!resolved) return { ok: false, reason: "provider_misconfigured" }
+    return {
+      ok: true,
+      provider: resolved.provider,
+      url: resolved.chatCompletionsURL,
+      key: credential.apiKey,
+      model: resolved.model,
+    }
+  }
+
+  /**
+   * The Jev gate rides the caller's provider key: OpenRouter/Vercel users
+   * score on their own key at their own Jev endpoint. Custom providers have
+   * no Jev endpoint, and accounts without a credential use the house route.
+   */
+  function jevRouteForInvite(inviteCode: string): JevRoute | undefined {
+    let credential: ProviderCredential | undefined
+    try {
+      credential = store.getProviderCredential(inviteCode)
+    } catch {
+      return jevRoute()
+    }
+    if (credential && (credential.provider === "openrouter" || credential.provider === "vercel")) {
+      const route = resolveJevRoute({ provider: credential.provider, resolveKey: () => credential.apiKey })
+      if (route) return route
+    }
+    return jevRoute()
+  }
   const adminToken = opts.adminToken ?? process.env.GRIST_ADMIN_TOKEN?.trim() ?? ""
   // Env-only on purpose: no admin email is hardcoded into the build, and an
   // empty value disables the Google sign-in admin shortcut entirely.
@@ -465,7 +528,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     const text = typeof body?.text === "string" ? body.text : ""
     const sessionID = typeof body?.session_id === "string" ? body.session_id : undefined
     const started = now()
-    const { scores, provider } = await scoreTask(text, jevRoute() ?? "", { fetch: upstreamFetch })
+    const { scores, provider } = await scoreTask(text, jevRouteForInvite(invite.code) ?? "", {
+      fetch: upstreamFetch,
+    })
     // Jev scoring is a paid upstream call; debit a flat per-call cost so the
     // invite cap reflects it. Shadow scoring never reaches a paid provider.
     if (provider === "jev") {
@@ -531,21 +596,26 @@ export function createGateway(opts: GatewayOptions = {}) {
     // Operating mode clamps the ladder server-side: in `capped` mode a
     // frontier request degrades to medium rather than paying frontier prices.
     const { rung: effectivePublicID } = applyModeCap(publicID, store.getMode())
-    const upstreamModel = upstreamLadderID(effectivePublicID)
-    if (!upstreamModel) {
-      return json(500, { error: "ladder misconfigured" })
-    }
-    if (!openrouterKey) {
-      return json(503, { error: "gateway has no OpenRouter key" })
+    // BYOK: the request rides the caller's provider key; the founder's
+    // OpenRouter key is the house fallback when no credential is stored.
+    const target = resolveRequestUpstream(invite.code, effectivePublicID)
+    if (!target.ok) {
+      const message =
+        target.reason === "master_key_missing"
+          ? "gateway cannot decrypt provider keys right now"
+          : target.reason === "provider_misconfigured"
+            ? "provider is misconfigured for this rung"
+            : "no inference key configured for this account"
+      return json(503, { error: message })
     }
 
     const stream = Boolean(body?.stream)
-    const payload = upstreamPayload(body ?? {}, upstreamModel, stream)
+    const payload = upstreamPayload(body ?? {}, target.model, stream)
     const upstreamStarted = now()
-    const upstream = await upstreamFetch("https://openrouter.ai/api/v1/chat/completions", {
+    const upstream = await upstreamFetch(target.url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${openrouterKey}`,
+        Authorization: `Bearer ${target.key}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://github.com/pranav6226/grist",
         "X-Title": "Grist",
@@ -560,7 +630,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       console.info(
         `[grist-gateway] completions rung=${publicID} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs} ${cacheHitLabel(usage)}`,
       )
-      meterFromUsage(store, invite, upstreamModel, usage, alert, globalBudget, now)
+      meterFromUsage(store, invite, target.model, usage, alert, globalBudget, now)
       return json(upstream.status, redactCompletion(data, publicID))
     }
 
@@ -569,7 +639,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     )
 
     if (!upstream.body) return new Response(null, { status: upstream.status })
-    return new Response(meteredSse(upstream.body, store, invite, upstreamModel, publicID, alert, globalBudget, now), {
+    return new Response(meteredSse(upstream.body, store, invite, target.model, publicID, alert, globalBudget, now), {
       status: upstream.status,
       headers: {
         "Content-Type": upstream.headers.get("Content-Type") ?? "text/event-stream",

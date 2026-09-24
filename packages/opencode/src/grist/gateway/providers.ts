@@ -12,7 +12,7 @@
  */
 
 import { JEV_ENDPOINTS, JEV_MODELS } from "../jev-route"
-import { DEFAULT_RUNG_MODELS } from "./ladder"
+import { resolveRung } from "./ladder"
 import type { Rung } from "../rung"
 
 export type ByokProvider = "openrouter" | "vercel" | "custom"
@@ -85,7 +85,8 @@ export function ladderModel(
   if (override) return override
   switch (provider) {
     case "openrouter":
-      return DEFAULT_RUNG_MODELS[rung].modelID
+      // resolveRung so GRIST_<RUNG>_MODEL overrides (Railway) keep working.
+      return resolveRung(rung, env).modelID
     case "vercel":
       return VERCEL_LADDER_MODELS[rung]
     case "custom":
