@@ -46,9 +46,63 @@ export async function runAuthLogin(gateway?: string) {
     if (next.status === "pending") continue
     if (next.status !== "approved") return { ok: false as const, reason: "expired" as const }
     saveInviteConfig({ code: next.code, gatewayUrl })
+    await setupProviderKey({ gatewayUrl, code: next.code })
     return { ok: true as const, gatewayUrl, code: next.code }
   }
   return { ok: false as const, reason: "expired" as const }
+}
+
+/**
+ * BYOK setup: after login, ask for the user's inference provider key and store
+ * it encrypted on the gateway. Best-effort — a skip or failure never fails
+ * the login itself; the key can be added later by re-running this.
+ */
+export async function setupProviderKey(input: { gatewayUrl: string; code: string }) {
+  if (!canPromptLogin()) {
+    UI.println("No provider key set yet. Add one any time by re-running this login.")
+    return
+  }
+  const providers = [
+    { id: "openrouter", label: "OpenRouter" },
+    { id: "vercel", label: "Vercel AI Gateway" },
+    { id: "custom", label: "Custom OpenAI-compatible endpoint" },
+  ] as const
+  UI.println("Grist runs inference on your own provider key (BYOK).")
+  providers.forEach((p, i) => UI.println(`  ${i + 1}. ${p.label}`))
+  UI.println(`  ${providers.length + 1}. Skip for now`)
+  const choice = await promptLine(`Provider [1-${providers.length + 1}]`)
+  const index = Number.parseInt(choice.trim(), 10) - 1
+  if (Number.isNaN(index) || index < 0 || index >= providers.length) return
+  const provider = providers[index]
+  const apiKey = await promptLine(`Paste your ${provider.label} API key (blank to skip)`)
+  if (!apiKey.trim()) return
+  const body: Record<string, string> = { provider: provider.id, api_key: apiKey.trim() }
+  if (provider.id === "custom") {
+    const baseUrl = await promptLine("Base URL, e.g. https://llm.example.com/v1 (blank to skip)")
+    if (!baseUrl.trim()) return
+    body.base_url = baseUrl.trim()
+  }
+  try {
+    const response = await fetch(`${strip(input.gatewayUrl)}/v1/provider`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Grist-Invite": input.code },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    UI.println("Provider key saved.")
+  } catch {
+    UI.error("Could not save the provider key. Add it later by re-running this login.")
+  }
+}
+
+function promptLine(question: string) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
+  return new Promise<string>((resolve) => {
+    rl.question(`${question}: `, (answer) => {
+      rl.close()
+      resolve(answer)
+    })
+  })
 }
 
 export async function runAuthApiKey(input: { key: string; gatewayUrl?: string }) {

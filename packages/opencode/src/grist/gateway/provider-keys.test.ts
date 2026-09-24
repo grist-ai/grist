@@ -100,6 +100,119 @@ describe("provider credential store", () => {
   })
 })
 
+describe("invite-optional auth (GRIST_REQUIRE_INVITE)", () => {
+  async function call(
+    fetch: (req: Request, peerIp?: string) => Promise<Response>,
+    method: string,
+    path: string,
+    input?: { headers?: Record<string, string>; body?: unknown },
+  ) {
+    const response = await fetch(
+      new Request(`http://gateway.test${path}`, {
+        method,
+        headers: { "Content-Type": "application/json", ...input?.headers },
+        body: method === "GET" ? undefined : JSON.stringify(input?.body ?? {}),
+      }),
+    )
+    const text = await response.text()
+    return { status: response.status, json: (text ? JSON.parse(text) : undefined) as Record<string, unknown> }
+  }
+
+  function withRequireInvite(value: string | undefined, fn: () => Promise<void>) {
+    return (async () => {
+      const previous = process.env.GRIST_REQUIRE_INVITE
+      if (value === undefined) delete process.env.GRIST_REQUIRE_INVITE
+      else process.env.GRIST_REQUIRE_INVITE = value
+      try {
+        await fn()
+      } finally {
+        if (previous === undefined) delete process.env.GRIST_REQUIRE_INVITE
+        else process.env.GRIST_REQUIRE_INVITE = previous
+      }
+    })()
+  }
+
+  test("device approval mints an account code when invites are off", () =>
+    withRequireInvite(undefined, async () => {
+      const store = openGatewayStore(":memory:")
+      const gateway = createGateway({ store })
+      const started = await call(gateway.fetch, "POST", "/v1/auth/device", {})
+      const approved = await call(gateway.fetch, "POST", "/v1/auth/device/approve", {
+        body: { user_code: started.json.user_code, code: "" },
+      })
+      expect(approved.json.ok).toBe(true)
+      const polled = await call(gateway.fetch, "POST", "/v1/auth/device/poll", {
+        body: { device_code: started.json.device_code },
+      })
+      expect(polled.json.status).toBe("approved")
+      expect(typeof polled.json.code).toBe("string")
+    }))
+
+  test("device approval still requires an invite when GRIST_REQUIRE_INVITE=1", () =>
+    withRequireInvite("1", async () => {
+      const store = openGatewayStore(":memory:")
+      const gateway = createGateway({ store })
+      const started = await call(gateway.fetch, "POST", "/v1/auth/device", {})
+      const approved = await call(gateway.fetch, "POST", "/v1/auth/device/approve", {
+        body: { user_code: started.json.user_code, code: "" },
+      })
+      expect(approved.json.ok).toBe(false)
+    }))
+
+  test("session reports invite_required and skips the invite step when off", () =>
+    withRequireInvite(undefined, async () => {
+      process.env.FIREBASE_API_KEY = "test"
+      process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+      process.env.FIREBASE_PROJECT_ID = "grist-test"
+      process.env.FIREBASE_APP_ID = "1:1:web:abc"
+      try {
+        const gateway = createGateway({
+          fetch: async () =>
+            new Response(JSON.stringify({ users: [{ localId: "uid_new", email: "new@example.com" }] }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+        })
+        const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
+          body: { id_token: "tok" },
+        })
+        expect(session.json.needs_invite).toBe(false)
+        expect(session.json.invite_required).toBe(false)
+      } finally {
+        delete process.env.FIREBASE_API_KEY
+        delete process.env.FIREBASE_AUTH_DOMAIN
+        delete process.env.FIREBASE_PROJECT_ID
+        delete process.env.FIREBASE_APP_ID
+      }
+    }))
+
+  test("session still demands an invite when GRIST_REQUIRE_INVITE=1", () =>
+    withRequireInvite("1", async () => {
+      process.env.FIREBASE_API_KEY = "test"
+      process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+      process.env.FIREBASE_PROJECT_ID = "grist-test"
+      process.env.FIREBASE_APP_ID = "1:1:web:abc"
+      try {
+        const gateway = createGateway({
+          fetch: async () =>
+            new Response(JSON.stringify({ users: [{ localId: "uid_new2", email: "new2@example.com" }] }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+        })
+        const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
+          body: { id_token: "tok" },
+        })
+        expect(session.json.needs_invite).toBe(true)
+        expect(session.json.invite_required).toBe(true)
+      } finally {
+        delete process.env.FIREBASE_API_KEY
+        delete process.env.FIREBASE_AUTH_DOMAIN
+        delete process.env.FIREBASE_PROJECT_ID
+        delete process.env.FIREBASE_APP_ID
+      }
+    }))
+})
 describe("POST /v1/provider", () => {
   async function authedGateway() {
     const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })

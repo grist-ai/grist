@@ -461,6 +461,8 @@ describe("gateway HTTP", () => {
     process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
     process.env.FIREBASE_PROJECT_ID = "grist-test"
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
+    // This test exercises the invite-gated flow explicitly.
+    process.env.GRIST_REQUIRE_INVITE = "1"
     const gateway = createGateway({
       adminToken: "secret",
       fetch: async () =>
@@ -502,6 +504,7 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_AUTH_DOMAIN
     delete process.env.FIREBASE_PROJECT_ID
     delete process.env.FIREBASE_APP_ID
+    delete process.env.GRIST_REQUIRE_INVITE
   })
 
   test("single-use binding: 409 on taken code, 400 on rebind, idempotent retry", async () => {
@@ -617,6 +620,8 @@ describe("gateway HTTP", () => {
     process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
     process.env.FIREBASE_PROJECT_ID = "grist-test"
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
+    // This test exercises the invite-gated flow explicitly.
+    process.env.GRIST_REQUIRE_INVITE = "1"
     const gateway = createGateway({
       adminToken: "secret",
       adminEmail: "pranavmm25@gmail.com",
@@ -677,6 +682,7 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_AUTH_DOMAIN
     delete process.env.FIREBASE_PROJECT_ID
     delete process.env.FIREBASE_APP_ID
+    delete process.env.GRIST_REQUIRE_INVITE
   })
 
   test("serves the Apple Silicon dmg from /download", async () => {

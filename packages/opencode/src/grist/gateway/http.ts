@@ -122,6 +122,10 @@ class PayloadTooLargeError extends Error {}
 export function createGateway(opts: GatewayOptions = {}) {
   const masterKey = opts.masterKey ?? parseMasterKey(process.env.GRIST_MASTER_KEY)
   const store = opts.store ?? openGatewayStore(opts.dbPath ?? ":memory:", { masterKey })
+  /** BYOK open source: invite codes gate onboarding only when this is set. */
+  const inviteRequired = ["1", "true", "yes"].includes(
+    (process.env.GRIST_REQUIRE_INVITE ?? "").trim().toLowerCase(),
+  )
   const windows = new Map<string, { count: number; reset: number }>()
   const fetchImpl = opts.fetch ?? globalThis.fetch
   const now = opts.now ?? Date.now
@@ -357,7 +361,8 @@ export function createGateway(opts: GatewayOptions = {}) {
     const body = await readJson(req)
     const user_code = typeof body?.user_code === "string" ? body.user_code : ""
     const raw = typeof body?.code === "string" ? body.code : ""
-    const invite = store.getInvite(raw)
+    // BYOK open source: mint an account code on the fly when invites are off.
+    const invite = store.getInvite(raw) ?? (!inviteRequired ? store.createInvite({ note: "byok" }) : undefined)
     if (!invite || !inviteUsable(invite, now())) {
       return json(200, { ok: false })
     }
@@ -399,12 +404,32 @@ export function createGateway(opts: GatewayOptions = {}) {
       })
     }
     const account = store.getAccount(user.uid)
-    if (!account) return json(200, { ok: true, admin: false, needs_invite: true, email: user.email })
+    if (!account)
+      return json(200, {
+        ok: true,
+        admin: false,
+        needs_invite: inviteRequired,
+        invite_required: inviteRequired,
+        email: user.email,
+      })
     const invite = store.getInvite(account.invite_code)
     if (!invite || !inviteUsable(invite, now())) {
-      return json(200, { ok: true, admin: false, needs_invite: true, email: user.email })
+      return json(200, {
+        ok: true,
+        admin: false,
+        needs_invite: inviteRequired,
+        invite_required: inviteRequired,
+        email: user.email,
+      })
     }
-    return json(200, { ok: true, admin: false, needs_invite: false, email: user.email, code: invite.code })
+    return json(200, {
+      ok: true,
+      admin: false,
+      needs_invite: false,
+      invite_required: inviteRequired,
+      email: user.email,
+      code: invite.code,
+    })
   }
 
   async function firebaseBind(req: Request, peerIp?: string): Promise<Response> {
@@ -414,7 +439,8 @@ export function createGateway(opts: GatewayOptions = {}) {
     const raw = typeof body?.code === "string" ? body.code : ""
     const user = await verifyFirebaseIdToken(token, fetchImpl)
     if (!user) return json(401, { ok: false })
-    const invite = store.getInvite(raw)
+    // BYOK open source: mint an account code on the fly when invites are off.
+    const invite = store.getInvite(raw) ?? (!inviteRequired ? store.createInvite({ note: "byok" }) : undefined)
     if (!invite || !inviteUsable(invite, now())) return json(200, { ok: false })
     const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code })
     if (!result.ok) {
