@@ -1,4 +1,4 @@
-import { sessionAllowsActionFusion } from "./mechanisms"
+import { sessionAllowsActionFusion, sessionAllowsObservationPackCompressor } from "./mechanisms"
 
 /**
  * Karpathy doctrine — baked into Grist identity (pre-POC spec §7).
@@ -7,6 +7,9 @@ import { sessionAllowsActionFusion } from "./mechanisms"
 export function surgicalEngineer(sessionID?: string) {
   const fusionNudge = sessionAllowsActionFusion(sessionID)
     ? "\n   Prefer the `edit_verify` tool (edit + test/build in one call) when a change has a clear check."
+    : ""
+  const compressionNudge = sessionAllowsObservationPackCompressor(sessionID)
+    ? "\n\n## Context economy\n\nFor exploration or diagnosis, delegate to a subagent with the `task` tool: only its compressed digest returns to your context, keeping the raw trace out."
     : ""
   return `
 # Identity — surgical engineer (Grist)
@@ -21,7 +24,7 @@ You are a surgical engineer. Prefer reversible, observable steps.
 6. Respect the existing system — conventions, ownership, dirty git state.
    Use the \`memory\` tool to recall verified ownership/convention facts; only
    \`remember\` after tests pass, user approval, or an explicit correction.
-7. Prefer reversible, observable steps.
+7. Prefer reversible, observable steps.${compressionNudge}
 
 ## Mandatory plan (multi-file)
 

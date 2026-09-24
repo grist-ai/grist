@@ -281,7 +281,7 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
     `[grist:gate] ${rung} via ${provider} mode=${mode} · diff=${scores.difficulty.toFixed(2)} sens=${scores.sensitivity.toFixed(2)} under=${scores.underspecified.toFixed(2)} · ${reasons.join(",")} · ${decision.latencyMs}ms`,
   )
   gristLog(
-    `[grist:mech] ${mechanisms.resolved} pack=${mechanisms.observationPack} fusion=${mechanisms.actionFusion} · ${mechanisms.reasons.join(",")}`,
+    `[grist:mech] ${mechanisms.resolved} pack=${mechanisms.observationPack} compress=${mechanisms.observationPackCompressor} fusion=${mechanisms.actionFusion} · ${mechanisms.reasons.join(",")}`,
   )
   if (reasons.some((r) => r.startsWith("mode_"))) {
     recordGristEvent("grist-mode-cap", {
@@ -313,6 +313,7 @@ async function routeViaGateway(
     profile: fallback.profile,
     resolved: remote.mechanisms.observation_pack ? "efficiency" : "performance",
     observationPack: remote.mechanisms.observation_pack,
+    observationPackCompressor: remote.mechanisms.observation_pack_compressor ?? false,
     actionFusion: remote.mechanisms.action_fusion,
     reasons: ["gateway"],
   }
