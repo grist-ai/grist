@@ -1,4 +1,5 @@
 import { NamedError } from "@opencode-ai/core/util/error"
+import { loadInviteConfig } from "@/grist/invite/config"
 import { errorFormat } from "@/util/error"
 import { isRecord } from "@/util/record"
 
@@ -32,11 +33,49 @@ function configIssues(input: Record<string, unknown>): ConfigIssue[] {
     : []
 }
 
+/**
+ * The Grist gateway 402s with a machine-tagged body when the account spend
+ * cap is hit. Inference errors surface through the provider SDK rather than
+ * the gateway client, so detect the 402 down the cause chain and surface the
+ * gateway's message cleanly instead of the generic provider-error dump.
+ */
+function gatewaySpendCap(input: unknown, depth = 0): string | undefined {
+  if (depth > 5 || !isRecord(input)) return undefined
+  const status = input["statusCode"] ?? input["status"]
+  if (status === 402) {
+    const texts = [input["message"], input["responseBody"], input["responseText"]]
+      .filter((value): value is string => typeof value === "string")
+    if (!texts.some((text) => /spend cap/i.test(text))) return undefined
+    const clean =
+      texts.map(gatewayErrorText).find((value) => value !== undefined) ?? "Spend cap reached."
+    const invite = loadInviteConfig()
+    const hint = invite
+      ? ` Raise it at ${invite.gatewayUrl.replace(/\/+$/, "")}/dashboard — your provider key is untouched.`
+      : ""
+    return `${clean}${hint}`
+  }
+  return gatewaySpendCap(input["cause"], depth + 1)
+}
+
+/** Pull the gateway's `{ error }` text out of a JSON body, when that's what this is. */
+function gatewayErrorText(text: string): string | undefined {
+  try {
+    const parsed = JSON.parse(text) as { error?: unknown }
+    if (typeof parsed.error === "string" && /spend cap/i.test(parsed.error)) return parsed.error
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
 export function FormatError(input: unknown): string | undefined {
   if (input instanceof Error && isRecord(input.cause) && "body" in input.cause) {
     const formatted = FormatError(input.cause.body)
     if (formatted) return formatted
   }
+
+  const spendCap = gatewaySpendCap(input)
+  if (spendCap) return spendCap
 
   // CliError: domain failure surfaced from an effectCmd handler via fail("...")
   if (isTaggedError(input, "CliError")) {

@@ -340,7 +340,7 @@ async function loadDashboard() {
     fail(
       error,
       response.status === 402
-        ? "Spend cap reached. Ask the founder for a top-up."
+        ? "Spend cap reached. Raise it below to keep running."
         : "Sign in again.",
     )
     if (response.status === 401) render()
@@ -354,6 +354,9 @@ async function loadDashboard() {
     `$${Number(data.spent_usd).toFixed(2)} of $${Number(data.cap_usd).toFixed(2)} used · ${data.plan ?? "beta"}${until}`
   const pct = data.cap_usd ? Math.min(100, (data.spent_usd / data.cap_usd) * 100) : 0
   document.getElementById("spent-bar").style.width = `${pct}%`
+  document.getElementById("cap-input").value = Number(data.cap_usd).toFixed(2)
+  document.getElementById("cap-msg").textContent = ""
+  document.getElementById("cap-form").hidden = false
   const rungs = data.by_rung ?? {}
   document.getElementById("rungs").innerHTML = ["cheapest", "medium", "frontier"]
     .map((name) => `<div><strong>${name}</strong>$${(rungs[name] ?? 0).toFixed(2)}</div>`)
@@ -580,6 +583,29 @@ document.getElementById("admin-invites")?.addEventListener("click", async (event
     headers: await headers(),
   })
   void loadAdmin()
+})
+
+document.getElementById("cap-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault()
+  const msg = document.getElementById("cap-msg")
+  const value = Number(document.getElementById("cap-input").value)
+  msg.textContent = "Saving…"
+  try {
+    const response = await fetch("/v1/account/cap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await headers()) },
+      body: JSON.stringify({ cap_usd: value }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      msg.textContent = typeof data.error === "string" ? data.error : `Couldn’t update the cap (HTTP ${response.status}).`
+      return
+    }
+    msg.textContent = `Cap updated to $${Number(data.cap_usd).toFixed(2)}.`
+    await loadDashboard()
+  } catch {
+    msg.textContent = "Couldn’t reach the gateway."
+  }
 })
 
 document.getElementById("key-form")?.addEventListener("submit", async (event) => {

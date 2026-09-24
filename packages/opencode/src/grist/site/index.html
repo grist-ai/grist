@@ -481,10 +481,11 @@ GRIST_OBS_PACK=off       # pack only</pre>
 
         <h2 id="spend">Spend</h2>
         <p>
-          Completions are metered against your spend cap. At the cap the CLI
-          stops. The dashboard shows remaining USD, rung mix, and expiry.
-          Agent API keys spend against the same cap. Inference runs on your
-          own provider key. We do not train on tester repos.
+          Completions are metered against your spend cap. At the cap the gateway
+          returns 402 and the CLI stops — raise the cap on the dashboard to keep
+          going. The dashboard shows remaining USD, rung mix, and expiry.
+          Agent API keys spend against the same cap but can never raise it.
+          Inference runs on your own provider key. We do not train on tester repos.
         </p>
 
         <h2 id="agents">Agents</h2>
@@ -686,6 +687,12 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
       <p class="remain" id="remain">—</p>
       <div class="bar" aria-hidden="true"><span id="spent-bar"></span></div>
       <p class="muted" id="cap-line"></p>
+      <form id="cap-form" class="cap-form" hidden>
+        <label for="cap-input">Spend cap (USD)</label>
+        <input id="cap-input" type="number" min="1" step="0.01" inputmode="decimal" />
+        <button type="submit">Update cap</button>
+        <span class="muted" id="cap-msg" role="status"></span>
+      </form>
       <div id="dash-panel-usage">
         <section class="rungs" id="rungs"></section>
         <section class="install">

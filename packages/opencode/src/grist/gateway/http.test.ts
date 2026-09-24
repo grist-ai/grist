@@ -6,7 +6,10 @@ import { canonicalApiKey, canonicalDeviceUserCode, canonicalInviteCode, generate
 import { usdForUsage } from "./prices"
 import { createGateway, MAX_COMPLETION_TOKENS } from "./http"
 import { openGatewayStore } from "./store"
+import { parseMasterKey } from "./provider-keys"
 import { RUNG_MODELS } from "./ladder"
+
+const TEST_MASTER_KEY = parseMasterKey("ab".repeat(32)) as Buffer
 
 test("admin email has no hardcoded default (env-only)", async () => {
   // Without the adminEmail opt or GRIST_ADMIN_EMAIL env, no email matches —
@@ -280,7 +283,12 @@ describe("gateway HTTP", () => {
       body: { model: "deepseek/deepseek-v4.1-flash", messages: [] },
     })
     expect(cap.status).toBe(402)
-    expect(String((cap.json as { error: string }).error)).toContain("Ask the founder")
+    const capBody = cap.json as { error: string; code: string; remedy: string }
+    expect(capBody.error).toContain("Spend cap reached")
+    expect(capBody.code).toBe("spend_cap")
+    // No provider credential on this account: the house key was footing the
+    // bill, so the remedy is the founder's top-up.
+    expect(capBody.remedy).toBe("founder")
 
     const revoked = await call(gateway.fetch, "DELETE", `/v1/admin/invites/${code}`, {
       headers: { "X-Grist-Admin": "secret" },
@@ -301,6 +309,111 @@ describe("gateway HTTP", () => {
     expect(gateway.store.getMode()).toBe("capped")
 
     void alerts
+  })
+
+  test("hard caps for BYOK callers, with self-serve raise", async () => {
+    const alerts: string[] = []
+    const gateway = createGateway({
+      adminToken: "secret",
+      masterKey: TEST_MASTER_KEY,
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      globalBudgetUsd: 250,
+      alert: (message) => alerts.push(message),
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 1000, completion_tokens: 500 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 0.0001, note: "byok-cap" },
+    })
+    expect(minted.status).toBe(200)
+    const code = (minted.json as { code: string }).code
+    gateway.store.setProviderCredential({
+      inviteCode: code,
+      provider: "openrouter",
+      apiKey: "sk-or-test-key",
+    })
+
+    const headers = { "X-Grist-Invite": code }
+    const completion = {
+      body: { model: "deepseek/deepseek-v4.1-flash", messages: [], stream: false },
+    } as const
+
+    const first = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers,
+      ...completion,
+    })
+    expect(first.status).toBe(200)
+
+    // Over cap on the caller's own key: 402, never served (the old soft
+    // behavior served it anyway).
+    const over = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers,
+      ...completion,
+    })
+    expect(over.status).toBe(402)
+    const overBody = over.json as { error: string; code: string; remedy: string }
+    expect(overBody.error).toContain("Spend cap reached")
+    expect(overBody.code).toBe("spend_cap")
+    expect(overBody.remedy).toBe("dashboard")
+    expect(alerts).toHaveLength(1)
+
+    // Self-serve raise, then the next request serves again.
+    const raise = await call(gateway.fetch, "POST", "/v1/account/cap", {
+      headers,
+      body: { cap_usd: 5 },
+    })
+    expect(raise.status).toBe(200)
+    expect((raise.json as { cap_usd: number }).cap_usd).toBe(5)
+
+    const after = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers,
+      ...completion,
+    })
+    expect(after.status).toBe(200)
+
+    // Guardrails: below the $1 floor, and below what's already spent.
+    const floor = await call(gateway.fetch, "POST", "/v1/account/cap", {
+      headers,
+      body: { cap_usd: 0.5 },
+    })
+    expect(floor.status).toBe(400)
+
+    gateway.store.addSpend({
+      code,
+      keyId: null,
+      model: "deepseek/deepseek-v4.1-flash",
+      rung: "cheapest",
+      inputTokens: 0,
+      outputTokens: 0,
+      usd: 3,
+    })
+    const belowSpent = await call(gateway.fetch, "POST", "/v1/account/cap", {
+      headers,
+      body: { cap_usd: 2 },
+    })
+    expect(belowSpent.status).toBe(400)
+    expect(String((belowSpent.json as { error: string }).error)).toContain("already spent")
+
+    // A delegated agent key can spend up to the cap but can never raise it.
+    const keyMint = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      headers,
+      body: { name: "agent" },
+    })
+    expect(keyMint.status).toBe(200)
+    const agentRaise = await call(gateway.fetch, "POST", "/v1/account/cap", {
+      headers: { "X-Grist-Api-Key": (keyMint.json as { key: string }).key },
+      body: { cap_usd: 50 },
+    })
+    expect(agentRaise.status).toBe(401)
   })
 
   test("serves the landing page and keeps /health as JSON", async () => {

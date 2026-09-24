@@ -187,9 +187,15 @@ export function parseAPICallError(input: { providerID: ProviderV2.ID; error: API
       (typeof body?.error === "string" ? body.error : undefined) ||
       (typeof body?.message === "string" ? body.message : undefined) ||
       m
+    // The gateway tags the remedy: BYOK callers raise the cap themselves on
+    // the dashboard; the house-key fallback needs the founder's top-up.
+    const suffix =
+      body?.remedy === "dashboard"
+        ? " Raise it on your Grist dashboard — your provider key is untouched."
+        : " Ask the founder for a top-up."
     return {
       type: "api_error",
-      message: cap.includes("top-up") ? cap : `${cap} Ask the founder for a top-up.`,
+      message: cap.includes("top-up") || /dashboard/i.test(cap) ? cap : `${cap}${suffix}`,
       statusCode: 402,
       isRetryable: false,
       responseHeaders: input.error.responseHeaders,

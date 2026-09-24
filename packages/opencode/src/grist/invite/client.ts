@@ -103,26 +103,30 @@ async function gatewayJson<T>(config: InviteConfig, path: string, init: RequestI
   })
   const body = await response.text()
   if (response.status === 402 || !response.ok) {
-    throw new GatewayHttpError(response.status, humanMessage(response.status, body))
+    throw new GatewayHttpError(response.status, humanMessage(response.status, body, config.gatewayUrl))
   }
   return JSON.parse(body) as T
 }
 
-function humanMessage(status: number, body: string) {
-  const parsed = parseError(body)
+function humanMessage(status: number, body: string, gatewayUrl: string) {
+  const parsed = parseGatewayError(body)
+  const message = typeof parsed?.error === "string" ? parsed.error : undefined
   if (status === 402) {
-    return parsed ?? "Invite spend cap reached. Ask the founder for a top-up."
+    const base = message ?? "Spend cap reached."
+    // The gateway tags the remedy: BYOK callers raise it themselves on the
+    // dashboard; the house-key fallback needs the founder's top-up.
+    if (parsed?.remedy === "founder") return `${base} Ask the founder for a top-up.`
+    return `${base} Raise it at ${strip(gatewayUrl)}/dashboard — your provider key is untouched.`
   }
-  return parsed ?? body ?? `gateway HTTP ${status}`
+  return message ?? body ?? `gateway HTTP ${status}`
 }
 
-function parseError(body: string) {
-  if (!body) return
+function parseGatewayError(body: string): { error?: unknown; remedy?: unknown } | undefined {
+  if (!body) return undefined
   try {
-    const parsed = JSON.parse(body) as { error?: unknown }
-    if (typeof parsed.error === "string") return parsed.error
+    return JSON.parse(body) as { error?: unknown; remedy?: unknown }
   } catch {
-    return body
+    return undefined
   }
 }
 

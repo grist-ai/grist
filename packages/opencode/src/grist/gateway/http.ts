@@ -75,6 +75,7 @@ const PUBLIC_MAC_DMGS: Record<string, string> = {
 const RATE_LIMITS = {
   validate: { limit: 10, windowMs: 60_000 },
   keyMint: { limit: 10, windowMs: 3_600_000 },
+  capChange: { limit: 20, windowMs: 3_600_000 },
   completions: { limit: 300, windowMs: 10 * 60_000 },
   deviceStart: { limit: 10, windowMs: 60_000 },
   gateRoute: { limit: 30, windowMs: 60_000 },
@@ -223,21 +224,22 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   /**
-   * Spend caps are hard on the house key (the founder's money) and soft on a
-   * caller's own provider key (their money, their bill): an over-cap BYOK
-   * request still serves, but fires a one-time alert per cap level.
+   * Spend caps are hard, on every key path. Under BYOK the cap is the
+   * account holder's own budgeting tool (inference bills to their provider
+   * key, not the founder's), and it is self-serve raisable — so there is no
+   * reason to serve past it. The one-time alert per cap level stays: it now
+   * fires on the first 402 instead of the first served-over-cap request.
    */
   function capResponse(invite: InviteRow, viaCredential: boolean): Response | undefined {
     if (invite.spent_usd < invite.cap_usd) return undefined
-    if (!viaCredential) return capHit(invite)
-    const flag = `cap_soft:${invite.code}:${invite.cap_usd}`
+    const flag = `cap_alert:${invite.code}:${invite.cap_usd}`
     if (!store.getAlertFlag(flag)) {
       store.setAlertFlag(flag)
       alert(
-        `invite ${inviteFingerprint(invite.code)} passed its $${invite.cap_usd.toFixed(2)} cap on its own provider key; continuing (soft cap)`,
+        `invite ${inviteFingerprint(invite.code)} hit its $${invite.cap_usd.toFixed(2)} cap; returning 402`,
       )
     }
-    return undefined
+    return capHit(invite, viaCredential)
   }
 
   /**
@@ -357,6 +359,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (req.method === "GET" && pathname === "/v1/usage") {
       return usage(req)
+    }
+    if (req.method === "POST" && pathname === "/v1/account/cap") {
+      return accountCap(req)
     }
     if (pathname === "/v1/api-keys" || pathname.startsWith("/v1/api-keys/")) {
       return apiKeys(req, pathname, peerIp)
@@ -645,6 +650,31 @@ export function createGateway(opts: GatewayOptions = {}) {
         frontier: roundUsd(by_rung.frontier),
         premium: roundUsd(by_rung.premium),
       },
+    })
+  }
+
+  async function accountCap(req: Request): Promise<Response> {
+    // Account session only — a delegated grist_sk_ can spend up to the cap
+    // but can never raise it. Same posture as /v1/api-keys.
+    const invite = await requireAccount(req)
+    if (invite instanceof Response) return invite
+    if (!allowWindow(`capchange:${invite.code}`, limits.capChange.limit, limits.capChange.windowMs)) {
+      return json(429, { error: "too many cap changes" })
+    }
+    const body = await readJson(req)
+    const cap = body?.cap_usd
+    if (typeof cap !== "number" || !Number.isFinite(cap) || cap < 1) {
+      return json(400, { error: "cap_usd must be a number >= 1" })
+    }
+    if (cap < invite.spent_usd) {
+      return json(400, {
+        error: `cap_usd must be at least $${invite.spent_usd.toFixed(2)} (already spent)`,
+      })
+    }
+    const updated = store.setCap(invite.code, cap)
+    return json(200, {
+      cap_usd: updated?.cap_usd ?? cap,
+      remaining_usd: roundUsd(Math.max(0, (updated?.cap_usd ?? cap) - invite.spent_usd)),
     })
   }
 
@@ -942,9 +972,14 @@ function publicInvite(invite: InviteRow) {
   }
 }
 
-function capHit(invite: InviteRow): Response {
+function capHit(invite: InviteRow, viaCredential: boolean): Response {
   return json(402, {
-    error: `Invite spend cap reached ($${invite.cap_usd.toFixed(2)}). Ask the founder for a top-up.`,
+    error: `Spend cap reached ($${invite.cap_usd.toFixed(2)} of $${invite.cap_usd.toFixed(2)} used).`,
+    code: "spend_cap",
+    // The CLI uses this to tell the user where the remedy lives: the
+    // dashboard for BYOK callers (self-serve raise), the founder for the
+    // house-key fallback (his money).
+    remedy: viaCredential ? "dashboard" : "founder",
   })
 }
 

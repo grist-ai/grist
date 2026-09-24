@@ -430,7 +430,7 @@ describe("BYOK metering", () => {
     expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 1_000_000, { provider: "custom" })).toBe(0)
   })
 
-  test("over-cap is a hard 402 on the house key, soft on the caller's key", async () => {
+  test("over-cap is a hard 402 on every key path", async () => {
     const alerts: string[] = []
     const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
     const invite = store.createInvite({ capUsd: 0.000001 })
@@ -448,14 +448,17 @@ describe("BYOK metering", () => {
     const blocked = await completions()
     expect(blocked.status).toBe(402)
 
-    // Same account, now on its own provider key: soft cap serves.
+    // Same account, now on its own provider key: still a hard block. Under
+    // BYOK the cap is the holder's own budgeting tool, and it is self-serve
+    // raisable — there is no reason to serve past it.
     store.setProviderCredential({ inviteCode: invite.code, provider: "vercel", apiKey: "vck_user_key" })
-    expect((await completions()).status).toBe(200)
-    expect((await completions()).status).toBe(200)
-    expect(alerts.filter((m) => m.includes("soft cap"))).toHaveLength(1)
+    const byok = await completions()
+    expect(byok.status).toBe(402)
+    expect(byok.json.remedy).toBe("dashboard")
+    expect(alerts.filter((m) => m.includes("returning 402"))).toHaveLength(1)
   })
 
-  test("gate route soft-caps on the caller's key", async () => {
+  test("gate route hard-caps on the caller's key", async () => {
     const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
     const invite = store.createInvite({ capUsd: 0.000001 })
     store.setProviderCredential({ inviteCode: invite.code, provider: "openrouter", apiKey: "sk-or-user-key" })
@@ -473,7 +476,8 @@ describe("BYOK metering", () => {
       headers: { "X-Grist-Invite": invite.code },
       body: { text: "refactor the auth module to use the new session store" },
     })
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(402)
+    expect(response.json.remedy).toBe("dashboard")
   })
 
   test("/v1/usage reports the configured provider", async () => {

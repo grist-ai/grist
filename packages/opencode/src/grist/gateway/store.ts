@@ -206,6 +206,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `UPDATE invites SET spent_usd = cap_usd WHERE code = ? AND spent_usd < cap_usd`,
   )
   const resetSpent = db.prepare(`UPDATE invites SET spent_usd = 0 WHERE code = ?`)
+  const setCapUsd = db.prepare(`UPDATE invites SET cap_usd = ? WHERE code = ?`)
   const insertUsage = db.prepare(
     `INSERT INTO usage_events (code, key_id, at, model, rung, input_tokens, output_tokens, usd)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -345,6 +346,17 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
         if (!applied) markCapHit.run(input.code)
       })()
       return selectInvite.get(input.code) as InviteRow
+    },
+
+    /**
+     * Self-serve spend-cap change. The cap is the account holder's own
+     * budgeting tool under BYOK (inference bills to their provider key), so
+     * it is theirs to raise — no upper bound. Lowering below already-spent
+     * is rejected by the caller; the store just writes.
+     */
+    setCap(code: string, capUsd: number): InviteRow | undefined {
+      setCapUsd.run(capUsd, code)
+      return selectInvite.get(code) as InviteRow | undefined
     },
 
     /**

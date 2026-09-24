@@ -45,7 +45,9 @@ account cap.
 
 Inference bills to the human's own provider key — not to Grist. The Grist
 account carries a spend cap that the gateway meters per (provider, resolved
-model); `grist usage` shows the remaining budget and per-rung spend. Keep
+model); `grist usage` shows the remaining budget and per-rung spend. The cap
+is hard: at the cap the run 402s, and only the human can raise it (on the
+dashboard — a `grist_sk_…` key can never raise its own cap). Keep
 tasks scoped: one feature or fix per run.
 
 ## Run
