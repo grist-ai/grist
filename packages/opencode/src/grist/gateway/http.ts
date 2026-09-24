@@ -179,7 +179,7 @@ export function createGateway(opts: GatewayOptions = {}) {
 
   /** Resolved upstream for one request, or a machine-readable failure. */
   type UpstreamResolution =
-    | { ok: true; provider: ByokProvider; url: string; key: string; model: string }
+    | { ok: true; provider: ByokProvider; url: string; key: string; model: string; viaCredential: boolean }
     | { ok: false; reason: "no_key" | "master_key_missing" | "provider_misconfigured" }
 
   /**
@@ -202,7 +202,14 @@ export function createGateway(opts: GatewayOptions = {}) {
       if (!openrouterKey) return { ok: false, reason: "no_key" }
       const house = resolveUpstream({ provider: "openrouter", rung })
       if (!house) return { ok: false, reason: "no_key" }
-      return { ok: true, provider: "openrouter", url: house.chatCompletionsURL, key: openrouterKey, model: house.model }
+      return {
+        ok: true,
+        provider: "openrouter",
+        url: house.chatCompletionsURL,
+        key: openrouterKey,
+        model: house.model,
+        viaCredential: false,
+      }
     }
     const resolved = resolveUpstream({
       provider: credential.provider,
@@ -217,6 +224,39 @@ export function createGateway(opts: GatewayOptions = {}) {
       url: resolved.chatCompletionsURL,
       key: credential.apiKey,
       model: resolved.model,
+      viaCredential: true,
+    }
+  }
+
+  /**
+   * Spend caps are hard on the house key (the founder's money) and soft on a
+   * caller's own provider key (their money, their bill): an over-cap BYOK
+   * request still serves, but fires a one-time alert per cap level.
+   */
+  function capResponse(invite: InviteRow, viaCredential: boolean): Response | undefined {
+    if (invite.spent_usd < invite.cap_usd) return undefined
+    if (!viaCredential) return capHit(invite)
+    const flag = `cap_soft:${invite.code}:${invite.cap_usd}`
+    if (!store.getAlertFlag(flag)) {
+      store.setAlertFlag(flag)
+      alert(
+        `invite ${inviteFingerprint(invite.code)} passed its $${invite.cap_usd.toFixed(2)} cap on its own provider key; continuing (soft cap)`,
+      )
+    }
+    return undefined
+  }
+
+  /**
+   * Whether the invite's provider credential is usable right now. Mirrors the
+   * fail-closed behavior of resolveRequestUpstream/jevRouteForInvite: a stored
+   * credential that cannot be decrypted counts as absent (the request falls
+   * back to the house key, so the cap stays hard).
+   */
+  function hasUsableCredential(inviteCode: string): boolean {
+    try {
+      return store.getProviderCredential(inviteCode) !== undefined
+    } catch {
+      return false
     }
   }
 
@@ -520,7 +560,8 @@ export function createGateway(opts: GatewayOptions = {}) {
   async function gateRoute(req: Request): Promise<Response> {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
-    if (invite.spent_usd >= invite.cap_usd) return capHit(invite)
+    const capBlock = capResponse(invite, hasUsableCredential(invite.code))
+    if (capBlock) return capBlock
     if (!allowWindow(`gate:${invite.code}`, limits.gateRoute.limit, limits.gateRoute.windowMs)) {
       return json(429, { error: "too many routing requests" })
     }
@@ -582,7 +623,6 @@ export function createGateway(opts: GatewayOptions = {}) {
       console.info(`[grist-gateway] completions auth_ms=${authMs} status=${invite.status}`)
       return invite
     }
-    if (invite.spent_usd >= invite.cap_usd) return capHit(invite)
     if (!allowWindow(`completions:${invite.code}`, limits.completions.limit, limits.completions.windowMs)) {
       return json(429, { error: "too many requests" })
     }
@@ -608,6 +648,9 @@ export function createGateway(opts: GatewayOptions = {}) {
             : "no inference key configured for this account"
       return json(503, { error: message })
     }
+    // Caps are hard on the house key, soft on the caller's own provider key.
+    const capBlock = capResponse(invite, target.viaCredential)
+    if (capBlock) return capBlock
 
     const stream = Boolean(body?.stream)
     const payload = upstreamPayload(body ?? {}, target.model, stream)
@@ -630,7 +673,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       console.info(
         `[grist-gateway] completions rung=${publicID} stream=${stream} status=${upstream.status} auth_ms=${authMs} upstream_ms=${upstreamMs} ${cacheHitLabel(usage)}`,
       )
-      meterFromUsage(store, invite, target.model, usage, alert, globalBudget, now)
+      meterFromUsage(store, invite, target.model, usage, alert, globalBudget, now, target.provider)
       return json(upstream.status, redactCompletion(data, publicID))
     }
 
@@ -639,7 +682,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     )
 
     if (!upstream.body) return new Response(null, { status: upstream.status })
-    return new Response(meteredSse(upstream.body, store, invite, target.model, publicID, alert, globalBudget, now), {
+    return new Response(meteredSse(upstream.body, store, invite, target.model, publicID, alert, globalBudget, now, target.provider), {
       status: upstream.status,
       headers: {
         "Content-Type": upstream.headers.get("Content-Type") ?? "text/event-stream",
@@ -658,6 +701,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       cap_usd: invite.cap_usd,
       remaining_usd: roundUsd(Math.max(0, invite.cap_usd - invite.spent_usd)),
       plan: "beta",
+      provider: store.providerCredentialSummary(invite.code)?.provider ?? null,
       expires_at: new Date(invite.expires_at).toISOString(),
       by_rung: {
         cheapest: roundUsd(by_rung.cheapest),
@@ -1017,11 +1061,12 @@ function meterFromUsage(
   alert: (message: string) => void,
   globalBudget: number,
   now: () => number,
+  provider: ByokProvider = "openrouter",
 ) {
   if (!usage) return
   const at = now()
-  const price = priceForModel(model, at)
-  const usd = usdForUsage(model, usage.input, usage.output, { cachedInputTokens: usage.cachedInput, at })
+  const price = priceForModel(model, at, process.env, provider)
+  const usd = usdForUsage(model, usage.input, usage.output, { cachedInputTokens: usage.cachedInput, at, provider })
   if (usd <= 0) return
   const updated = store.addSpend({
     code: invite.code,
@@ -1116,6 +1161,7 @@ function meteredSse(
   alert: (message: string) => void,
   globalBudget: number,
   now: () => number,
+  provider: ByokProvider,
 ): ReadableStream<Uint8Array> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -1128,7 +1174,7 @@ function meteredSse(
   const meterOnce = () => {
     if (metered) return
     metered = true
-    meterFromUsage(store, invite, model, usage, alert, globalBudget, now)
+    meterFromUsage(store, invite, model, usage, alert, globalBudget, now, provider)
     if (usage) {
       console.info(`[grist-gateway] completions cache ${cacheHitLabel(usage)}`)
     }

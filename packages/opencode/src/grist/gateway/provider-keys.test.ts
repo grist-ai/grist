@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createGateway } from "./http"
+import { priceForModel, usdForUsage } from "./prices"
 import { openGatewayStore } from "./store"
 import {
   decryptProviderKey,
@@ -438,5 +439,104 @@ describe("BYOK request routing", () => {
     expect(response.status).toBe(200)
     expect(seen).toHaveLength(1)
     expect(seen[0]?.auth).toBe("Bearer or-house-key")
+  })
+})
+
+describe("BYOK metering", () => {
+  async function call(
+    fetch: (req: Request, peerIp?: string) => Promise<Response>,
+    method: string,
+    path: string,
+    input?: { headers?: Record<string, string>; body?: unknown },
+  ) {
+    const response = await fetch(
+      new Request(`http://gateway.test${path}`, {
+        method,
+        headers: { "Content-Type": "application/json", ...input?.headers },
+        body: method === "GET" ? undefined : JSON.stringify(input?.body ?? {}),
+      }),
+    )
+    const text = await response.text()
+    return { status: response.status, json: (text ? JSON.parse(text) : undefined) as Record<string, unknown> }
+  }
+
+  function captureFetch() {
+    return async (_input: string | URL | Request, init?: RequestInit) => {
+      void init
+      return new Response(JSON.stringify({ choices: [], usage: { prompt_tokens: 1000, completion_tokens: 500 } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+  }
+
+  test("vercel prices strip the OpenRouter markup", () => {
+    const model = "deepseek/deepseek-v4.1-flash"
+    const house = usdForUsage(model, 1_000_000, 1_000_000, { provider: "openrouter" })
+    const vercel = usdForUsage(model, 1_000_000, 1_000_000, { provider: "vercel" })
+    expect(house).toBeGreaterThan(0)
+    expect(vercel).toBeCloseTo(house / 1.055, 10)
+  })
+
+  test("custom providers meter at zero — their rates are unknowable", () => {
+    expect(priceForModel("deepseek/deepseek-v4.1-flash", Date.now(), {}, "custom")).toBeUndefined()
+    expect(priceForModel("cheapest", Date.now(), {}, "custom")).toBeUndefined()
+    expect(usdForUsage("deepseek/deepseek-v4.1-flash", 1_000_000, 1_000_000, { provider: "custom" })).toBe(0)
+  })
+
+  test("over-cap is a hard 402 on the house key, soft on the caller's key", async () => {
+    const alerts: string[] = []
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite({ capUsd: 0.000001 })
+    const headers = { "X-Grist-Invite": invite.code }
+    const gateway = createGateway({ store, openrouterKey: "or-house-key", fetch: captureFetch(), alert: (m) => alerts.push(m) })
+    const completions = () =>
+      call(gateway.fetch, "POST", "/v1/chat/completions", {
+        headers,
+        body: { model: "cheapest", messages: [{ role: "user", content: "hi" }], stream: false },
+      })
+
+    // Burn through the tiny cap on the house key.
+    expect((await completions()).status).toBe(200)
+    // Over cap on the house key: hard block.
+    const blocked = await completions()
+    expect(blocked.status).toBe(402)
+
+    // Same account, now on its own provider key: soft cap serves.
+    store.setProviderCredential({ inviteCode: invite.code, provider: "vercel", apiKey: "vck_user_key" })
+    expect((await completions()).status).toBe(200)
+    expect((await completions()).status).toBe(200)
+    expect(alerts.filter((m) => m.includes("soft cap"))).toHaveLength(1)
+  })
+
+  test("gate route soft-caps on the caller's key", async () => {
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite({ capUsd: 0.000001 })
+    store.setProviderCredential({ inviteCode: invite.code, provider: "openrouter", apiKey: "sk-or-user-key" })
+    store.addSpend({
+      code: invite.code,
+      keyId: null,
+      model: "cheapest",
+      rung: "cheapest",
+      inputTokens: 0,
+      outputTokens: 0,
+      usd: 1,
+    })
+    const gateway = createGateway({ store, openrouterKey: "or-house-key", fetch: captureFetch() })
+    const response = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      headers: { "X-Grist-Invite": invite.code },
+      body: { text: "refactor the auth module to use the new session store" },
+    })
+    expect(response.status).toBe(200)
+  })
+
+  test("/v1/usage reports the configured provider", async () => {
+    const store = openGatewayStore(":memory:", { masterKey: TEST_MASTER_KEY })
+    const invite = store.createInvite()
+    store.setProviderCredential({ inviteCode: invite.code, provider: "vercel", apiKey: "vck_user_key" })
+    const gateway = createGateway({ store, fetch: captureFetch() })
+    const response = await call(gateway.fetch, "GET", "/v1/usage", { headers: { "X-Grist-Invite": invite.code } })
+    expect(response.status).toBe(200)
+    expect(response.json.provider).toBe("vercel")
   })
 })

@@ -1,5 +1,6 @@
 import { DEFAULT_RUNG_MODELS, resolveRung } from "./ladder"
 import { MODEL_PRICES } from "./model-prices"
+import type { ByokProvider } from "./providers"
 import type { Rung } from "../rung"
 
 /**
@@ -101,8 +102,23 @@ export function priceForRung(rung: Rung, at = Date.now()): ModelPrice {
   return { ...SOL_PRICE, rung }
 }
 
-function listedPrice(modelID: string): TokenPrice | undefined {
-  return RUNG_MODEL_PRICES[modelID] ?? MODEL_PRICES[modelID]
+/** Vercel AI Gateway charges 0% markup; OpenRouter list prices carry ~5.5%. */
+const VERCEL_PRICE_FACTOR = 1 / 1.055
+
+function scalePrice(price: TokenPrice, factor: number): TokenPrice {
+  return {
+    input: price.input * factor,
+    output: price.output * factor,
+    cachedInput: price.cachedInput === undefined ? undefined : price.cachedInput * factor,
+  }
+}
+
+function listedPrice(modelID: string, provider: ByokProvider): TokenPrice | undefined {
+  // Custom endpoints bill at their own rates, which the gateway cannot see.
+  if (provider === "custom") return undefined
+  const price = RUNG_MODEL_PRICES[modelID] ?? MODEL_PRICES[modelID]
+  if (!price) return undefined
+  return provider === "vercel" ? scalePrice(price, VERCEL_PRICE_FACTOR) : price
 }
 
 function withTimeOfDay(modelID: string, price: TokenPrice, at: number): TokenPrice {
@@ -115,27 +131,43 @@ function withTimeOfDay(modelID: string, price: TokenPrice, at: number): TokenPri
 }
 
 /** Effective per-token price for a resolved upstream model (or rung name). */
-export function priceForModel(model: string, at = Date.now(), env: NodeJS.ProcessEnv = process.env): ModelPrice | undefined {
+export function priceForModel(
+  model: string,
+  at = Date.now(),
+  env: NodeJS.ProcessEnv = process.env,
+  provider: ByokProvider = "openrouter",
+): ModelPrice | undefined {
+  // Custom endpoints bill at their own rates, which the gateway cannot see —
+  // nothing here is a valid price for them, not even the rung fallback.
+  if (provider === "custom") return undefined
   const id = normalizeLadderModel(model)
   const resolved = isRung(id) ? resolveRung(id, env).modelID : id
-  const listed = listedPrice(resolved)
+  const listed = listedPrice(resolved, provider)
   const rung = publicLadderID(id, env)
   if (listed) return { ...withTimeOfDay(resolved, listed, at), rung: rung ?? "cheapest" }
   if (!rung) return
-  return priceForRung(rung, at)
+  const fallback = priceForRung(rung, at)
+  if (provider === "vercel") return { ...scalePrice(fallback, VERCEL_PRICE_FACTOR), rung }
+  return fallback
 }
 
 /**
  * Bill input, cached input, and output tokens. `cachedInputTokens` is a subset
  * of `inputTokens`; when the model has no cached rate it bills at full input.
+ * Custom providers price at zero — the gateway cannot see their rates.
  */
 export function usdForUsage(
   model: string,
   inputTokens: number,
   outputTokens: number,
-  options: { cachedInputTokens?: number; at?: number; env?: NodeJS.ProcessEnv } = {},
+  options: {
+    cachedInputTokens?: number
+    at?: number
+    env?: NodeJS.ProcessEnv
+    provider?: ByokProvider
+  } = {},
 ): number {
-  const price = priceForModel(model, options.at, options.env)
+  const price = priceForModel(model, options.at, options.env, options.provider ?? "openrouter")
   if (!price) return 0
   const cached = Math.max(0, Math.min(options.cachedInputTokens ?? 0, inputTokens))
   const freshInput = inputTokens - cached
