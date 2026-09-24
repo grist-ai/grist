@@ -16,6 +16,10 @@ import type { Rung } from "../rung"
  *   UTC weekdays 01:00–04:00 and 06:00–10:00.
  * - Kimi K3 charges cached input tokens at `$0.30/M` instead of `$3/M`.
  * - GPT-6 Sol (frontier, launched 2026-09-22) is permanently `$2/$10`.
+ * - Claude Opus 5.5 (premium, launched 2026-09-22) is `$4/$20` with `$0.20/M`
+ *   cache reads (verified on claude.com/pricing 2026-09-23).
+ * - Claude Opus 5.5 (premium, launched 2026-09-22) is `$4/$20` with `$0.20/M`
+ *   cache reads (verified on claude.com/pricing 2026-09-23).
  */
 export type TokenPrice = { input: number; output: number; cachedInput?: number }
 export type ModelPrice = TokenPrice & { rung: Rung }
@@ -34,15 +38,17 @@ const FLASH_MODEL_ID = DEFAULT_RUNG_MODELS.cheapest.modelID
 const FLASH_OFFPEAK: TokenPrice = { input: 0.15, output: 0.6 }
 const KIMI_PRICE: TokenPrice = { input: 3, output: 15, cachedInput: 0.3 }
 const SOL_PRICE: TokenPrice = { input: 2, output: 10 }
+const OPUS55_PRICE: TokenPrice = { input: 4, output: 20, cachedInput: 0.2 }
 
 /** Existing rung rates for the default ladder model ids. */
 const RUNG_MODEL_PRICES: Record<string, TokenPrice> = {
   [DEFAULT_RUNG_MODELS.cheapest.modelID]: FLASH_OFFPEAK,
   [DEFAULT_RUNG_MODELS.medium.modelID]: KIMI_PRICE,
   [DEFAULT_RUNG_MODELS.frontier.modelID]: SOL_PRICE,
+  [DEFAULT_RUNG_MODELS.premium.modelID]: OPUS55_PRICE,
 }
 
-const PUBLIC_IDS: Rung[] = ["cheapest", "medium", "frontier"]
+const PUBLIC_IDS: Rung[] = ["cheapest", "medium", "frontier", "premium"]
 
 function isRung(id: string): id is Rung {
   return PUBLIC_IDS.includes(id as Rung)
@@ -66,7 +72,7 @@ export function normalizeLadderModel(model: string): string {
   return model.startsWith("openrouter/") ? model.slice("openrouter/".length) : model
 }
 
-/** Opaque id testers see (`cheapest` / `medium` / `frontier`). */
+/** Opaque id testers see (`cheapest` / `medium` / `frontier` / `premium`). */
 export function publicLadderID(model: string, env: NodeJS.ProcessEnv = process.env): Rung | undefined {
   const id = normalizeLadderModel(model)
   if (isRung(id)) return id
@@ -91,6 +97,7 @@ export function priceForRung(rung: Rung, at = Date.now()): ModelPrice {
     }
   }
   if (rung === "medium") return { ...KIMI_PRICE, rung }
+  if (rung === "premium") return { ...OPUS55_PRICE, rung }
   return { ...SOL_PRICE, rung }
 }
 

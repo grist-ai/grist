@@ -2,7 +2,7 @@ import path from "path"
 import { createHash } from "node:crypto"
 import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
-import { publicModelRef } from "../rung"
+import { publicModelRef, type Rung } from "../rung"
 import { typesafeKey } from "../jev-client"
 import { resolveJevRoute, resolveProviderKey, type JevProvider } from "../jev-route"
 import { applyModeCap, type OperatingMode } from "../mode"
@@ -547,7 +547,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
     const events = store.usageFor(invite.code)
-    const by_rung = { cheapest: 0, medium: 0, frontier: 0 }
+    const by_rung: Record<Rung, number> = { cheapest: 0, medium: 0, frontier: 0, premium: 0 }
     for (const event of events) by_rung[event.rung] += event.usd
     return json(200, {
       spent_usd: roundUsd(invite.spent_usd),
@@ -559,6 +559,7 @@ export function createGateway(opts: GatewayOptions = {}) {
         cheapest: roundUsd(by_rung.cheapest),
         medium: roundUsd(by_rung.medium),
         frontier: roundUsd(by_rung.frontier),
+        premium: roundUsd(by_rung.premium),
       },
     })
   }

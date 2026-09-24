@@ -33,13 +33,14 @@ describe("gate battery", () => {
   test("suggestThresholds raises frontier bar when share high", () => {
     const summary: BurnInSummary = {
       decisions: 20,
-      byRung: { cheapest: 10, medium: 5, frontier: 5 },
-      tierMix: { cheapest: 0.5, medium: 0.25, frontier: 0.25 },
+      byRung: { cheapest: 10, medium: 5, frontier: 5, premium: 0 },
+      tierMix: { cheapest: 0.5, medium: 0.25, frontier: 0.25, premium: 0 },
       outcomes: 0,
       successRate: 0,
       cheapestSuccessShare: 0,
       escalationPrecision: null,
       frontierShare: 0.25,
+      premiumShare: 0,
     }
     const s = suggestThresholds(summary)
     expect(s.difficultyFrontier).toBeGreaterThan(0.75)

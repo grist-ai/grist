@@ -1,5 +1,5 @@
-/** Grist model ladder rungs (pre-POC: cheapest → medium → frontier). */
-export type Rung = "cheapest" | "medium" | "frontier"
+/** Grist model ladder rungs (cheapest → medium → frontier → premium). */
+export type Rung = "cheapest" | "medium" | "frontier" | "premium"
 
 export type ModelRef = {
   providerID: string
@@ -12,10 +12,11 @@ export const PUBLIC_RUNG_NAME: Record<Rung, string> = {
   cheapest: "Fast",
   medium: "Standard",
   frontier: "Max",
+  premium: "Ultra",
 }
 
 /** The only rung ids the client may see or send. */
-export const PUBLIC_RUNGS: readonly Rung[] = ["cheapest", "medium", "frontier"]
+export const PUBLIC_RUNGS: readonly Rung[] = ["cheapest", "medium", "frontier", "premium"]
 
 /** Strip an `openrouter/` prefix so client and rung ids compare equal. */
 export function normalizePublicModel(model: string): string {

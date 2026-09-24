@@ -5,6 +5,8 @@ export type GateThresholds = {
   difficultyMedium: number
   /** Difficulty ≥ this → frontier */
   difficultyFrontier: number
+  /** Difficulty ≥ this → premium (top judge score only) */
+  difficultyPremium: number
   /** Underspecified ≥ this → force cheapest */
   underspecifiedCheapest: number
   /** Sensitivity ≥ this → cap at cheapest */
@@ -16,6 +18,7 @@ export type GateThresholds = {
 export const DEFAULT_THRESHOLDS: GateThresholds = {
   difficultyMedium: 0.4,
   difficultyFrontier: 0.75,
+  difficultyPremium: 0.9,
   underspecifiedCheapest: 0.7,
   sensitivityCapCheapest: 0.75,
   sensitivityCapMedium: 0.45,
@@ -33,6 +36,7 @@ export function loadThresholds(env: NodeJS.ProcessEnv = process.env): GateThresh
   return {
     difficultyMedium: num(env.GRIST_TH_DIFF_MEDIUM, DEFAULT_THRESHOLDS.difficultyMedium),
     difficultyFrontier: num(env.GRIST_TH_DIFF_FRONTIER, DEFAULT_THRESHOLDS.difficultyFrontier),
+    difficultyPremium: num(env.GRIST_TH_DIFF_PREMIUM, DEFAULT_THRESHOLDS.difficultyPremium),
     underspecifiedCheapest: num(env.GRIST_TH_UNDER_CHEAPEST, DEFAULT_THRESHOLDS.underspecifiedCheapest),
     sensitivityCapCheapest: num(env.GRIST_TH_SENS_CHEAPEST, DEFAULT_THRESHOLDS.sensitivityCapCheapest),
     sensitivityCapMedium: num(env.GRIST_TH_SENS_MEDIUM, DEFAULT_THRESHOLDS.sensitivityCapMedium),
@@ -49,6 +53,7 @@ export function loadThresholdsFromJson(raw: unknown): GateThresholds {
   return {
     difficultyMedium: pick("difficultyMedium"),
     difficultyFrontier: pick("difficultyFrontier"),
+    difficultyPremium: pick("difficultyPremium"),
     underspecifiedCheapest: pick("underspecifiedCheapest"),
     sensitivityCapCheapest: pick("sensitivityCapCheapest"),
     sensitivityCapMedium: pick("sensitivityCapMedium"),

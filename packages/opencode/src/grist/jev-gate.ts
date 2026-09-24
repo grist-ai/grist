@@ -62,7 +62,7 @@ export function composeRung(
   const reasons: string[] = []
 
   // Sensitivity caps how high we may escalate.
-  let max: Rung = "frontier"
+  let max: Rung = "premium"
   if (input.sensitivity >= thresholds.sensitivityCapCheapest) {
     max = "cheapest"
     reasons.push("sensitivity_cap_cheapest")
@@ -75,6 +75,9 @@ export function composeRung(
   if (input.underspecified >= thresholds.underspecifiedCheapest) {
     want = "cheapest"
     reasons.push("underspecified_cheapest")
+  } else if (input.difficulty >= thresholds.difficultyPremium) {
+    want = "premium"
+    reasons.push("difficulty_premium")
   } else if (input.difficulty >= thresholds.difficultyFrontier) {
     want = "frontier"
     reasons.push("difficulty_frontier")
@@ -85,7 +88,7 @@ export function composeRung(
     reasons.push("difficulty_cheapest")
   }
 
-  const order = { cheapest: 0, medium: 1, frontier: 2 } as const
+  const order = { cheapest: 0, medium: 1, frontier: 2, premium: 3 } as const
   const sensitivityCapped = order[want] <= order[max] ? want : max
   if (sensitivityCapped !== want) reasons.push(`capped_to_${sensitivityCapped}`)
 
@@ -185,7 +188,7 @@ async function evaluateWithJev(
     state: {
       task: text,
       product: "Grist",
-      ladder: "cheapest, medium, frontier",
+      ladder: "cheapest, medium, frontier, premium",
     },
     questions: {
       difficulty: {
@@ -197,7 +200,7 @@ async function evaluateWithJev(
           "Routine change with clear files",
           "Multi-step but well-specified",
           "Hard: redesign, subtle correctness, or broad blast radius",
-          "Frontier-grade: novel architecture or high-risk production change",
+          "Premium-grade: the hardest problems, worth the top-tier model — novel architecture, extreme correctness demands, or bet-the-company production change",
         ],
       },
       sensitivity: {

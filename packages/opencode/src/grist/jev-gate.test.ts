@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { composeRung, normalizeTaskText, routeTask, scoreTask, shadowScores } from "./jev-gate"
 import { GatewayHttpError } from "./invite/client"
+import type { Rung } from "./rung"
 
 class MockGatewayHttpError extends Error {
   readonly status: number
@@ -14,7 +15,7 @@ class MockGatewayHttpError extends Error {
 }
 
 type GatewayRoute = {
-  rung: "cheapest" | "medium" | "frontier"
+  rung: Rung
   model: { provider_id: string; model_id: string }
   difficulty: number
   sensitivity: number
@@ -57,6 +58,22 @@ describe("composeRung", () => {
   test("medium difficulty without sensitivity cap", () => {
     const { rung } = composeRung({ difficulty: 0.5, sensitivity: 0.1, underspecified: 0.1 })
     expect(rung).toBe("medium")
+  })
+
+  test("top difficulty reaches premium", () => {
+    const { rung, reasons } = composeRung({ difficulty: 1.0, sensitivity: 0.1, underspecified: 0.1 })
+    expect(rung).toBe("premium")
+    expect(reasons).toContain("difficulty_premium")
+  })
+
+  test("frontier band stays below premium", () => {
+    const { rung } = composeRung({ difficulty: 0.8, sensitivity: 0.1, underspecified: 0.1 })
+    expect(rung).toBe("frontier")
+  })
+
+  test("sensitivity caps premium down to cheapest", () => {
+    const { rung } = composeRung({ difficulty: 1.0, sensitivity: 0.9, underspecified: 0.1 })
+    expect(rung).toBe("cheapest")
   })
 })
 

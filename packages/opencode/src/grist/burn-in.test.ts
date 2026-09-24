@@ -47,7 +47,7 @@ describe("burn-in summarize", () => {
     expect(meetsTierMixTargets(summary).ok).toBe(true)
   })
 
-  test("flags frontier share over 5%", () => {
+  test("flags expensive share over 5%", () => {
     const events: BurnInEvent[] = [
       decision("cheapest"),
       decision("frontier"),
@@ -55,7 +55,14 @@ describe("burn-in summarize", () => {
     ]
     const check = meetsTierMixTargets(summarize(events))
     expect(check.ok).toBe(false)
-    expect(check.reasons.some((r) => r.startsWith("frontier_share"))).toBe(true)
+    expect(check.reasons.some((r) => r.startsWith("expensive_share"))).toBe(true)
+  })
+
+  test("premium counts toward the expensive share", () => {
+    const events: BurnInEvent[] = [decision("cheapest"), decision("premium")]
+    const summary = summarize(events)
+    expect(summary.premiumShare).toBe(0.5)
+    expect(meetsTierMixTargets(summary).ok).toBe(false)
   })
 
   test("file log round-trips decisions", async () => {
@@ -91,7 +98,7 @@ describe("burn-in summarize", () => {
   })
 })
 
-function decision(rung: "cheapest" | "medium" | "frontier"): BurnInEvent {
+function decision(rung: "cheapest" | "medium" | "frontier" | "premium"): BurnInEvent {
   return {
     id: crypto.randomUUID(),
     at: Date.now(),
