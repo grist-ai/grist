@@ -1,5 +1,14 @@
 # Grist Public Launch Spec — invite-gated, credit-backed, npm-installable
 
+> **SUPERSEDED 2026-09-24.** Grist is now **BYOK**: users bring their own
+> provider key (OpenRouter, Vercel AI Gateway, or any OpenAI-compatible
+> endpoint) and inference bills to their provider account. The two-token
+> invite model below — founder-held OpenRouter key, per-code spend caps —
+> no longer applies. `grist_sk_...` keys now identify the *user*; invite
+> codes are optional onboarding gating; the Jev gate rides the user's
+> provider key. Kept for history; see [README](../README.md) for the
+> current shape.
+
 **Status:** spec for build · **Author:** Alfred · **Date:** 2026-09-19
 **Companion docs:** `grist-pre-poc-spec-sheet.md` (product decisions), `grist-gtm-doc.md` (positioning)
 
