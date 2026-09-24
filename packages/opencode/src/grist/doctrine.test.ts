@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { SURGICAL_ENGINEER, surgicalEngineer } from "./doctrine"
+import { SURGICAL_ENGINEER, identityDoctrine, sessionNudges, surgicalEngineer } from "./doctrine"
 import { clearSessionMechanisms, composeMechanisms, rememberSessionMechanisms } from "./mechanisms"
 
 describe("doctrine", () => {
@@ -24,6 +24,20 @@ describe("doctrine", () => {
     rememberSessionMechanisms(id, composeMechanisms("run the tests", "auto"))
     expect(surgicalEngineer(id)).toContain("edit_verify")
     expect(surgicalEngineer(id)).not.toContain("Context economy")
+    clearSessionMechanisms(id)
+  })
+
+  test("identityDoctrine is stable and omits mechanism nudges", () => {
+    expect(identityDoctrine()).not.toContain("edit_verify")
+    expect(identityDoctrine()).not.toContain("Context economy")
+    expect(identityDoctrine()).toBe(identityDoctrine())
+  })
+
+  test("sessionNudges sit after the cache boundary", () => {
+    expect(sessionNudges()).toContain("edit_verify")
+    const id = "sess-nudge-off"
+    rememberSessionMechanisms(id, composeMechanisms("anything", "off"))
+    expect(sessionNudges(id)).toBeUndefined()
     clearSessionMechanisms(id)
   })
 })

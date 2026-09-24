@@ -1,5 +1,5 @@
 import type { JsonSchema, LLMRequest, ProviderMetadata } from "@opencode-ai/llm"
-import { LLM, Message, SystemPart, ToolCallPart, ToolDefinition, ToolResultPart } from "@opencode-ai/llm"
+import { CacheHint, LLM, Message, SystemPart, ToolCallPart, ToolDefinition, ToolResultPart } from "@opencode-ai/llm"
 import {
   AmazonBedrock,
   Anthropic,
@@ -12,6 +12,7 @@ import {
 import type { ModelMessage } from "ai"
 import type { Provider } from "@/provider/provider"
 import { isRecord } from "@/util/record"
+import { CacheLayout } from "@/grist/cache-layout"
 
 type ToolInput = {
   readonly description?: string
@@ -103,7 +104,15 @@ const content = (value: ModelMessage["content"]) =>
   typeof value === "string" ? [{ type: "text" as const, text: value }] : value.map(contentPart)
 
 const messages = (input: readonly ModelMessage[]) => {
-  const system = input.flatMap((message) => (message.role === "system" ? [SystemPart.make(message.content)] : []))
+  const systemMessages = input.filter((message) => message.role === "system")
+  const lastSystem = systemMessages.length - 1
+  const system = systemMessages.map((message, index) => {
+    const text = typeof message.content === "string" ? message.content : ""
+    const part = SystemPart.make(text)
+    if (!CacheLayout.layoutEnabled()) return part
+    if (index !== 0 && index !== lastSystem) return part
+    return { ...part, cache: new CacheHint({ type: "ephemeral" }) }
+  })
   const messages = input.flatMap((message) => {
     if (message.role === "system") return []
     return [
@@ -124,13 +133,15 @@ const schema = (value: unknown): JsonSchema => {
 }
 
 const tools = (input: Record<string, ToolInput> | undefined): ToolDefinition[] =>
-  Object.entries(input ?? {}).map(([name, item]) =>
-    ToolDefinition.make({
-      name,
-      description: item.description ?? "",
-      inputSchema: schema(item.inputSchema),
-    }),
-  )
+  Object.entries(input ?? {})
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([name, item]) =>
+      ToolDefinition.make({
+        name,
+        description: item.description ?? "",
+        inputSchema: schema(item.inputSchema),
+      }),
+    )
 
 const generation = (input: RequestInput) => {
   const result = {
@@ -190,6 +201,9 @@ export const request = (input: RequestInput) => {
     toolChoice: input.toolChoice,
     generation: generation(input),
     providerOptions: input.providerOptions,
+    // Layout-owned CacheHints on first+last system. "none" stops auto from
+    // rewriting the latest user message each turn (that busts the prefix).
+    cache: CacheLayout.layoutEnabled() ? "none" : undefined,
   })
 }
 
