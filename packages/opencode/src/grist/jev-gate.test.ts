@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { composeRung, normalizeTaskText, routeTask, scoreTask, shadowScores } from "./jev-gate"
+import { applyRungCeiling, composeRung, normalizeTaskText, routeTask, scoreTask, shadowScores } from "./jev-gate"
 import { GatewayHttpError } from "./invite/client"
 import type { Rung } from "./rung"
 
@@ -235,5 +235,72 @@ describe("routeTask", () => {
     expect(called).toBe(false)
     expect(decision.provider).toBe("shadow")
     expect(decision.rung).toBe("cheapest")
+  })
+
+  test("maxRung caps a gateway-routed rung and resolves the model by rung name", async () => {
+process.env.GRIST_API_KEY = API_KEY
+    fetchGateRouteImpl = () =>
+      Promise.resolve({
+        rung: "frontier",
+        model: { provider_id: "openrouter", model_id: "openai/gpt-5.6" },
+        difficulty: 0.8,
+        sensitivity: 0.1,
+        underspecified: 0.1,
+        reasons: ["gateway_frontier"],
+        mechanisms: { observation_pack: true, action_fusion: true },
+        provider: "jev",
+      })
+    const decision = await routeTask({ text: "Refactor the payment flow", current, maxRung: "medium" })
+    expect(decision.rung).toBe("medium")
+    expect(decision.model).toEqual({ providerID: "openrouter", modelID: "medium" })
+    expect(decision.reasons).toContain("capped_to_medium")
+  })
+
+  test("maxRung above the gated rung does not cap", async () => {
+process.env.GRIST_API_KEY = API_KEY
+    fetchGateRouteImpl = () =>
+      Promise.resolve({
+        rung: "cheapest",
+        model: { provider_id: "openrouter", model_id: "deepseek/deepseek-v4.1-flash" },
+        difficulty: 0.1,
+        sensitivity: 0.1,
+        underspecified: 0.1,
+        reasons: ["gateway_cheapest"],
+        mechanisms: { observation_pack: true, action_fusion: true },
+        provider: "jev",
+      })
+    const decision = await routeTask({ text: "What is 7 times 8?", current, maxRung: "frontier" })
+    expect(decision.rung).toBe("cheapest")
+    expect(decision.model).toEqual({ providerID: "openrouter", modelID: "deepseek/deepseek-v4.1-flash" })
+    expect(decision.reasons).not.toContain("capped_to_cheapest")
+  })
+
+  test("maxRung caps the local shadow gate too", async () => {
+    // shadowScores: "redesign|distributed" -> difficulty 0.85 -> frontier
+    const decision = await routeTask({
+      text: "Redesign the distributed consensus protocol for multi-region replication",
+      current,
+      maxRung: "medium",
+    })
+    expect(decision.provider).toBe("shadow")
+    expect(decision.rung).toBe("medium")
+    expect(decision.model).toEqual({ providerID: "openrouter", modelID: "medium" })
+    expect(decision.reasons).toContain("capped_to_medium")
+  })
+})
+
+describe("applyRungCeiling", () => {
+  test("no ceiling passes the rung through", () => {
+    expect(applyRungCeiling("frontier")).toEqual({ rung: "frontier", capped: false })
+  })
+
+  test("a higher rung is capped down to the ceiling", () => {
+    expect(applyRungCeiling("premium", "medium")).toEqual({ rung: "medium", capped: true })
+    expect(applyRungCeiling("frontier", "cheapest")).toEqual({ rung: "cheapest", capped: true })
+  })
+
+  test("a rung at or below the ceiling is untouched", () => {
+    expect(applyRungCeiling("medium", "medium")).toEqual({ rung: "medium", capped: false })
+    expect(applyRungCeiling("cheapest", "frontier")).toEqual({ rung: "cheapest", capped: false })
   })
 })

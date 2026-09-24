@@ -72,6 +72,8 @@ export type SessionControl = {
   exploratory: number
   edits: number
   escalated: boolean
+  /** True when the rung was not really gated (explicit pin / gate off). */
+  passthrough?: boolean
 }
 
 const EXPLORATORY = new Set(["grep", "glob", "list", "search", "webfetch", "websearch", "codesearch"])
@@ -103,6 +105,8 @@ export function rememberSessionControl(
     sensitivity: number
     underspecified: number
     task: string
+    /** True when the rung was not really gated (explicit pin / gate off). */
+    passthrough?: boolean
   },
 ) {
   const prev = sessions.get(sessionID)
@@ -115,6 +119,7 @@ export function rememberSessionControl(
     exploratory: prev?.exploratory ?? 0,
     edits: prev?.edits ?? 0,
     escalated: prev?.escalated ?? false,
+    passthrough: input.passthrough,
   })
 }
 

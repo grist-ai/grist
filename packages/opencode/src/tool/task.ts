@@ -17,6 +17,9 @@ import { Database } from "@opencode-ai/core/database/database"
 import { runCompressed, estimateTokens } from "@/grist/observation-pack-compressor"
 import { gristLog } from "@/grist/debug"
 import { recordGristEvent } from "@/grist/usage-log"
+import { routeTask } from "@/grist/jev-gate"
+import { publicRungFor } from "@/grist/rung"
+import { getSessionControl } from "@/grist/control-plane"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -181,10 +184,30 @@ export const TaskTool = Tool.define(
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
       const variant = msg.info.variant
 
-      const model = next.model ?? {
+      // Subagents re-gate on their own task text, capped at the parent's rung:
+      // a hard task decomposed into easy pieces sheds cost, never gains it.
+      // Agent-config pinned models and user-pinned (passthrough) sessions keep
+      // today's inherit behavior — pins are never rewritten.
+      const parentModel = {
         modelID: msg.info.modelID,
         providerID: msg.info.providerID,
       }
+      const sessionControl = next.model ? undefined : getSessionControl(ctx.sessionID)
+      const parentRung =
+        publicRungFor(String(msg.info.modelID)) ??
+        (sessionControl && !sessionControl.passthrough ? sessionControl.rung : undefined)
+      const gated = parentRung
+        ? yield* Effect.promise(() =>
+            routeTask({
+              text: params.prompt,
+              current: parentModel,
+              maxRung: parentRung,
+              sessionID: nextSession.id,
+            }),
+          )
+        : undefined
+      const model = next.model ?? gated?.model ?? parentModel
+      const modelChanged = Boolean(gated && gated.model.modelID !== parentModel.modelID)
       const metadata = {
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
@@ -206,10 +229,12 @@ export const TaskTool = Tool.define(
           messageID: MessageID.ascending(),
           sessionID: nextSession.id,
           model: {
-            modelID: model.modelID,
-            providerID: model.providerID,
+            // The gate returns plain string ids; the prompt boundary expects
+            // branded ids. Same strings, compile-time tags only.
+            modelID: model.modelID as typeof parentModel.modelID,
+            providerID: model.providerID as typeof parentModel.providerID,
           },
-          variant: next.model ? undefined : variant,
+          variant: next.model || modelChanged ? undefined : variant,
           agent: next.name,
           parts,
         })

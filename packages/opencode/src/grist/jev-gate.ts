@@ -43,6 +43,24 @@ export type GateInput = {
   /** When true, never rewrite model (explicit user/agent pin). */
   pinned?: boolean
   sessionID?: string
+  /**
+   * Ceiling for the decided rung. Used when re-gating subagent tasks: the
+   * subagent may drop to a cheaper rung than its parent, never above it.
+   */
+  maxRung?: Rung
+}
+
+/** Rung order, cheapest → premium. Shared by composeRung and applyRungCeiling. */
+const RUNG_ORDER = { cheapest: 0, medium: 1, frontier: 2, premium: 3 } as const
+
+/**
+ * Clamp a gated rung to a ceiling. Returns the effective rung and whether the
+ * gate's first choice was capped. Never raises the rung.
+ */
+export function applyRungCeiling(rung: Rung, maxRung?: Rung): { rung: Rung; capped: boolean } {
+  if (!maxRung) return { rung, capped: false }
+  const capped = RUNG_ORDER[rung] > RUNG_ORDER[maxRung]
+  return { rung: capped ? maxRung : rung, capped }
 }
 
 /**
@@ -88,8 +106,7 @@ export function composeRung(
     reasons.push("difficulty_cheapest")
   }
 
-  const order = { cheapest: 0, medium: 1, frontier: 2, premium: 3 } as const
-  const sensitivityCapped = order[want] <= order[max] ? want : max
+  const sensitivityCapped = RUNG_ORDER[want] <= RUNG_ORDER[max] ? want : max
   if (sensitivityCapped !== want) reasons.push(`capped_to_${sensitivityCapped}`)
 
   // Operating mode (§10) — degrades, never hard-stops.
@@ -256,6 +273,7 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
         sensitivity: scores.sensitivity,
         underspecified: scores.underspecified,
         task: input.text,
+        passthrough: true,
       })
     }
     return {
@@ -285,9 +303,11 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
   const { scores, provider } = await scoreTask(input.text)
 
   const { rung, reasons } = composeRung(scores, loadThresholds(), mode)
-  const model = modelForRung(rung, input.current)
+  const ceiling = applyRungCeiling(rung, input.maxRung)
+  if (ceiling.capped) reasons.push(`capped_to_${ceiling.rung}`)
+  const model = modelForRung(ceiling.rung, input.current)
   const decision: GateDecision = {
-    rung,
+    rung: ceiling.rung,
     model,
     provider,
     mode,
@@ -298,7 +318,7 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
   }
   if (input.sessionID) {
     rememberSessionControl(input.sessionID, {
-      rung,
+      rung: ceiling.rung,
       difficulty: scores.difficulty,
       sensitivity: scores.sensitivity,
       underspecified: scores.underspecified,
@@ -346,12 +366,18 @@ async function routeViaGateway(
     reasons: ["gateway"],
   }
   if (input.sessionID) rememberSessionMechanisms(input.sessionID, mechanisms)
-  const model: ModelRef = {
-    providerID: remote.model.provider_id,
-    modelID: remote.model.model_id,
-  }
+  const ceiling = applyRungCeiling(remote.rung, input.maxRung)
+  const reasons = ceiling.capped ? [...remote.reasons, `capped_to_${ceiling.rung}`] : remote.reasons
+  // When capped, address the gateway by rung name; it resolves the same
+  // ladder model it would have returned for that rung.
+  const model: ModelRef = ceiling.capped
+    ? publicModelRef(ceiling.rung)
+    : {
+        providerID: remote.model.provider_id,
+        modelID: remote.model.model_id,
+      }
   const decision: GateDecision = {
-    rung: remote.rung,
+    rung: ceiling.rung,
     model,
     provider: remote.provider ?? "jev",
     mode: remote.mode ?? mode,
@@ -359,12 +385,12 @@ async function routeViaGateway(
     difficulty: remote.difficulty,
     sensitivity: remote.sensitivity,
     underspecified: remote.underspecified,
-    reasons: remote.reasons,
+    reasons,
     latencyMs: Date.now() - started,
   }
   if (input.sessionID) {
     rememberSessionControl(input.sessionID, {
-      rung: remote.rung,
+      rung: ceiling.rung,
       difficulty: remote.difficulty,
       sensitivity: remote.sensitivity,
       underspecified: remote.underspecified,
