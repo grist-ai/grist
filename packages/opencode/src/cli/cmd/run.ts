@@ -179,7 +179,7 @@ export const RunCommand = effectCmd({
       .option("model", {
         type: "string",
         alias: ["m"],
-        describe: "rung to use: cheapest, medium, or frontier (Grist mode; upstream model ids are never exposed)",
+        describe: "rung to use: cheapest, medium, frontier, or premium (Grist mode; upstream model ids are never exposed)",
       })
       .option("agent", {
         type: "string",
@@ -283,7 +283,7 @@ export const RunCommand = effectCmd({
       if (!signedIn) return yield* fail(INVITE_REQUIRED_MESSAGE)
     }
     if (gristMode && args.model && !(GRIST_RUNGS as readonly string[]).includes(args.model)) {
-      return yield* fail(`Invalid model "${args.model}". In Grist mode, -m accepts only a rung name: cheapest, medium, frontier.`)
+      return yield* fail(`Invalid model "${args.model}". In Grist mode, -m accepts only a rung name: cheapest, medium, frontier, premium.`)
     }
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
