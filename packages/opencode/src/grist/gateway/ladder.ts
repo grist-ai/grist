@@ -13,18 +13,56 @@ import type { ModelRef, Rung } from "../rung"
  *
  * OpenRouter model ids keep their org/model slash (provider is still `openrouter`).
  */
-export const RUNG_MODELS: Record<Rung, ModelRef> = {
+export const DEFAULT_RUNG_MODELS: Record<Rung, ModelRef> = {
   cheapest: {
-    providerID: process.env.GRIST_CHEAPEST_PROVIDER ?? "openrouter",
+    providerID: "openrouter",
     // OpenRouter id for DeepSeek-V4.1-Flash (legacy deepseek-v4-flash still aliases).
-    modelID: process.env.GRIST_CHEAPEST_MODEL ?? "deepseek/deepseek-v4.1-flash",
+    modelID: "deepseek/deepseek-v4.1-flash",
   },
   medium: {
-    providerID: process.env.GRIST_MEDIUM_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_MEDIUM_MODEL ?? "moonshotai/kimi-k3",
+    providerID: "openrouter",
+    modelID: "moonshotai/kimi-k3",
   },
   frontier: {
-    providerID: process.env.GRIST_FRONTIER_PROVIDER ?? "openrouter",
-    modelID: process.env.GRIST_FRONTIER_MODEL ?? "openai/gpt-6-sol",
+    providerID: "openrouter",
+    modelID: "openai/gpt-6-sol",
+  },
+}
+
+/** Resolve a rung to the upstream model the gateway will call. */
+export function resolveRung(rung: Rung, env: NodeJS.ProcessEnv = process.env): ModelRef {
+  switch (rung) {
+    case "cheapest":
+      return {
+        providerID: env.GRIST_CHEAPEST_PROVIDER ?? DEFAULT_RUNG_MODELS.cheapest.providerID,
+        modelID: env.GRIST_CHEAPEST_MODEL ?? DEFAULT_RUNG_MODELS.cheapest.modelID,
+      }
+    case "medium":
+      return {
+        providerID: env.GRIST_MEDIUM_PROVIDER ?? DEFAULT_RUNG_MODELS.medium.providerID,
+        modelID: env.GRIST_MEDIUM_MODEL ?? DEFAULT_RUNG_MODELS.medium.modelID,
+      }
+    case "frontier":
+      return {
+        providerID: env.GRIST_FRONTIER_PROVIDER ?? DEFAULT_RUNG_MODELS.frontier.providerID,
+        modelID: env.GRIST_FRONTIER_MODEL ?? DEFAULT_RUNG_MODELS.frontier.modelID,
+      }
+    default: {
+      const _exhaustive: never = rung
+      return _exhaustive
+    }
+  }
+}
+
+/** Live ladder: env overrides win over `DEFAULT_RUNG_MODELS`. */
+export const RUNG_MODELS: Record<Rung, ModelRef> = {
+  get cheapest() {
+    return resolveRung("cheapest")
+  },
+  get medium() {
+    return resolveRung("medium")
+  },
+  get frontier() {
+    return resolveRung("frontier")
   },
 }

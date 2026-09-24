@@ -94,6 +94,36 @@ describe("metering", () => {
     // Without the fix this bills 1000 fresh at 3/M = 0.0105.
     expect(gateway.store.getInvite(code)?.spent_usd).toBeCloseTo(0.00807, 5)
   })
+
+  test("debits cheapest completions at the default Flash rate", async () => {
+    const offPeak = Date.UTC(2026, 8, 21, 12, 0, 0)
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      now: () => offPeak,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 1_000_000, completion_tokens: 0 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "cheapest", messages: [], stream: false },
+    })
+    expect(response.status).toBe(200)
+    expect(gateway.store.getInvite(code)?.spent_usd).toBeCloseTo(usdForUsage("cheapest", 1_000_000, 0, { at: offPeak }))
+    expect(gateway.store.usageFor(code)[0]?.model).toBe(RUNG_MODELS.cheapest.modelID)
+  })
 })
 
 describe("atomic spend cap", () => {

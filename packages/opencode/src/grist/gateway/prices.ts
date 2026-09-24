@@ -1,8 +1,15 @@
-import { RUNG_MODELS } from "./ladder"
+import { DEFAULT_RUNG_MODELS, resolveRung } from "./ladder"
+import { MODEL_PRICES } from "./model-prices"
 import type { Rung } from "../rung"
 
 /**
- * Gateway metering prices (USD per 1M tokens), verified 2026-09-22.
+ * Gateway metering prices (USD per 1M tokens).
+ *
+ * The meter prices the resolved upstream model, not the rung label. Default
+ * ladder models keep the verified-2026-09-22 rung rates so no-override
+ * metering is unchanged; every other id uses the OpenRouter /api/v1/models
+ * snapshot in `model-prices.ts` (2026-09-23). Unknown resolved models fall
+ * back to the rung they occupy.
  *
  * - DeepSeek V4.1 Flash is time-of-day priced: off-peak `$0.15/$0.60`, peak 2x
  *   (`$0.30/$1.20`). Peak windows are documented in `docs/providers.md`:
@@ -23,9 +30,23 @@ export const PEAK_HOURS_UTC: ReadonlyArray<readonly [number, number]> = [
 ]
 export const PEAK_MULTIPLIER = 2
 
+const FLASH_MODEL_ID = DEFAULT_RUNG_MODELS.cheapest.modelID
 const FLASH_OFFPEAK: TokenPrice = { input: 0.15, output: 0.6 }
 const KIMI_PRICE: TokenPrice = { input: 3, output: 15, cachedInput: 0.3 }
 const SOL_PRICE: TokenPrice = { input: 2, output: 10 }
+
+/** Existing rung rates for the default ladder model ids. */
+const RUNG_MODEL_PRICES: Record<string, TokenPrice> = {
+  [DEFAULT_RUNG_MODELS.cheapest.modelID]: FLASH_OFFPEAK,
+  [DEFAULT_RUNG_MODELS.medium.modelID]: KIMI_PRICE,
+  [DEFAULT_RUNG_MODELS.frontier.modelID]: SOL_PRICE,
+}
+
+const PUBLIC_IDS: Rung[] = ["cheapest", "medium", "frontier"]
+
+function isRung(id: string): id is Rung {
+  return PUBLIC_IDS.includes(id as Rung)
+}
 
 /** True during a DeepSeek weekday peak window (UTC). */
 export function isPeakHourUTC(at: number): boolean {
@@ -36,10 +57,8 @@ export function isPeakHourUTC(at: number): boolean {
   return PEAK_HOURS_UTC.some(([start, end]) => hour >= start && hour < end)
 }
 
-const PUBLIC_IDS: Rung[] = ["cheapest", "medium", "frontier"]
-
-export function ladderModelIDs(): string[] {
-  return Object.values(RUNG_MODELS).map((m) => m.modelID)
+export function ladderModelIDs(env: NodeJS.ProcessEnv = process.env): string[] {
+  return PUBLIC_IDS.map((rung) => resolveRung(rung, env).modelID)
 }
 
 /** Strip an `openrouter/` prefix so client and ladder ids compare equal. */
@@ -48,21 +67,17 @@ export function normalizeLadderModel(model: string): string {
 }
 
 /** Opaque id testers see (`cheapest` / `medium` / `frontier`). */
-export function publicLadderID(model: string): Rung | undefined {
+export function publicLadderID(model: string, env: NodeJS.ProcessEnv = process.env): Rung | undefined {
   const id = normalizeLadderModel(model)
-  if (PUBLIC_IDS.includes(id as Rung)) return id as Rung
-  for (const [rung, ref] of Object.entries(RUNG_MODELS) as [Rung, (typeof RUNG_MODELS)[Rung]][]) {
-    if (ref.modelID === id) return rung
-  }
+  if (isRung(id)) return id
+  return PUBLIC_IDS.find((rung) => resolveRung(rung, env).modelID === id)
 }
 
 /** Real OpenRouter id the gateway sends upstream. */
-export function upstreamLadderID(model: string): string | undefined {
+export function upstreamLadderID(model: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
   const id = normalizeLadderModel(model)
-  if (PUBLIC_IDS.includes(id as Rung)) return RUNG_MODELS[id as Rung].modelID
-  for (const ref of Object.values(RUNG_MODELS)) {
-    if (ref.modelID === id) return id
-  }
+  if (isRung(id)) return resolveRung(id, env).modelID
+  if (PUBLIC_IDS.some((rung) => resolveRung(rung, env).modelID === id)) return id
 }
 
 /** Effective per-token price for a rung at a point in time. */
@@ -79,10 +94,28 @@ export function priceForRung(rung: Rung, at = Date.now()): ModelPrice {
   return { ...SOL_PRICE, rung }
 }
 
-export function priceForModel(model: string, at = Date.now()): ModelPrice | undefined {
-  const publicID = publicLadderID(model)
-  if (!publicID) return
-  return priceForRung(publicID, at)
+function listedPrice(modelID: string): TokenPrice | undefined {
+  return RUNG_MODEL_PRICES[modelID] ?? MODEL_PRICES[modelID]
+}
+
+function withTimeOfDay(modelID: string, price: TokenPrice, at: number): TokenPrice {
+  if (modelID !== FLASH_MODEL_ID || !isPeakHourUTC(at)) return price
+  return {
+    input: price.input * PEAK_MULTIPLIER,
+    output: price.output * PEAK_MULTIPLIER,
+    cachedInput: price.cachedInput,
+  }
+}
+
+/** Effective per-token price for a resolved upstream model (or rung name). */
+export function priceForModel(model: string, at = Date.now(), env: NodeJS.ProcessEnv = process.env): ModelPrice | undefined {
+  const id = normalizeLadderModel(model)
+  const resolved = isRung(id) ? resolveRung(id, env).modelID : id
+  const listed = listedPrice(resolved)
+  const rung = publicLadderID(id, env)
+  if (listed) return { ...withTimeOfDay(resolved, listed, at), rung: rung ?? "cheapest" }
+  if (!rung) return
+  return priceForRung(rung, at)
 }
 
 /**
@@ -93,9 +126,9 @@ export function usdForUsage(
   model: string,
   inputTokens: number,
   outputTokens: number,
-  options: { cachedInputTokens?: number; at?: number } = {},
+  options: { cachedInputTokens?: number; at?: number; env?: NodeJS.ProcessEnv } = {},
 ): number {
-  const price = priceForModel(model, options.at)
+  const price = priceForModel(model, options.at, options.env)
   if (!price) return 0
   const cached = Math.max(0, Math.min(options.cachedInputTokens ?? 0, inputTokens))
   const freshInput = inputTokens - cached
@@ -103,6 +136,6 @@ export function usdForUsage(
   return (freshInput * price.input + cached * cachedRate + outputTokens * price.output) / 1_000_000
 }
 
-export function isLadderModel(model: string): boolean {
-  return publicLadderID(model) !== undefined
+export function isLadderModel(model: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  return publicLadderID(model, env) !== undefined
 }
