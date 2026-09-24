@@ -1,6 +1,12 @@
 import { Database } from "bun:sqlite"
 import type { OperatingMode } from "../mode"
 import type { Rung } from "../rung"
+import type { ByokProvider } from "./providers"
+import {
+  decryptProviderKey,
+  encryptProviderKey,
+  fingerprintKey,
+} from "./provider-keys"
 import {
   apiKeyPrefix,
   canonicalApiKey,
@@ -80,13 +86,44 @@ export type AccessRequestRow = {
   created_at: number
 }
 
+export type ProviderCredentialRow = {
+  code: string
+  provider: string
+  key_blob: string
+  key_fingerprint: string
+  base_url: string | null
+  custom_models: string | null
+  created_at: number
+  updated_at: number
+}
+
+/** Decrypted provider credential — only ever held in memory, never logged. */
+export type ProviderCredential = {
+  code: string
+  provider: ByokProvider
+  apiKey: string
+  baseURL: string | null
+  customModels: Partial<Record<Rung, string>>
+  keyFingerprint: string
+}
+
+/** Safe-to-display credential summary: identifies the key, never reveals it. */
+export type ProviderCredentialSummary = {
+  provider: ByokProvider
+  keyFingerprint: string
+  baseURL: string | null
+  hasCustomModels: boolean
+  updatedAt: number
+}
+
 const DEFAULT_CAP = 5
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const MAX_API_KEYS = 20
 const TOUCH_API_KEY_MS = 60_000
 
-export function openGatewayStore(filePath = ":memory:") {
+export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buffer }) {
   const db = new Database(filePath)
+  const masterKey = opts?.masterKey
   db.exec("PRAGMA journal_mode = WAL")
   db.exec("PRAGMA synchronous = NORMAL")
   db.exec("PRAGMA busy_timeout = 5000")
@@ -155,6 +192,16 @@ export function openGatewayStore(filePath = ":memory:") {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS access_requests_email ON access_requests(email);
+    CREATE TABLE IF NOT EXISTS provider_credentials (
+      code TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      key_blob TEXT NOT NULL,
+      key_fingerprint TEXT NOT NULL,
+      base_url TEXT,
+      custom_models TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `)
   // `CREATE TABLE IF NOT EXISTS` will not add the column to a database created
   // before per-key attribution existed, so backfill it in place.
@@ -255,6 +302,24 @@ export function openGatewayStore(filePath = ":memory:") {
   const setRequestCode = db.prepare(
     `UPDATE access_requests SET status = 'coded', invite_code = ? WHERE id = ? AND invite_code IS NULL`,
   )
+  const upsertCredential = db.prepare(
+    `INSERT INTO provider_credentials (code, provider, key_blob, key_fingerprint, base_url, custom_models, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(code) DO UPDATE SET
+       provider = excluded.provider,
+       key_blob = excluded.key_blob,
+       key_fingerprint = excluded.key_fingerprint,
+       base_url = excluded.base_url,
+       custom_models = excluded.custom_models,
+       updated_at = excluded.updated_at`,
+  )
+  const selectCredential = db.prepare(`SELECT * FROM provider_credentials WHERE code = ?`)
+  const deleteCredential = db.prepare(`DELETE FROM provider_credentials WHERE code = ?`)
+
+  function requireMasterKey(): Buffer {
+    if (!masterKey) throw new Error("GRIST_MASTER_KEY is not configured")
+    return masterKey
+  }
 
   function lookup(raw: string): InviteRow | undefined {
     const code = canonicalInviteCode(raw)
@@ -497,6 +562,76 @@ export function openGatewayStore(filePath = ":memory:") {
       return markApiKeyRevoked.run(input.id, invite.code).changes > 0
     },
 
+    /**
+     * Store (or replace) the user's BYOK provider key, encrypted at rest.
+     * Throws when GRIST_MASTER_KEY is not configured. The raw key never
+     * touches the database — only the encrypted blob and its fingerprint.
+     */
+    setProviderCredential(input: {
+      inviteCode: string
+      provider: ByokProvider
+      apiKey: string
+      baseURL?: string
+      customModels?: Partial<Record<Rung, string>>
+    }): ProviderCredentialSummary {
+      const invite = lookup(input.inviteCode)
+      if (!invite) throw new Error("unknown invite code")
+      const apiKey = input.apiKey.trim()
+      if (!apiKey) throw new Error("provider key must not be empty")
+      const key = requireMasterKey()
+      const now = Date.now()
+      const existing = selectCredential.get(invite.code) as ProviderCredentialRow | undefined
+      const baseURL = input.baseURL?.trim().replace(/\/+$/, "") || null
+      const customModels = input.customModels ? JSON.stringify(input.customModels) : null
+      upsertCredential.run(
+        invite.code,
+        input.provider,
+        encryptProviderKey(apiKey, key),
+        fingerprintKey(apiKey),
+        baseURL,
+        customModels,
+        existing?.created_at ?? now,
+        now,
+      )
+      return toCredentialSummary(selectCredential.get(invite.code) as ProviderCredentialRow)
+    },
+
+    /**
+     * Decrypted credential for building an upstream request. Returns undefined
+     * when the user never set a provider key. Throws when a credential exists
+     * but GRIST_MASTER_KEY is not configured (fail closed).
+     */
+    getProviderCredential(inviteCode: string): ProviderCredential | undefined {
+      const invite = lookup(inviteCode)
+      if (!invite) return undefined
+      const row = selectCredential.get(invite.code) as ProviderCredentialRow | undefined
+      if (!row) return undefined
+      const key = requireMasterKey()
+      return {
+        code: row.code,
+        provider: row.provider as ByokProvider,
+        apiKey: decryptProviderKey(row.key_blob, key),
+        baseURL: row.base_url,
+        customModels: row.custom_models ? (JSON.parse(row.custom_models) as Partial<Record<Rung, string>>) : {},
+        keyFingerprint: row.key_fingerprint,
+      }
+    },
+
+    /** Safe-to-display summary: identifies the key, never reveals it. */
+    providerCredentialSummary(inviteCode: string): ProviderCredentialSummary | undefined {
+      const invite = lookup(inviteCode)
+      if (!invite) return undefined
+      const row = selectCredential.get(invite.code) as ProviderCredentialRow | undefined
+      if (!row) return undefined
+      return toCredentialSummary(row)
+    },
+
+    deleteProviderCredential(inviteCode: string): boolean {
+      const invite = lookup(inviteCode)
+      if (!invite) return false
+      return deleteCredential.run(invite.code).changes > 0
+    },
+
     createAccessRequest(input: { email: string; name?: string; note?: string }): AccessRequestRow {
       const email = input.email.trim().toLowerCase()
       const pending = selectOpenRequest.get(email) as AccessRequestRow | undefined
@@ -559,6 +694,16 @@ function publicApiKey(row: ApiKeyRow): PublicApiKey {
     created_at: row.created_at,
     last_used_at: row.last_used_at,
     revoked: Boolean(row.revoked),
+  }
+}
+
+function toCredentialSummary(row: ProviderCredentialRow): ProviderCredentialSummary {
+  return {
+    provider: row.provider as ByokProvider,
+    keyFingerprint: row.key_fingerprint,
+    baseURL: row.base_url,
+    hasCustomModels: Boolean(row.custom_models),
+    updatedAt: row.updated_at,
   }
 }
 

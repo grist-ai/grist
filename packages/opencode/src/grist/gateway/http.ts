@@ -2,7 +2,7 @@ import path from "path"
 import { createHash } from "node:crypto"
 import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
-import { publicModelRef, type Rung } from "../rung"
+import { publicModelRef, PUBLIC_RUNGS, type Rung } from "../rung"
 import { typesafeKey } from "../jev-client"
 import { resolveJevRoute, resolveProviderKey, type JevProvider } from "../jev-route"
 import { applyModeCap, type OperatingMode } from "../mode"
@@ -10,12 +10,16 @@ import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "
 import { isLadderModel, publicLadderID, upstreamLadderID, priceForModel, usdForUsage } from "./prices"
 import { openGatewayStore, type GatewayStore, type InviteRow } from "./store"
 import { canonicalApiKey } from "./codes"
+import { parseByokProvider, type ByokProvider } from "./providers"
+import { parseMasterKey } from "./provider-keys"
 
 export type GatewayOptions = {
   store?: GatewayStore
   dbPath?: string
   openrouterKey?: string
   typesafeKey?: string
+  /** Master key for BYOK provider-key encryption at rest (GRIST_MASTER_KEY). */
+  masterKey?: Buffer
   adminToken?: string
   adminEmail?: string
   fetch?: (input: string, init?: RequestInit) => Promise<Response>
@@ -116,7 +120,8 @@ export const MAX_COMPLETION_TOKENS = 8192
 class PayloadTooLargeError extends Error {}
 
 export function createGateway(opts: GatewayOptions = {}) {
-  const store = opts.store ?? openGatewayStore(opts.dbPath ?? ":memory:")
+  const masterKey = opts.masterKey ?? parseMasterKey(process.env.GRIST_MASTER_KEY)
+  const store = opts.store ?? openGatewayStore(opts.dbPath ?? ":memory:", { masterKey })
   const windows = new Map<string, { count: number; reset: number }>()
   const fetchImpl = opts.fetch ?? globalThis.fetch
   const now = opts.now ?? Date.now
@@ -254,6 +259,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (pathname === "/v1/api-keys" || pathname.startsWith("/v1/api-keys/")) {
       return apiKeys(req, pathname, peerIp)
+    }
+    if (pathname === "/v1/provider") {
+      return providerCredentials(req)
     }
     if (req.method === "POST" && pathname === "/v1/access/requests") {
       return accessRequest(req, peerIp)
@@ -593,6 +601,61 @@ export function createGateway(opts: GatewayOptions = {}) {
     return json(404, { error: "not found" })
   }
 
+  /**
+   * BYOK provider credentials. The caller manages their own key, identified by
+   * their grist_sk / invite. Responses carry the key fingerprint only — the
+   * raw key is never returned, never logged, and stored encrypted at rest.
+   */
+  async function providerCredentials(req: Request): Promise<Response> {
+    const invite = await resolveInvite(req)
+    if (invite instanceof Response) return invite
+
+    if (req.method === "GET") {
+      const summary = store.providerCredentialSummary(invite.code)
+      return json(200, summary ?? { provider: null })
+    }
+
+    if (req.method === "DELETE") {
+      return json(200, { revoked: store.deleteProviderCredential(invite.code) })
+    }
+
+    if (req.method === "POST") {
+      if (!allowWindow(`provider:${invite.code}`, 10, 3_600_000)) {
+        return json(429, { error: "too many provider key updates" })
+      }
+      const body = await readJson(req)
+      const provider = parseByokProvider(body?.provider)
+      if (!provider) return json(400, { error: "provider must be openrouter | vercel | custom" })
+      const apiKey = typeof body?.api_key === "string" ? body.api_key.trim() : ""
+      if (!apiKey) return json(400, { error: "api_key is required" })
+      const baseURL = validBaseURL(typeof body?.base_url === "string" ? body.base_url : undefined)
+      if (provider === "custom" && !baseURL) {
+        return json(400, { error: "base_url (https) is required for custom providers" })
+      }
+      const customModels = validCustomModels(body?.models)
+      if (body?.models !== undefined && !customModels) {
+        return json(400, { error: "models must map rung names to model ids" })
+      }
+      try {
+        const summary = store.setProviderCredential({
+          inviteCode: invite.code,
+          provider,
+          apiKey,
+          baseURL: baseURL ?? undefined,
+          customModels: customModels ?? undefined,
+        })
+        return json(200, { ok: true, ...summary })
+      } catch (error) {
+        if (error instanceof Error && error.message === "GRIST_MASTER_KEY is not configured") {
+          return json(503, { error: "gateway cannot store provider keys right now" })
+        }
+        throw error
+      }
+    }
+
+    return json(404, { error: "not found" })
+  }
+
   async function admin(req: Request, pathname: string): Promise<Response> {
     const denied = await requireAdmin(req)
     if (denied) return denied
@@ -776,6 +839,36 @@ function inviteUsable(invite: InviteRow, t: number): boolean {
   if (invite.revoked) return false
   if (invite.expires_at <= t) return false
   return true
+}
+
+/** https base URL for a custom provider, or undefined when absent/invalid. */
+function validBaseURL(raw: string | undefined): string | undefined {
+  const text = raw?.trim().replace(/\/+$/, "")
+  if (!text) return undefined
+  try {
+    const url = new URL(text)
+    if (url.protocol !== "https:") return undefined
+    return url.toString().replace(/\/+$/, "")
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Validate a custom provider's rung → model id map. Returns the cleaned map,
+ * or undefined when the input was absent; null when the input was present but
+ * malformed.
+ */
+function validCustomModels(raw: unknown): Partial<Record<Rung, string>> | undefined | null {
+  if (raw === undefined) return undefined
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null
+  const models: Partial<Record<Rung, string>> = {}
+  for (const [rung, model] of Object.entries(raw)) {
+    if (!(PUBLIC_RUNGS as readonly string[]).includes(rung)) return null
+    if (typeof model !== "string" || !model.trim()) return null
+    models[rung as Rung] = model.trim()
+  }
+  return models
 }
 
 function publicInvite(invite: InviteRow) {
