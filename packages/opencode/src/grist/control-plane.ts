@@ -18,11 +18,11 @@ import {
   controlPlaneEnabled,
   noul01,
   score01,
-  typesafeKey,
   type ChoiceAnswer,
   type NoulAnswer,
   type ScoreAnswer,
 } from "./jev-client"
+import { resolveJevRoute, type JevRoute } from "./jev-route"
 import type { MapNode } from "./code-map/types"
 import { loadThresholds } from "./thresholds"
 import { gristLog, gristWarn } from "./debug"
@@ -256,11 +256,13 @@ async function jevContinue(input: {
     verified?: boolean
     pendingTodos?: number
   }
-  apiKey: string
+  route: JevRoute
 }): Promise<ContinueDecision> {
   const started = Date.now()
   const result = await askSystemOne({
-    apiKey: input.apiKey,
+    apiKey: input.route.apiKey,
+    endpoint: input.route.endpoint,
+    model: input.route.model,
     state: {
       product: "Grist",
       task: input.control.task,
@@ -351,10 +353,10 @@ export async function decideContinue(input: {
 
   const control = getSessionControl(input.sessionID)
   const tools = toolSummary(input.parts)
-  const key = typesafeKey()
-  if (key && control) {
+  const route = resolveJevRoute()
+  if (route && control) {
     try {
-      const decision = await jevContinue({ step: input.step, control, tools, apiKey: key })
+      const decision = await jevContinue({ step: input.step, control, tools, route })
       logContinue(input.sessionID, decision)
       if (decision.action === "escalate" && decision.rung) {
         control.rung = decision.rung
@@ -446,11 +448,13 @@ export async function decidePermission(input: {
 
   const control = getSessionControl(input.sessionID)
   const sensitivity = control?.sensitivity ?? 0.4
-  const key = typesafeKey()
-  if (key && control) {
+  const route = resolveJevRoute()
+  if (route && control) {
     try {
       const result = await askSystemOne({
-        apiKey: key,
+        apiKey: route.apiKey,
+        endpoint: route.endpoint,
+        model: route.model,
         state: {
           product: "Grist",
           task: control.task,
@@ -556,11 +560,13 @@ export async function decideVerify(input: {
     sessions.set(input.sessionID!, control)
   }
 
-  const key = typesafeKey()
-  if (key && control) {
+  const route = resolveJevRoute()
+  if (route && control) {
     try {
       const result = await askSystemOne({
-        apiKey: key,
+        apiKey: route.apiKey,
+        endpoint: route.endpoint,
+        model: route.model,
         state: {
           product: "Grist",
           task: control.task,
@@ -697,11 +703,13 @@ export async function decideToolBudget(input: {
   })
 
   // Optional Jev tighten: if under soft cap but task is clear, block early.
-  const key = typesafeKey()
-  if (key && isExploratoryTool(input.toolID) && control.exploratory >= Math.ceil(cap / 2) && decision.action === "allow") {
+  const route = resolveJevRoute()
+  if (route && isExploratoryTool(input.toolID) && control.exploratory >= Math.ceil(cap / 2) && decision.action === "allow") {
     try {
       const result = await askSystemOne({
-        apiKey: key,
+        apiKey: route.apiKey,
+        endpoint: route.endpoint,
+        model: route.model,
         state: {
           product: "Grist",
           task: control.task,
@@ -756,9 +764,9 @@ export async function rankContextNodes(input: {
   const keep = input.keep ?? 12
   if (!controlPlaneEnabled() || input.nodes.length <= keep) return input.nodes
 
-  const key = typesafeKey()
+  const route = resolveJevRoute()
   const slice = input.nodes.slice(0, 24)
-  if (key) {
+  if (route) {
     try {
       const questions: Record<string, { type: "score"; instructions: string; criteria: string[] }> = {}
       for (const [i, node] of slice.entries()) {
@@ -769,7 +777,9 @@ export async function rankContextNodes(input: {
         }
       }
       const result = await askSystemOne({
-        apiKey: key,
+        apiKey: route.apiKey,
+        endpoint: route.endpoint,
+        model: route.model,
         state: { product: "Grist", task: input.task.slice(0, 1000) },
         questions,
       })
