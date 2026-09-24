@@ -24,6 +24,8 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { decidePermission, decideToolBudget } from "@/grist/control-plane"
+import { ToolOffload } from "@/grist/tool-offload"
+import type { JSONSchema7 } from "@ai-sdk/provider"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -47,6 +49,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   bypassAgentCheck: boolean
   messages: SessionV1.WithParts[]
   promptOps: TaskPromptOps
+  directory?: string
 }) {
   const tools: Record<string, AITool> = {}
   const run = yield* EffectBridge.make()
@@ -512,8 +515,125 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     tools[key] = item
   }
 
-  return tools
+  if (!ToolOffload.offloadEnabled()) return mapTools(tools, withCallLog)
+  return yield* applyOffload(input.session.id, tools, mcp, input.directory ?? process.cwd())
 })
+
+function applyOffload(sessionID: string, tools: Record<string, AITool>, mcp: MCP.Interface, directory: string) {
+  return Effect.gen(function* () {
+    const clientNames = Object.keys(yield* mcp.clients())
+    const mcpStatus = yield* mcp.status()
+    const payloads = yield* Effect.forEach(Object.entries(tools), ([id, item]) =>
+      extractSchema(item).pipe(
+        Effect.map((schema) => {
+          const mcpMeta = mcpToolMeta(id, clientNames, mcpStatus)
+          return {
+            id,
+            description: item.description ?? "",
+            schema,
+            group: mcpMeta?.group,
+            status: mcpMeta?.status,
+          }
+        }),
+      ),
+    )
+    const projected = ToolOffload.project(sessionID, payloads)
+    const next: Record<string, AITool> = {}
+    for (const item of projected.tools) {
+      switch (item.mode) {
+        case "loader":
+          next[item.id] = withCallLog(
+            item.id,
+            tool({
+              description: item.description,
+              inputSchema: jsonSchema(item.schema),
+              execute: (args) => Promise.resolve(ToolOffload.runLoad(sessionID, args)),
+            }),
+          )
+          continue
+        case "stub":
+          next[item.id] = withCallLog(
+            item.id,
+            tool({
+              description: item.description,
+              inputSchema: jsonSchema(item.schema),
+              execute: () => Promise.resolve(ToolOffload.runStub(sessionID, item.id, {})),
+            }),
+          )
+          continue
+        case "full": {
+          const original = tools[item.id]
+          if (!original) continue
+          next[item.id] = withCallLog(item.id, { ...original, description: item.description })
+          continue
+        }
+        default: {
+          const _exhaustive: never = item.mode
+          throw new Error(`Unhandled tool offload mode: ${_exhaustive}`)
+        }
+      }
+    }
+
+    yield* Effect.promise(() =>
+      ToolOffload.writeCatalog(directory, projected.catalog).then(
+        () => undefined,
+        () => undefined,
+      ),
+    )
+    return next
+  })
+}
+
+function mapTools(tools: Record<string, AITool>, map: (id: string, item: AITool) => AITool) {
+  return Object.fromEntries(Object.entries(tools).map(([id, item]) => [id, map(id, item)]))
+}
+
+function withCallLog(id: string, item: AITool): AITool {
+  const execute = item.execute
+  if (!execute) return item
+  return {
+    ...item,
+    execute: (args, options) =>
+      Promise.resolve(execute(args, options)).then(
+        (result) => {
+          ToolOffload.recordCall({ tool: id, ok: true, stub: toolResultStub(result) })
+          return result
+        },
+        (error: unknown) => {
+          ToolOffload.recordCall({
+            tool: id,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          return Promise.reject(error)
+        },
+      ),
+  }
+}
+
+function toolResultStub(result: unknown) {
+  if (typeof result !== "object" || result === null || !("metadata" in result)) return
+  const metadata = result.metadata
+  if (typeof metadata !== "object" || metadata === null || !("stub" in metadata)) return
+  return metadata.stub === true
+}
+
+function extractSchema(item: AITool) {
+  return Effect.promise(() => Promise.resolve(asSchema(item.inputSchema).jsonSchema)).pipe(
+    Effect.map((json): JSONSchema7 => {
+      if (json && typeof json === "object" && !Array.isArray(json)) return json
+      return { type: "object", properties: {} }
+    }),
+  )
+}
+
+function mcpToolMeta(toolKey: string, clientNames: string[], status: Record<string, MCP.Status>) {
+  const match = clientNames
+    .filter((name) => toolKey.startsWith(`${McpCatalog.sanitize(name)}_`))
+    .sort((a, b) => McpCatalog.sanitize(b).length - McpCatalog.sanitize(a).length)[0]
+  if (!match) return
+  return { group: `mcp:${match}`, status: ToolOffload.mcpStatusLine(status[match]) }
+}
 
 function toRecord(value: unknown) {
   if (isRecord(value)) return value
