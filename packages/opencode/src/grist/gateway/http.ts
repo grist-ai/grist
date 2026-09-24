@@ -4,6 +4,7 @@ import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
 import { publicModelRef } from "../rung"
 import { typesafeKey } from "../jev-client"
+import { resolveJevRoute, resolveProviderKey, type JevProvider } from "../jev-route"
 import { applyModeCap, type OperatingMode } from "../mode"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase"
 import { isLadderModel, publicLadderID, upstreamLadderID, priceForModel, usdForUsage } from "./prices"
@@ -147,6 +148,24 @@ export function createGateway(opts: GatewayOptions = {}) {
     )
   }
   const openrouterKey = opts.openrouterKey ?? process.env.OPENROUTER_API_KEY?.trim() ?? ""
+  const jevRoute = () =>
+    resolveJevRoute({
+      resolveKey: (provider: JevProvider) => {
+        switch (provider) {
+          case "openrouter":
+            return openrouterKey || undefined
+          case "vercel":
+            return resolveProviderKey("vercel")
+          case "typesafe":
+            return (opts.typesafeKey ?? typesafeKey()) || undefined
+          default: {
+            const _exhaustive: never = provider
+            void _exhaustive
+            return
+          }
+        }
+      },
+    })
   const adminToken = opts.adminToken ?? process.env.GRIST_ADMIN_TOKEN?.trim() ?? ""
   // Env-only on purpose: no admin email is hardcoded into the build, and an
   // empty value disables the Google sign-in admin shortcut entirely.
@@ -412,7 +431,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const text = typeof body?.text === "string" ? body.text : ""
     const sessionID = typeof body?.session_id === "string" ? body.session_id : undefined
     const started = now()
-    const { scores, provider } = await scoreTask(text, opts.typesafeKey ?? typesafeKey())
+    const { scores, provider } = await scoreTask(text, jevRoute() ?? "", { fetch: upstreamFetch })
     // Jev scoring is a paid upstream call; debit a flat per-call cost so the
     // invite cap reflects it. Shadow scoring never reaches a paid provider.
     if (provider === "jev") {

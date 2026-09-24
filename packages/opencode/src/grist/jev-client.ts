@@ -1,7 +1,9 @@
 /** Shared TypeSafe System One (Jev) HTTP client for Grist control-plane judgments. */
 
-export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
-export const JEV_MODEL = "jev-latest"
+import { JEV_ENDPOINTS, JEV_MODELS } from "./jev-route"
+
+export const JEV_ENDPOINT = JEV_ENDPOINTS.typesafe
+export const JEV_MODEL = JEV_MODELS.typesafe
 
 export type ScoreAnswer = {
   type: "score"
@@ -75,19 +77,27 @@ export async function askSystemOne(input: {
   state: Record<string, unknown>
   questions: Record<string, QuestionSpec>
   apiKey: string
+  endpoint?: string
+  model?: string
+  fetch?: (input: string, init?: RequestInit) => Promise<Response>
 }): Promise<SystemOneResult> {
-  const response = await fetch(JEV_ENDPOINT, {
+  const endpoint = input.endpoint ?? JEV_ENDPOINT
+  const model = input.model ?? JEV_MODEL
+  const fetchImpl = input.fetch ?? globalThis.fetch
+  const response = await fetchImpl(endpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: JEV_MODEL,
+      model,
       state: input.state,
       questions: input.questions,
     }),
   })
   if (!response.ok) throw new Error(`Jev HTTP ${response.status}`)
-  return (await response.json()) as SystemOneResult
+  const data = await response.json()
+  if (!data || typeof data !== "object" || !("answers" in data)) throw new Error("Jev response missing answers")
+  return data as SystemOneResult
 }

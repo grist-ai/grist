@@ -1244,6 +1244,51 @@ describe("gateway HTTP", () => {
     expect(shadow.store.getInvite(code)?.spent_usd).toBe(0)
   })
 
+  test("routes Jev through OpenRouter with the inference key", async () => {
+    const calls: { url: string; model?: string; authorization?: string | null }[] = []
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async (input, init) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { model?: string }
+        calls.push({
+          url: String(input),
+          model: body.model,
+          authorization: new Headers(init?.headers).get("Authorization"),
+        })
+        return new Response(
+          JSON.stringify({
+            model: "typesafe/jev-latest",
+            answers: {
+              difficulty: { type: "score", score: 2 },
+              sensitivity: { type: "score", score: 1 },
+              underspecified: { type: "noul", noul: 0.1 },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      },
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const route = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      headers: { "X-Grist-Invite": code },
+      body: { text: "refactor auth across files" },
+    })
+    expect(route.status).toBe(200)
+    expect((route.json as { provider: string }).provider).toBe("jev")
+    expect(calls[0]).toEqual({
+      url: "https://openrouter.ai/api/v1/systemone",
+      model: "typesafe/jev-latest",
+      authorization: "Bearer or-test",
+    })
+    expect(gateway.store.usageFor(code).some((event) => event.model === "gate/route")).toBe(true)
+  })
+
   test("rejects oversized request bodies with 413", async () => {
     const gateway = createGateway({ adminToken: "secret", typesafeKey: "" })
     const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {

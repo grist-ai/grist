@@ -13,12 +13,14 @@ import { rememberSessionControl } from "./control-plane"
 import { gristLog, gristWarn } from "./debug"
 import {
   askSystemOne,
+  JEV_ENDPOINT,
+  JEV_MODEL,
   noul01,
   score01,
-  typesafeKey,
   type NoulAnswer,
   type ScoreAnswer,
 } from "./jev-client"
+import { resolveJevRoute, type JevRoute } from "./jev-route"
 import { loadInviteConfig } from "./invite/config"
 import { fetchGateRoute, GatewayHttpError } from "./invite/client"
 
@@ -104,7 +106,7 @@ export function normalizeTaskText(text: string): string {
   return firstParagraph.slice(0, 500)
 }
 
-/** Heuristic shadow evaluator when TYPESAFE_API_KEY is absent. */
+/** Heuristic shadow evaluator when no Jev provider key is present. */
 export function shadowScores(text: string): {
   difficulty: number
   sensitivity: number
@@ -135,28 +137,51 @@ export function shadowScores(text: string): {
 
 export async function scoreTask(
   text: string,
-  apiKey = typesafeKey(),
+  auth?: string | JevRoute,
+  options?: { fetch?: (input: string, init?: RequestInit) => Promise<Response> },
 ): Promise<{
   scores: { difficulty: number; sensitivity: number; underspecified: number }
   provider: "jev" | "shadow"
 }> {
   const essence = normalizeTaskText(text)
-  if (!apiKey) return { scores: shadowScores(essence), provider: "shadow" }
+  const route = resolveScoreAuth(auth)
+  if (!route) return { scores: shadowScores(essence), provider: "shadow" }
   try {
-    return { scores: await evaluateWithJev(essence, apiKey), provider: "jev" }
+    return { scores: await evaluateWithJev(essence, route, options?.fetch), provider: "jev" }
   } catch (error) {
     gristWarn("[grist] Jev call failed; using shadow gate", error)
     return { scores: shadowScores(essence), provider: "shadow" }
   }
 }
 
-async function evaluateWithJev(text: string, apiKey: string): Promise<{
+function resolveScoreAuth(auth?: string | JevRoute): JevRoute | undefined {
+  if (typeof auth === "object") return auth
+  if (typeof auth === "string") {
+    if (!auth) return
+    return {
+      provider: "typesafe",
+      endpoint: JEV_ENDPOINT,
+      model: JEV_MODEL,
+      apiKey: auth,
+    }
+  }
+  return resolveJevRoute()
+}
+
+async function evaluateWithJev(
+  text: string,
+  route: JevRoute,
+  fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>,
+): Promise<{
   difficulty: number
   sensitivity: number
   underspecified: number
 }> {
   const result = await askSystemOne({
-    apiKey,
+    apiKey: route.apiKey,
+    endpoint: route.endpoint,
+    model: route.model,
+    fetch: fetchImpl,
     state: {
       task: text,
       product: "Grist",
