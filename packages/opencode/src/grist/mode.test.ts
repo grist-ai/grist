@@ -14,9 +14,15 @@ describe("operating mode", () => {
   })
 
   test("modeMaxRung ceilings", () => {
-    expect(modeMaxRung("normal")).toBe("frontier")
+    expect(modeMaxRung("normal")).toBe("premium")
     expect(modeMaxRung("capped")).toBe("medium")
     expect(modeMaxRung("cheapest")).toBe("cheapest")
+  })
+
+  test("applyModeCap degrades premium under capped", () => {
+    const { rung, reasons } = applyModeCap("premium", "capped")
+    expect(rung).toBe("medium")
+    expect(reasons).toContain("mode_capped_cap")
   })
 
   test("applyModeCap degrades frontier under capped", () => {

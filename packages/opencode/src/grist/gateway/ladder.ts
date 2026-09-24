@@ -2,7 +2,8 @@
  *
  * This module MUST stay gateway-only. Upstream model ids must never ship in
  * the client binary (extractable via `strings`). The client speaks rung names
- * only (`cheapest` / `medium` / `frontier`); the gateway resolves them here.
+ * only (`cheapest` / `medium` / `frontier` / `premium`); the gateway resolves
+ * them here.
  */
 import type { ModelRef, Rung } from "../rung"
 
@@ -27,6 +28,11 @@ export const DEFAULT_RUNG_MODELS: Record<Rung, ModelRef> = {
     providerID: "openrouter",
     modelID: "openai/gpt-6-sol",
   },
+  premium: {
+    providerID: "openrouter",
+    // OpenRouter id for Claude Opus 5.5 (added 2026-09-23; $4/$20 per M).
+    modelID: "anthropic/claude-opus-5.5",
+  },
 }
 
 /** Resolve a rung to the upstream model the gateway will call. */
@@ -47,6 +53,11 @@ export function resolveRung(rung: Rung, env: NodeJS.ProcessEnv = process.env): M
         providerID: env.GRIST_FRONTIER_PROVIDER ?? DEFAULT_RUNG_MODELS.frontier.providerID,
         modelID: env.GRIST_FRONTIER_MODEL ?? DEFAULT_RUNG_MODELS.frontier.modelID,
       }
+    case "premium":
+      return {
+        providerID: env.GRIST_PREMIUM_PROVIDER ?? DEFAULT_RUNG_MODELS.premium.providerID,
+        modelID: env.GRIST_PREMIUM_MODEL ?? DEFAULT_RUNG_MODELS.premium.modelID,
+      }
     default: {
       const _exhaustive: never = rung
       return _exhaustive
@@ -64,5 +75,8 @@ export const RUNG_MODELS: Record<Rung, ModelRef> = {
   },
   get frontier() {
     return resolveRung("frontier")
+  },
+  get premium() {
+    return resolveRung("premium")
   },
 }

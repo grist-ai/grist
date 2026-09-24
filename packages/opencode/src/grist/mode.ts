@@ -3,15 +3,15 @@ import type { Rung } from "./rung"
 /**
  * Operating modes (pre-POC §10).
  *
- * - `normal` — full ladder up to plan frontier budget
- * - `capped` — frontier off; medium is the top rung (~90% spend drop)
+ * - `normal` — full ladder up to premium
+ * - `capped` — frontier and premium off; medium is the top rung (~90% spend drop)
  * - `cheapest` — cheapest-only (lowest plan)
  *
  * Mode never hard-stops the agent — it degrades, never blocks.
  */
 export type OperatingMode = "normal" | "capped" | "cheapest"
 
-const ORDER: Record<Rung, number> = { cheapest: 0, medium: 1, frontier: 2 }
+const ORDER: Record<Rung, number> = { cheapest: 0, medium: 1, frontier: 2, premium: 3 }
 
 export function loadOperatingMode(raw = process.env.GRIST_MODE): OperatingMode {
   const value = raw?.trim().toLowerCase()
@@ -24,7 +24,7 @@ export function loadOperatingMode(raw = process.env.GRIST_MODE): OperatingMode {
 export function modeMaxRung(mode: OperatingMode = loadOperatingMode()): Rung {
   if (mode === "cheapest") return "cheapest"
   if (mode === "capped") return "medium"
-  return "frontier"
+  return "premium"
 }
 
 /**

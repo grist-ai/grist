@@ -10,11 +10,15 @@ describe("RUNG_MODELS", () => {
     expect(RUNG_MODELS.cheapest.modelID).toBe("deepseek/deepseek-v4.1-flash")
     expect(RUNG_MODELS.medium.modelID).toBe("moonshotai/kimi-k3")
     expect(RUNG_MODELS.frontier.modelID).toBe("openai/gpt-6-sol")
+    expect(RUNG_MODELS.premium.providerID).toBe("openrouter")
+    expect(RUNG_MODELS.premium.modelID).toBe("anthropic/claude-opus-5.5")
   })
 
   test("public refs hide vendor ids", () => {
     expect(publicModelRef("cheapest")).toEqual({ providerID: "openrouter", modelID: "cheapest" })
+    expect(publicModelRef("premium")).toEqual({ providerID: "openrouter", modelID: "premium" })
     expect(PUBLIC_RUNG_NAME.frontier).toBe("Max")
+    expect(PUBLIC_RUNG_NAME.premium).toBe("Ultra")
   })
 })
 
@@ -29,7 +33,9 @@ describe("B1 client safety", () => {
     expect(publicRungFor("cheapest")).toBe("cheapest")
     expect(publicRungFor("medium")).toBe("medium")
     expect(publicRungFor("frontier")).toBe("frontier")
+    expect(publicRungFor("premium")).toBe("premium")
     expect(publicRungFor("openrouter/cheapest")).toBe("cheapest")
     expect(publicRungFor("deepseek/deepseek-v4.1-flash")).toBeUndefined()
+    expect(publicRungFor("anthropic/claude-opus-5.5")).toBeUndefined()
   })
 })

@@ -45,12 +45,14 @@ export type BurnInSummary = {
    * (cheaperWouldSucceed === false). */
   escalationPrecision: number | null
   frontierShare: number
+  premiumShare: number
 }
 
 const emptyCounts = (): Record<Rung, number> => ({
   cheapest: 0,
   medium: 0,
   frontier: 0,
+  premium: 0,
 })
 
 export function summarize(events: BurnInEvent[]): BurnInSummary {
@@ -64,6 +66,7 @@ export function summarize(events: BurnInEvent[]): BurnInSummary {
     cheapest: byRung.cheapest / total,
     medium: byRung.medium / total,
     frontier: byRung.frontier / total,
+    premium: byRung.premium / total,
   }
 
   const outcomes = events.filter((e) => e.kind === "outcome" && e.outcome && e.outcome !== "unknown")
@@ -94,10 +97,11 @@ export function summarize(events: BurnInEvent[]): BurnInSummary {
     cheapestSuccessShare,
     escalationPrecision,
     frontierShare: tierMix.frontier,
+    premiumShare: tierMix.premium,
   }
 }
 
-/** Targets from pre-POC §9: ≥80% cheapest / ≤5% frontier. */
+/** Targets from pre-POC §9: ≥80% cheapest / ≤5% frontier+premium. */
 export function meetsTierMixTargets(summary: BurnInSummary): {
   ok: boolean
   reasons: string[]
@@ -107,8 +111,9 @@ export function meetsTierMixTargets(summary: BurnInSummary): {
   if (summary.tierMix.cheapest < 0.8) {
     reasons.push(`cheapest_share=${summary.tierMix.cheapest.toFixed(3)} < 0.80`)
   }
-  if (summary.frontierShare > 0.05) {
-    reasons.push(`frontier_share=${summary.frontierShare.toFixed(3)} > 0.05`)
+  const expensiveShare = summary.frontierShare + summary.premiumShare
+  if (expensiveShare > 0.05) {
+    reasons.push(`expensive_share=${expensiveShare.toFixed(3)} > 0.05`)
   }
   return { ok: reasons.length === 0, reasons }
 }

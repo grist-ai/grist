@@ -17,7 +17,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import { gatewayAuthHeaders, loadInviteConfig } from "@/grist/invite/config"
-import { PUBLIC_RUNG_NAME, publicModelRef, publicRungFor } from "@/grist/rung"
+import { PUBLIC_RUNG_NAME, PUBLIC_RUNGS, publicModelRef, publicRungFor } from "@/grist/rung"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -1345,7 +1345,7 @@ function ensureGristLadderModels(providers: Record<string, Info>) {
   if (!template) return
   openrouter.name = "Grist"
   const models: Record<string, Model> = {}
-  for (const rung of ["cheapest", "medium", "frontier"] as const) {
+  for (const rung of PUBLIC_RUNGS) {
     models[rung] = {
       ...template,
       id: ModelV2.ID.make(rung),

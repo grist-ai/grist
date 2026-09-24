@@ -77,3 +77,12 @@ describe("resolved-model metering", () => {
     expect(usdForUsage("cheapest", 0, 1_000_000, { at: MONDAY_PEAK, env })).toBeCloseTo(1.2)
   })
 })
+
+describe("Claude Opus 5.5 premium pricing", () => {
+  test("bills the premium rung at 4/20 with 0.20 cached reads", () => {
+    expect(usdForUsage("anthropic/claude-opus-5.5", 1_000_000, 0)).toBeCloseTo(4)
+    expect(usdForUsage("premium", 0, 1_000_000)).toBeCloseTo(20)
+    expect(usdForUsage("premium", 1_000_000, 0, { cachedInputTokens: 1_000_000 })).toBeCloseTo(0.2)
+    expect(usdForUsage("openrouter/premium", 1_000_000, 1_000_000)).toBeCloseTo(24)
+  })
+})

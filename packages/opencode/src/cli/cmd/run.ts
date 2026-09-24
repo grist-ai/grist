@@ -26,12 +26,13 @@ import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@openc
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
 import { runLocalHeadless } from "./run/headless"
+import { PUBLIC_RUNGS } from "@/grist/rung"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
 /** Grist ladder rungs — the only `-m` values accepted in Grist mode. Upstream
  *  model identities never surface to users. */
-const GRIST_RUNGS = ["cheapest", "medium", "frontier"] as const
+const GRIST_RUNGS: readonly string[] = PUBLIC_RUNGS
 
 function pick(value: string | undefined, gristMode = false): ModelInput | undefined {
   if (!value) return undefined

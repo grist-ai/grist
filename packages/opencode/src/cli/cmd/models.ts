@@ -34,8 +34,9 @@ export const ModelsCommand = effectCmd({
     // Grist mode: upstream model identities never surface. Only the ladder
     // rungs are listed; the full catalog stays internal.
     const { loadInviteConfig } = yield* Effect.promise(() => import("@/grist/invite/config"))
+    const { PUBLIC_RUNGS } = yield* Effect.promise(() => import("@/grist/rung"))
     const gristMode = !!loadInviteConfig()
-    const GRIST_RUNGS = ["cheapest", "medium", "frontier"]
+    const GRIST_RUNGS: readonly string[] = PUBLIC_RUNGS
 
     const provider = yield* Provider.Service
     const providers = yield* provider.list()

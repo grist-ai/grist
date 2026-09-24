@@ -1,4 +1,5 @@
 import { gatewayAuthHeaders, loadInviteConfig, type InviteConfig } from "./config"
+import type { Rung } from "../rung"
 
 export class GatewayHttpError extends Error {
   readonly status: number
@@ -32,7 +33,7 @@ export async function fetchUsage(config: InviteConfig = requireInvite()) {
     remaining_usd: number
     plan: string
     expires_at: string
-    by_rung: { cheapest: number; medium: number; frontier: number }
+    by_rung: { cheapest: number; medium: number; frontier: number; premium: number }
   }>(config, "/v1/usage", { method: "GET" })
 }
 
@@ -41,7 +42,7 @@ export async function fetchGateRoute(
   config: InviteConfig = requireInvite(),
 ) {
   return gatewayJson<{
-    rung: "cheapest" | "medium" | "frontier"
+    rung: Rung
     model: { provider_id: string; model_id: string }
     difficulty: number
     sensitivity: number
