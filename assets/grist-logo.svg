@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" role="img" aria-label="Grist">
+  <title>Grist</title>
+  <g fill="#EC5B2B">
+    <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z"/>
+    <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z"/>
+    <path d="M66 6H72V36H66V6Z"/>
+    <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z"/>
+    <path d="M120 6H156V12H144V36H132V12H120V6Z"/>
+  </g>
+</svg>
