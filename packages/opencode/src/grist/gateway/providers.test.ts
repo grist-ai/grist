@@ -30,7 +30,7 @@ describe("providerEndpoints", () => {
     const endpoints = providerEndpoints("openrouter")
     expect(endpoints?.chatCompletions).toBe("https://openrouter.ai/api/v1/chat/completions")
     expect(endpoints?.jevEndpoint).toContain("openrouter.ai")
-    expect(endpoints?.jevModel).toBe("typesafe/jev-latest")
+    expect(endpoints?.jevModel).toBe("typesafe/jev-1.13")
   })
   test("vercel chat + jev endpoints", () => {
     const endpoints = providerEndpoints("vercel")

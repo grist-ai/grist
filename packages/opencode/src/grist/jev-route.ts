@@ -1,8 +1,10 @@
 /**
  * Provider-aware Jev (System One) routing.
  *
- * OpenRouter: POST https://openrouter.ai/api/v1/systemone  model typesafe/jev-latest
+ * OpenRouter: POST https://openrouter.ai/api/v1/systemone  model typesafe/jev-1.13
  *   https://openrouter.ai/docs/api/api-reference/systemone/submit-a-system-one-request
+ *   (The "~typesafe/jev-latest" alias tracks newest; tilde-less "typesafe/jev-latest"
+ *   is not a valid OpenRouter model ID — do not use it.)
  *
  * Vercel AI Gateway TypeSafe-compatible (keeps noul / System One shape):
  *   POST https://ai-gateway.vercel.sh/typesafe/v1/systemone  model typesafe-ai/jev
@@ -34,7 +36,9 @@ export const JEV_ENDPOINTS = {
 } as const
 
 export const JEV_MODELS = {
-  openrouter: "typesafe/jev-latest",
+  // Pinned: tilde-less "typesafe/jev-latest" 404s on OpenRouter; only
+  // "typesafe/jev-1.13" and "~typesafe/jev-latest" are valid.
+  openrouter: "typesafe/jev-1.13",
   vercel: "typesafe-ai/jev",
   typesafe: "jev-latest",
 } as const

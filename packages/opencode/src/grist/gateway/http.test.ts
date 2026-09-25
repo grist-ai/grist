@@ -1252,7 +1252,7 @@ describe("gateway HTTP", () => {
         })
         return new Response(
           JSON.stringify({
-            model: "typesafe/jev-latest",
+            model: "typesafe/jev-1.13",
             answers: {
               difficulty: { type: "score", score: 2 },
               sensitivity: { type: "score", score: 1 },
@@ -1276,7 +1276,7 @@ describe("gateway HTTP", () => {
     expect((route.json as { provider: string }).provider).toBe("jev")
     expect(calls[0]).toEqual({
       url: "https://openrouter.ai/api/v1/systemone",
-      model: "typesafe/jev-latest",
+      model: "typesafe/jev-1.13",
       authorization: "Bearer or-test",
     })
     expect(gateway.store.usageFor(code).some((event) => event.model === "gate/route")).toBe(true)

@@ -20,12 +20,12 @@ describe("resolveProviderKey", () => {
 })
 
 describe("resolveJevRoute", () => {
-  test("openrouter maps to systemone + typesafe/jev-latest", () => {
+  test("openrouter maps to systemone + typesafe/jev-1.13", () => {
     const route = resolveJevRoute({ provider: "openrouter", env: { OPENROUTER_API_KEY: OPENROUTER } })
     expect(route).toEqual({
       provider: "openrouter",
       endpoint: "https://openrouter.ai/api/v1/systemone",
-      model: "typesafe/jev-latest",
+      model: "typesafe/jev-1.13",
       apiKey: OPENROUTER,
     })
     expect(route?.endpoint).toBe(JEV_ENDPOINTS.openrouter)
@@ -65,7 +65,7 @@ describe("resolveJevRoute", () => {
       env: { OPENROUTER_API_KEY: OPENROUTER, TYPESAFE_API_KEY: TYPESAFE },
     })
     expect(openrouter?.provider).toBe("openrouter")
-    expect(openrouter?.model).toBe("typesafe/jev-latest")
+    expect(openrouter?.model).toBe("typesafe/jev-1.13")
 
     const vercel = resolveJevRoute({
       env: { AI_GATEWAY_API_KEY: VERCEL, TYPESAFE_API_KEY: TYPESAFE },
