@@ -86,6 +86,40 @@ for (const filepath of new Bun.Glob("*/package.json").scanSync({ cwd: "./dist" }
 }
 console.log("binaries", binaries)
 
+/**
+ * Stage the @grist-ai/grist-skills npm package from skills/grist/ into
+ * dist/grist-skills/. The publish-grist workflow's dist/grist-* loop picks it
+ * up automatically (skip-if-published guard makes it a no-op on CLI-only
+ * releases); bump skills/grist/package.json's version to cut a skill release.
+ */
+async function prepareSkills() {
+  const src = fileURLToPath(new URL("../../../skills/grist", import.meta.url))
+  const license = fileURLToPath(new URL("../../../LICENSE", import.meta.url))
+  const dist = "./dist/grist-skills"
+  const pkg = await Bun.file(`${src}/package.json`).json()
+  const name = String(pkg.name)
+  if (!name.startsWith("@grist-ai/")) throw new Error(`skills package must be @grist-ai/*, got ${name}`)
+  await $`mkdir -p ${dist}`
+  for (const file of ["SKILL.md", "README.md", "package.json"]) {
+    const source = Bun.file(`${src}/${file}`)
+    if (!(await source.exists())) throw new Error(`skills source missing: ${file}`)
+    await Bun.write(`${dist}/${file}`, await source.text())
+  }
+  await Bun.write(`${dist}/LICENSE`, await Bun.file(license).text())
+  const staged = await Bun.file(`${dist}/package.json`).json()
+  staged.repository = {
+    type: "git",
+    url: `https://github.com/${PRODUCT_REPO}.git`,
+    directory: "skills/grist",
+  }
+  await Bun.file(`${dist}/package.json`).write(`${JSON.stringify(staged, null, 2)}\n`)
+  const version = String(staged.version)
+  console.log(`prepared ${name}@${version}`)
+  return { name, version }
+}
+
+const skills = await prepareSkills()
+
 const version = Object.values(binaries)[0]
 if (!version) {
   console.error("No platform packages in dist/. Run: bun run --cwd packages/opencode script/build.ts")
@@ -157,6 +191,7 @@ for (const name of Object.keys(binaries)) {
   await publish(`./dist/${name}`, name, binaries[name])
 }
 await publish(wrapperDir, PRODUCT_NPM, version)
+await publish("./dist/grist-skills", skills.name, skills.version)
 
 console.log(`Published ${PRODUCT_NPM}@${version}`)
 console.log(`Install: npm install -g ${PRODUCT_NPM}`)
