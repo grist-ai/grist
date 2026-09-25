@@ -1327,3 +1327,149 @@ async function call(
     json: text ? JSON.parse(text) : undefined,
   }
 }
+
+describe("rung models", () => {
+  test("store round-trips per-account overrides", () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite()
+    expect(store.getRungModelOverrides(invite.code)).toEqual({})
+    expect(store.setRungModelOverride(invite.code, "cheapest", "acct/flash")).toBe(true)
+    expect(store.getRungModelOverrides(invite.code)).toEqual({ cheapest: "acct/flash" })
+    expect(store.deleteRungModelOverride(invite.code, "cheapest")).toBe(true)
+    expect(store.getRungModelOverrides(invite.code)).toEqual({})
+    expect(store.deleteRungModelOverride(invite.code, "cheapest")).toBe(false)
+    store.setRungModelOverride(invite.code, "medium", "acct/k3")
+    store.setRungModelOverride(invite.code, "frontier", "acct/sol")
+    store.clearRungModelOverrides(invite.code)
+    expect(store.getRungModelOverrides(invite.code)).toEqual({})
+    expect(store.setRungModelOverride("grist-AAAA-BBBB", "cheapest", "x")).toBe(false)
+    store.close()
+  })
+
+  test("resolveRungWithOverrides precedence: account > env > default", async () => {
+    const { resolveRung, resolveRungWithOverrides, DEFAULT_RUNG_MODELS } = await import("./ladder")
+    const env = { GRIST_MEDIUM_MODEL: "env/k3" }
+    expect(resolveRungWithOverrides("medium", { medium: "acct/k3" }, env).modelID).toBe("acct/k3")
+    expect(resolveRungWithOverrides("medium", undefined, env).modelID).toBe("env/k3")
+    expect(resolveRungWithOverrides("medium", undefined, {}).modelID).toBe(
+      DEFAULT_RUNG_MODELS.medium.modelID,
+    )
+    expect(resolveRungWithOverrides("medium", { medium: "  " }, env).modelID).toBe("env/k3")
+    expect(resolveRung("medium", {}).modelID).toBe(DEFAULT_RUNG_MODELS.medium.modelID)
+  })
+
+  async function rungTestGateway() {
+    const upstreamBodies: unknown[] = []
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async (_input: string, init?: RequestInit) => {
+        upstreamBodies.push(init?.body ? JSON.parse(init.body as string) : undefined)
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 10, completion_tokens: 5 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      },
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5, note: "models" },
+    })
+    const code = (minted.json as { code: string }).code
+    return { gateway, code, upstreamBodies }
+  }
+
+  test("GET shows defaults, PUT sets and resets overrides", async () => {
+    const { gateway, code } = await rungTestGateway()
+    const auth = { headers: { "X-Grist-Invite": code } }
+
+    const initial = await call(gateway.fetch, "GET", "/v1/rung-models", auth)
+    expect(initial.status).toBe(200)
+    const rungs = (initial.json as { rungs: { rung: string; override: string | null }[] }).rungs
+    expect(rungs.map((row) => row.rung)).toEqual(["cheapest", "medium", "frontier", "premium"])
+    expect(rungs.every((row) => row.override === null)).toBe(true)
+
+    const set = await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      ...auth,
+      body: { overrides: { cheapest: "acct/flash" } },
+    })
+    expect(set.status).toBe(200)
+    const cheapest = (set.json as { rungs: { rung: string; override: string | null; effective: { model: string } }[] }).rungs.find(
+      (row) => row.rung === "cheapest",
+    )
+    expect(cheapest?.override).toBe("acct/flash")
+    expect(cheapest?.effective.model).toBe("acct/flash")
+
+    const reset = await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      ...auth,
+      body: { overrides: { cheapest: null } },
+    })
+    expect(reset.status).toBe(200)
+    const cheapestAfter = (reset.json as { rungs: { rung: string; override: string | null }[] }).rungs.find(
+      (row) => row.rung === "cheapest",
+    )
+    expect(cheapestAfter?.override).toBe(null)
+  })
+
+  test("PUT validates rung names and model ids", async () => {
+    const { gateway, code } = await rungTestGateway()
+    const auth = { headers: { "X-Grist-Invite": code } }
+
+    const badRung = await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      ...auth,
+      body: { overrides: { nope: "x/y" } },
+    })
+    expect(badRung.status).toBe(400)
+
+    const badModel = await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      ...auth,
+      body: { overrides: { cheapest: "has space" } },
+    })
+    expect(badModel.status).toBe(400)
+
+    const badShape = await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      ...auth,
+      body: { overrides: ["cheapest"] },
+    })
+    expect(badShape.status).toBe(400)
+  })
+
+  test("delegated grist_sk keys cannot change models (account session only)", async () => {
+    const { gateway, code } = await rungTestGateway()
+    const created = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      headers: { "X-Grist-Invite": code },
+      body: { name: "agent" },
+    })
+    const key = (created.json as { key: string }).key
+    const denied = await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      headers: { "X-Grist-Api-Key": key },
+      body: { overrides: { cheapest: "acct/flash" } },
+    })
+    expect(denied.status).toBe(401)
+    const deniedGet = await call(gateway.fetch, "GET", "/v1/rung-models", {
+      headers: { "X-Grist-Api-Key": key },
+    })
+    expect(deniedGet.status).toBe(401)
+  })
+
+  test("override changes the model on the house request path", async () => {
+    const { gateway, code, upstreamBodies } = await rungTestGateway()
+    const auth = { headers: { "X-Grist-Invite": code } }
+
+    await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      ...auth,
+      body: { overrides: { cheapest: "acct/flash" } },
+    })
+    const completion = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      ...auth,
+      body: { model: "cheapest", messages: [], stream: false },
+    })
+    expect(completion.status).toBe(200)
+    const last = upstreamBodies[upstreamBodies.length - 1] as { model?: string }
+    expect(last?.model).toBe("acct/flash")
+  })
+})

@@ -57,6 +57,64 @@ before persisting any rows to memory.
 Value prop: frontier-tier output at your provider's metered cost, with
 institutional memory that survives turnover.
 
+## Architecture
+
+One request, six moves. The client speaks rung names only — vendor model ids
+never ship in the client binary; the gateway resolves everything.
+
+```
+┌──────────┐  task + rung   ┌─────────┐  grist_sk auth   ┌──────────┐
+│ CLI/TUI/ │ ─────────────▶ │ Gateway │ ───────────────▶ │ Jev gate │
+│ Desktop  │                │         │  cap check (402) │  1×/run  │
+└──────────┘                └────┬────┘                  └────┬─────┘
+                                 │ rung                       │ rung
+                                 ▼                            ▼
+                          ┌────────────┐   model id    ┌──────────────┐
+                          │   Ladder   │ ────────────▶ │   Provider   │
+                          │ rung→model │               │  (your key)  │
+                          └────────────┘               └──────────────┘
+                                 ▲
+                 ┌───────────────┴────────────────┐
+                 │ defaults (ours)                │
+                 │ dashboard override (yours)     │
+                 └────────────────────────────────┘
+```
+
+- **Gateway**: admits the request (`grist_sk_...` identifies the account),
+  enforces hard spend caps, holds the ladder config and per-user provider
+  keys (AES-256-GCM, never logged, never returned by any API).
+- **Jev gate** ([TypeSafe Jev](https://typesafe.ai)): scores task
+  difficulty/confidence once per run and routes to the cheapest rung that can
+  handle it. The gate rides *your* provider key — no second API dependency.
+- **Subagent re-gating**: delegation text re-gates with the parent's rung as a
+  ceiling, so decomposed work can only shed cost, never gain it.
+- **Ladder**: rung → upstream model. Four cost-tiered rungs
+  (`cheapest`/`medium`/`frontier`/`premium`); `GRIST_<RUNG>_MODEL` env
+  overrides on the server, per-account overrides from the dashboard.
+- **BYOK**: the provider call rides *your* key (OpenRouter, Vercel AI Gateway,
+  or any OpenAI-compatible endpoint). Inference bills to your provider
+  account — Grist never holds your inference budget.
+- **Memory**: Supermemory sidecar (self-hosted, MIT) or `.grist/memory.json`;
+  ownership mined from your git history via `grist bootstrap`, so the next
+  session starts briefed.
+
+### Configuring the ladder
+
+Server defaults live in `packages/opencode/src/grist/gateway/ladder.ts` and
+can be overridden per rung with `GRIST_<RUNG>_MODEL` /
+`GRIST_<RUNG>_PROVIDER` env vars (per-provider: `GRIST_<PROVIDER>_<RUNG>_MODEL`).
+
+Users override any rung from the dashboard (**Models** tab) or via
+`PUT /v1/rung-models` (account session, same posture as `/v1/api-keys` —
+delegated `grist_sk_...` keys can't change models):
+
+```json
+{ "overrides": { "frontier": "openai/gpt-6-sol", "premium": null } }
+```
+`null` resets a rung to the default.
+
+Precedence: account override → env → compiled default.
+
 ## Self-hosting the gateway
 
 The gateway holds the ladder config, the gate, and per-user provider keys

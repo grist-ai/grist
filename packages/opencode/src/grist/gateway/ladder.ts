@@ -37,6 +37,23 @@ export const DEFAULT_RUNG_MODELS: Record<Rung, ModelRef> = {
 
 /** Resolve a rung to the upstream model the gateway will call. */
 export function resolveRung(rung: Rung, env: NodeJS.ProcessEnv = process.env): ModelRef {
+  return resolveRungWithOverrides(rung, undefined, env)
+}
+
+/**
+ * Resolve a rung with per-account overrides. Precedence: the account's
+ * override wins, then `GRIST_<RUNG>_PROVIDER` / `GRIST_<RUNG>_MODEL` env,
+ * then the compiled defaults. Deleting an override restores the default.
+ */
+export function resolveRungWithOverrides(
+  rung: Rung,
+  overrides?: Partial<Record<Rung, string>>,
+  env: NodeJS.ProcessEnv = process.env,
+): ModelRef {
+  const override = overrides?.[rung]?.trim()
+  if (override) {
+    return { providerID: resolveRung(rung, env).providerID, modelID: override }
+  }
   switch (rung) {
     case "cheapest":
       return {

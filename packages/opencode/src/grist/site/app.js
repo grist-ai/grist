@@ -26,6 +26,7 @@ const views = {
   "/login": "view-login",
   "/dashboard": "view-dashboard",
   "/dashboard/api": "view-dashboard",
+  "/dashboard/models": "view-dashboard",
   "/admin": "view-admin",
   "/plans": "view-plans",
   "/docs": "view-docs",
@@ -41,6 +42,7 @@ const titles = {
   "/login": "Sign in — Grist",
   "/dashboard": "Usage — Grist",
   "/dashboard/api": "API keys — Grist",
+  "/dashboard/models": "Models — Grist",
   "/admin": "Admin — Grist",
   "/plans": "Plans — Grist",
   "/docs": "Docs — Grist",
@@ -294,7 +296,7 @@ async function route() {
     void loadAdmin()
     return
   }
-  if (path === "/dashboard" || path === "/dashboard/api") {
+  if (path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models") {
     if (!signedIn()) {
       history.replaceState(null, "", "/login")
       show("view-login")
@@ -302,10 +304,11 @@ async function route() {
       return
     }
     show("view-dashboard")
-    setDashTab(path === "/dashboard/api" ? "api" : "usage")
+    setDashTab(path === "/dashboard/api" ? "api" : path === "/dashboard/models" ? "models" : "usage")
     setAuthNav()
     void loadDashboard()
     if (path === "/dashboard/api") void loadApiKeys()
+    if (path === "/dashboard/models") void loadModels()
     return
   }
   if (path === "/login" && device() && invite()) {
@@ -366,10 +369,11 @@ async function loadDashboard() {
 }
 
 function setDashTab(tab) {
-  const api = tab === "api"
-  document.getElementById("dash-title").textContent = api ? "API keys" : "Usage"
-  document.getElementById("dash-panel-usage").hidden = api
-  document.getElementById("dash-panel-api").hidden = !api
+  const titles = { usage: "Usage", api: "API keys", models: "Models" }
+  document.getElementById("dash-title").textContent = titles[tab] ?? "Usage"
+  document.getElementById("dash-panel-usage").hidden = tab !== "usage"
+  document.getElementById("dash-panel-api").hidden = tab !== "api"
+  document.getElementById("dash-panel-models").hidden = tab !== "models"
   for (const node of document.querySelectorAll("[data-dash]")) {
     node.classList.toggle("is-on", node.getAttribute("data-dash") === tab)
   }
@@ -647,6 +651,79 @@ document.getElementById("copy-key")?.addEventListener("click", async (event) => 
   const ok = await copyText(document.getElementById("key-secret-value").textContent)
   if (!ok) return
   flashCopied(node)
+})
+
+let modelsLoad = 0
+
+async function loadModels() {
+  const gen = ++modelsLoad
+  const error = document.getElementById("dash-error")
+  const response = await fetch("/v1/rung-models", { headers: await headers() })
+  if (gen !== modelsLoad) return
+  if (response.status !== 200) {
+    fail(error, "Couldn’t load models. Sign in again.")
+    return
+  }
+  const data = await response.json()
+  renderModels(data.rungs ?? [])
+}
+
+function renderModels(rungs) {
+  document.getElementById("model-rows").innerHTML = rungs
+    .map(
+      (row) => `
+      <div class="model-row">
+        <div class="model-row-head">
+          <strong>${escapeHtml(row.label)}</strong>
+          <code>${escapeHtml(row.rung)}</code>
+          ${row.override ? `<span class="pill">custom</span>` : `<span class="pill pill-dim">default</span>`}
+        </div>
+        <p class="muted">Default <code>${escapeHtml(row.default.model)}</code></p>
+        <input data-rung="${escapeHtml(row.rung)}" value="${escapeHtml(row.override ?? "")}"
+          placeholder="${escapeHtml(row.default.model)}" autocomplete="off" spellcheck="false"
+          aria-label="${escapeHtml(row.label)} model override" />
+      </div>`,
+    )
+    .join("")
+}
+
+async function putRungModels(overrides) {
+  const msg = document.getElementById("models-msg")
+  msg.textContent = ""
+  const response = await fetch("/v1/rung-models", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...(await headers()) },
+    body: JSON.stringify({ overrides }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (response.status !== 200) {
+    msg.textContent = data.error ?? "Couldn’t save models."
+    return
+  }
+  renderModels(data.rungs ?? [])
+  msg.textContent = "Saved."
+}
+
+function collectRungModels() {
+  const overrides = {}
+  for (const input of document.querySelectorAll("#model-rows input[data-rung]")) {
+    const value = input.value.trim()
+    overrides[input.getAttribute("data-rung")] = value ? value : null
+  }
+  return overrides
+}
+
+document.getElementById("models-form")?.addEventListener("submit", (event) => {
+  event.preventDefault()
+  void putRungModels(collectRungModels())
+})
+
+document.getElementById("models-reset")?.addEventListener("click", () => {
+  const overrides = {}
+  for (const input of document.querySelectorAll("#model-rows input[data-rung]")) {
+    overrides[input.getAttribute("data-rung")] = null
+  }
+  void putRungModels(overrides)
 })
 
 document.getElementById("copy-skill")?.addEventListener("click", async (event) => {

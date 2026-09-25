@@ -184,6 +184,13 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS rung_model_overrides (
+      code TEXT NOT NULL,
+      rung TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (code, rung)
+    );
   `)
   // `CREATE TABLE IF NOT EXISTS` will not add the column to a database created
   // before per-key attribution existed, so backfill it in place.
@@ -272,6 +279,14 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   )
   const selectCredential = db.prepare(`SELECT * FROM provider_credentials WHERE code = ?`)
   const deleteCredential = db.prepare(`DELETE FROM provider_credentials WHERE code = ?`)
+  const upsertRungOverride = db.prepare(
+    `INSERT INTO rung_model_overrides (code, rung, model_id, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(code, rung) DO UPDATE SET model_id = excluded.model_id, updated_at = excluded.updated_at`,
+  )
+  const selectRungOverrides = db.prepare(`SELECT rung, model_id FROM rung_model_overrides WHERE code = ?`)
+  const deleteRungOverride = db.prepare(`DELETE FROM rung_model_overrides WHERE code = ? AND rung = ?`)
+  const deleteRungOverrides = db.prepare(`DELETE FROM rung_model_overrides WHERE code = ?`)
 
   function requireMasterKey(): Buffer {
     if (!masterKey) throw new Error("GRIST_MASTER_KEY is not configured")
@@ -593,6 +608,37 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       const invite = lookup(inviteCode)
       if (!invite) return false
       return deleteCredential.run(invite.code).changes > 0
+    },
+
+    /**
+     * Per-account rung → model id overrides. An override wins over the
+     * server default ladder; deleting it restores the default.
+     */
+    getRungModelOverrides(inviteCode: string): Partial<Record<Rung, string>> {
+      const invite = lookup(inviteCode)
+      if (!invite) return {}
+      const rows = selectRungOverrides.all(invite.code) as { rung: string; model_id: string }[]
+      return Object.fromEntries(rows.map((row) => [row.rung, row.model_id]))
+    },
+
+    setRungModelOverride(inviteCode: string, rung: Rung, modelId: string): boolean {
+      const invite = lookup(inviteCode)
+      if (!invite) return false
+      upsertRungOverride.run(invite.code, rung, modelId, Date.now())
+      return true
+    },
+
+    deleteRungModelOverride(inviteCode: string, rung: Rung): boolean {
+      const invite = lookup(inviteCode)
+      if (!invite) return false
+      return deleteRungOverride.run(invite.code, rung).changes > 0
+    },
+
+    clearRungModelOverrides(inviteCode: string): boolean {
+      const invite = lookup(inviteCode)
+      if (!invite) return false
+      deleteRungOverrides.run(invite.code)
+      return true
     },
 
     inviteForApiKey(raw: string, now: number): (InviteRow & { keyId: string }) | undefined {

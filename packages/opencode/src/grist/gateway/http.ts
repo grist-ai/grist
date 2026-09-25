@@ -2,7 +2,8 @@ import path from "path"
 import { createHash } from "node:crypto"
 import { composeMechanisms, loadMechanismProfile } from "../mechanisms"
 import { composeRung, scoreTask } from "../jev-gate"
-import { publicModelRef, PUBLIC_RUNGS, type Rung } from "../rung"
+import { publicModelRef, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, type Rung } from "../rung"
+import { resolveRung, resolveRungWithOverrides } from "./ladder"
 import { typesafeKey } from "../jev-client"
 import { resolveJevRoute, resolveProviderKey, type JevProvider, type JevRoute } from "../jev-route"
 import { parseByokProvider, providerEndpoints, resolveUpstream, type ByokProvider } from "./providers"
@@ -195,7 +196,11 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (!credential) {
       if (!openrouterKey) return { ok: false, reason: "no_key" }
-      const house = resolveUpstream({ provider: "openrouter", rung })
+      const house = resolveUpstream({
+        provider: "openrouter",
+        rung,
+        rungModelOverrides: store.getRungModelOverrides(inviteCode),
+      })
       if (!house) return { ok: false, reason: "no_key" }
       return {
         ok: true,
@@ -211,6 +216,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       rung,
       customBaseURL: credential.baseURL ?? undefined,
       customModels: credential.customModels,
+      rungModelOverrides: store.getRungModelOverrides(inviteCode),
     })
     if (!resolved) return { ok: false, reason: "provider_misconfigured" }
     return {
@@ -365,6 +371,10 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (pathname === "/v1/api-keys" || pathname.startsWith("/v1/api-keys/")) {
       return apiKeys(req, pathname, peerIp)
+    }
+
+    if (pathname === "/v1/rung-models") {
+      return rungModels(req)
     }
     if (pathname === "/v1/provider") {
       return providerCredentials(req)
@@ -708,6 +718,46 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   /**
+   * Per-account rung → model overrides. GET shows each rung with the server
+   * default and the effective model; PUT sets overrides (`null` resets a rung
+   * to the default). Overrides win over the default ladder on every request.
+   */
+  async function rungModels(req: Request): Promise<Response> {
+    const invite = await requireAccount(req)
+    if (invite instanceof Response) return invite
+
+    if (req.method === "GET") {
+      return json(200, { rungs: rungModelView(store, invite.code) })
+    }
+
+    if (req.method === "PUT") {
+      if (!allowWindow(`models:${invite.code}`, limits.capChange.limit, limits.capChange.windowMs)) {
+        return json(429, { error: "too many model changes" })
+      }
+      const body = await readJson(req)
+      const overrides = body?.overrides
+      if (typeof overrides !== "object" || overrides === null || Array.isArray(overrides)) {
+        return json(400, { error: "overrides must be an object keyed by rung" })
+      }
+      for (const [rung, model] of Object.entries(overrides)) {
+        if (!(PUBLIC_RUNGS as readonly string[]).includes(rung)) {
+          return json(400, { error: `unknown rung: ${rung}` })
+        }
+        if (model !== null && (typeof model !== "string" || !isModelId(model))) {
+          return json(400, { error: `invalid model id for rung ${rung}` })
+        }
+      }
+      for (const [rung, model] of Object.entries(overrides)) {
+        if (model === null) store.deleteRungModelOverride(invite.code, rung as Rung)
+        else store.setRungModelOverride(invite.code, rung as Rung, (model as string).trim())
+      }
+      return json(200, { rungs: rungModelView(store, invite.code) })
+    }
+
+    return json(404, { error: "not found" })
+  }
+
+  /**
    * BYOK provider credentials. The caller manages their own key, identified by
    * their grist_sk / invite. Responses carry the key fingerprint only — the
    * raw key is never returned, never logged, and stored encrypted at rest.
@@ -951,6 +1001,27 @@ function validBaseURL(raw: string | undefined): string | undefined {
  * or undefined when the input was absent; null when the input was present but
  * malformed.
  */
+function rungModelView(store: GatewayStore, code: string) {
+  const overrides = store.getRungModelOverrides(code)
+  return PUBLIC_RUNGS.map((rung) => {
+    const def = resolveRung(rung)
+    const effective = resolveRungWithOverrides(rung, overrides)
+    return {
+      rung,
+      label: PUBLIC_RUNG_NAME[rung],
+      default: { provider: def.providerID, model: def.modelID },
+      effective: { provider: effective.providerID, model: effective.modelID },
+      override: overrides[rung] ?? null,
+    }
+  })
+}
+
+/** Model ids are opaque upstream strings: no whitespace, bounded length. */
+function isModelId(raw: string): boolean {
+  const id = raw.trim()
+  return id.length > 0 && id.length <= 200 && /^[A-Za-z0-9._/:@+-]+$/.test(id)
+}
+
 function validCustomModels(raw: unknown): Partial<Record<Rung, string>> | undefined | null {
   if (raw === undefined) return undefined
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null

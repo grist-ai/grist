@@ -103,3 +103,45 @@ describe("resolveUpstream", () => {
     })
   })
 })
+
+describe("rung model overrides", () => {
+  test("account override wins over env and the compiled default", () => {
+    const env = { GRIST_CHEAPEST_MODEL: "env/model" }
+    expect(ladderModel("openrouter", "cheapest", env, { cheapest: "acct/model" })).toBe("acct/model")
+  })
+  test("env wins when no account override", () => {
+    const env = { GRIST_CHEAPEST_MODEL: "env/model" }
+    expect(ladderModel("openrouter", "cheapest", env)).toBe("env/model")
+  })
+  test("compiled default when neither override nor env", () => {
+    expect(ladderModel("openrouter", "cheapest", {})).toBe(DEFAULT_RUNG_MODELS.cheapest.modelID)
+  })
+  test("blank account override is ignored", () => {
+    expect(ladderModel("openrouter", "cheapest", {}, { cheapest: "   " })).toBe(
+      DEFAULT_RUNG_MODELS.cheapest.modelID,
+    )
+  })
+  test("override applies to vercel ladder too", () => {
+    expect(ladderModel("vercel", "frontier", {}, { frontier: "acct/sol" })).toBe("acct/sol")
+  })
+  test("resolveUpstream threads overrides through", () => {
+    const resolved = resolveUpstream({
+      provider: "openrouter",
+      rung: "medium",
+      rungModelOverrides: { medium: "acct/k3" },
+      env: {},
+    })
+    expect(resolved?.model).toBe("acct/k3")
+  })
+  test("custom provider keeps using customModels, unaffected by overrides", () => {
+    const resolved = resolveUpstream({
+      provider: "custom",
+      rung: "cheapest",
+      customBaseURL: "https://llm.example.com/v1",
+      customModels: { cheapest: "my-org/my-model" },
+      rungModelOverrides: { cheapest: "acct/other" },
+      env: {},
+    })
+    expect(resolved?.model).toBe("my-org/my-model")
+  })
+})

@@ -72,15 +72,20 @@ const VERCEL_LADDER_MODELS: Record<Rung, string> = {
 }
 
 /**
- * Upstream model id for (provider, rung). `custom` has no ladder table — the
- * user supplies per-rung ids in their provider config. Env override wins:
- * GRIST_<PROVIDER>_<RUNG>_MODEL (e.g. GRIST_VERCEL_FRONTIER_MODEL).
+ * Upstream model id for (provider, rung). Precedence: the account's rung
+ * override wins, then env (`GRIST_<PROVIDER>_<RUNG>_MODEL`, e.g.
+ * GRIST_VERCEL_FRONTIER_MODEL), then the compiled ladder table. `custom`
+ * has no ladder table — the user supplies per-rung ids in their provider
+ * config (`customModels`), which already act as the override.
  */
 export function ladderModel(
   provider: ByokProvider,
   rung: Rung,
   env: NodeJS.ProcessEnv = process.env,
+  rungModelOverrides?: Partial<Record<Rung, string>>,
 ): string | undefined {
+  const accountOverride = rungModelOverrides?.[rung]?.trim()
+  if (accountOverride) return accountOverride
   const override = env[`GRIST_${provider.toUpperCase()}_${rung.toUpperCase()}_MODEL`]?.trim()
   if (override) return override
   switch (provider) {
@@ -112,6 +117,7 @@ export function resolveUpstream(input: {
   rung: Rung
   customBaseURL?: string
   customModels?: Partial<Record<Rung, string>>
+  rungModelOverrides?: Partial<Record<Rung, string>>
   env?: NodeJS.ProcessEnv
 }): ResolvedUpstream | undefined {
   const endpoints = providerEndpoints(input.provider, input.customBaseURL)
@@ -119,7 +125,7 @@ export function resolveUpstream(input: {
   const model =
     input.provider === "custom"
       ? input.customModels?.[input.rung]?.trim() || undefined
-      : ladderModel(input.provider, input.rung, input.env)
+      : ladderModel(input.provider, input.rung, input.env, input.rungModelOverrides)
   if (!model) return undefined
   return {
     provider: input.provider,

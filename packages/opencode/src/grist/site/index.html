@@ -34,6 +34,7 @@
       </a>
       <nav>
         <a href="/#product">Product</a>
+        <a href="/#architecture">Architecture</a>
         <a href="/docs">Docs</a>
         <a href="/plans">Pricing</a>
         <a class="btn" href="/#get-started" data-auth="out">Get started</a>
@@ -294,16 +295,20 @@ grist</pre>
         </div>
         <ol class="ladder" aria-hidden="true">
           <li class="fig-rung fig-rung-1">
-            <div><b>CHEAP</b><em>default</em></div>
+            <div><b>FAST</b><em>default</em></div>
             <p>Routine edits, stubs, formatting. Stays here unless the work is actually hard.</p>
           </li>
           <li class="fig-rung fig-rung-2">
-            <div><b>CAPABLE</b><em>pre-frontier</em></div>
-            <p>Cross-file refactors and work that needs more than the cheap rung.</p>
+            <div><b>STANDARD</b><em>step up</em></div>
+            <p>Cross-file refactors and work that needs more than the fast rung.</p>
           </li>
           <li class="fig-rung fig-rung-3">
-            <div><b>EXCEPTIONAL</b><em>reserved</em></div>
+            <div><b>MAX</b><em>reserved</em></div>
             <p>Used when it is actually hard. Not a habit.</p>
+          </li>
+          <li class="fig-rung fig-rung-4">
+            <div><b>ULTRA</b><em>opt-in</em></div>
+            <p>The top tier, for the rare task that earns it.</p>
           </li>
         </ol>
       </section>
@@ -343,6 +348,54 @@ grist</pre>
           </article>
         </div>
         <p class="bound-receipt">3 files · tests passed · $0.012</p>
+      </section>
+
+      <section class="arch-section" id="architecture">
+        <div>
+          <p class="eyebrow">[ architecture ]</p>
+          <h2>How a prompt becomes a diff.</h2>
+          <p class="lede">
+            One request, six moves. The client never sees a model id — only
+            rung names. The gateway resolves everything, and your provider key
+            pays for inference. Not ours.
+          </p>
+        </div>
+        <ol class="arch-flow">
+          <li>
+            <span class="arch-n">1</span>
+            <h3>You prompt</h3>
+            <p>CLI, TUI, or desktop. The client sends the task and names a rung — never a vendor model id.</p>
+          </li>
+          <li>
+            <span class="arch-n">2</span>
+            <h3>Gateway admits</h3>
+            <p><code>grist_sk</code> identifies your account. Spend caps are hard: over cap returns 402, not a bill.</p>
+          </li>
+          <li>
+            <span class="arch-n">3</span>
+            <h3>Jev gate routes</h3>
+            <p>A confidence gate scores difficulty once per run and picks the cheapest rung that can handle it.</p>
+          </li>
+          <li>
+            <span class="arch-n">4</span>
+            <h3>Ladder resolves</h3>
+            <p>Rung becomes a model. Defaults are ours — <a href="/dashboard/models">your dashboard</a> can override any rung.</p>
+          </li>
+          <li>
+            <span class="arch-n">5</span>
+            <h3>Your key pays</h3>
+            <p>The provider call rides your BYOK key. Inference bills to your provider account; Grist never holds your budget.</p>
+          </li>
+          <li>
+            <span class="arch-n">6</span>
+            <h3>Memory compounds</h3>
+            <p>Approved diffs and proven changes become memory — code map, ownership, Supermemory. The next run starts briefed.</p>
+          </li>
+        </ol>
+        <p class="arch-note">
+          Subagents re-gate on their delegation text with the parent's rung as a
+          ceiling — decomposed work can only shed cost, never gain it.
+        </p>
       </section>
 
       <section class="waitlist" id="get-started">
@@ -682,6 +735,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
       <nav class="dash-tabs" aria-label="Dashboard">
         <a href="/dashboard" data-dash="usage">Usage</a>
         <a href="/dashboard/api" data-dash="api">API keys</a>
+        <a href="/dashboard/models" data-dash="models">Models</a>
       </nav>
       <p class="error" id="dash-error" hidden></p>
       <p class="remain" id="remain">—</p>
@@ -727,6 +781,19 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           <button type="button" class="copy" id="copy-key">Copy</button>
         </section>
         <section class="admin-list" id="key-list"></section>
+      </div>
+      <div id="dash-panel-models" hidden>
+        <p class="lede">
+          Each ladder rung has a default model. Override any rung with a model
+          id your provider serves — clearing the field restores the default.
+          Overrides apply to every request on this account.
+        </p>
+        <section class="model-list" id="model-rows"></section>
+        <form id="models-form" class="key-form">
+          <button class="btn" type="submit">Save models</button>
+          <button type="button" class="text-btn" id="models-reset">Reset all to defaults</button>
+          <span class="muted" id="models-msg" role="status"></span>
+        </form>
       </div>
     </main>
 
@@ -1305,7 +1372,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
     <script>
       (() => {
         const path = location.pathname.replace(/\/+$/, "") || "/"
-        if (path === "/admin" || path === "/admin/requests" || path === "/dashboard" || path === "/dashboard/api") {
+        if (path === "/admin" || path === "/admin/requests" || path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models") {
           for (const main of document.querySelectorAll("main")) main.hidden = true
           return
         }
@@ -1314,6 +1381,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           "/login": "view-login",
           "/dashboard": "view-dashboard",
           "/dashboard/api": "view-dashboard",
+          "/dashboard/models": "view-dashboard",
           "/admin": "view-admin",
           "/admin/requests": "view-admin",
           "/plans": "view-plans",
