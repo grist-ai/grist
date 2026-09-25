@@ -3,9 +3,9 @@
 </p>
 
 <p align="center">
-  <strong>The confidence-gated coding agent.</strong><br />
-  Every task is routed to the cheapest model rung that can handle it — frontier-tier
-  output at metered cost, with institutional memory that survives turnover.
+  <strong>A complete coding-agent harness.</strong><br />
+  Confidence-gated model routing, institutional memory, and BYOK economics —
+  frontier-tier output at metered cost.
 </p>
 
 <p align="center">
@@ -18,13 +18,13 @@ Grist is a coding-agent harness — a rebranded fork of [OpenCode](https://githu
 The agent loop *is* this codebase: the same binary runs the chat, the IDE integration,
 the CLI, and the desktop app. There is no separate wrapper process.
 
-What makes it different is the economics layer wrapped around that loop: a
-**Jev confidence gate** scores every task once and routes it to the cheapest of
-four cost-tiered model rungs that can handle it. Routine edits run on a $0.14/M-token
-workhorse; only the genuinely hard tasks touch frontier models. **Bring your own
-key** — inference bills to your provider account (OpenRouter, Vercel AI Gateway, or
-any OpenAI-compatible endpoint). Grist never holds your inference budget and takes
-zero markup.
+What makes it different is what's wrapped around that loop: a **Jev confidence
+gate** that routes every task to the cheapest capable model rung; **institutional
+memory** mined from your git history; a **code map** the gate can actually reason
+over; **token mechanisms** that shrink context on every rung; and **BYOK
+economics** — inference bills to your provider account (OpenRouter, Vercel AI
+Gateway, or any OpenAI-compatible endpoint) with zero markup. Grist never holds
+your inference budget.
 
 ## Benchmarks & economics
 

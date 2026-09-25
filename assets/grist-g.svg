@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Grist G mark">
+  <title>Grist</title>
+  <g fill="#EC5B2B" transform="translate(24 18) scale(3)">
+    <rect x="0" y="0" width="16" height="4"/>
+    <rect x="0" y="4" width="4" height="12"/>
+    <rect x="0" y="16" width="16" height="4"/>
+    <rect x="8" y="8" width="8" height="4"/>
+  </g>
+</svg>
