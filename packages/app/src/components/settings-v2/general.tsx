@@ -150,7 +150,7 @@ const AppearanceSection: Component<{ controller: AppearanceSettingsController }>
           description={
             <>
               {language.t("settings.general.row.theme.description")}{" "}
-              <ExternalLink class="settings-v2-link" href="https://github.com/pranav6226/grist#readme">
+              <ExternalLink class="settings-v2-link" href="https://github.com/grist-ai/grist#readme">
                 {language.t("common.learnMore")}
               </ExternalLink>
             </>

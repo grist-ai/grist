@@ -8,7 +8,7 @@
     "openrouter": {
       "options": {
         "headers": {
-          "HTTP-Referer": "https://github.com/pranav6226/grist",
+          "HTTP-Referer": "https://github.com/grist-ai/grist",
           "X-Title": "Grist"
         }
       }

@@ -832,7 +832,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          open("https://github.com/pranav6226/grist#readme").catch(() => {})
+          open("https://github.com/grist-ai/grist#readme").catch(() => {})
           dialog.clear()
         },
         category: "System",

@@ -98,7 +98,7 @@ Never publish the 50MB+ platform tarballs from this laptop (`SSL` / `EPIPE`).
 Always GitHub Actions:
 
 ```bash
-gh workflow run publish-grist.yml -R pranav6226/grist --ref main \
+gh workflow run publish-grist.yml -R grist-ai/grist --ref main \
   -f version=<npm-version> -f channel=latest -f single=false
 ```
 
@@ -116,7 +116,7 @@ must not block darwin/linux/`grist-ai`. Success is `grist-ai@<version>` plus
 ### npm auth (do not regress)
 
 - OIDC trusted publisher on each package. Workflow file **must** be exactly
-  `publish-grist.yml`, repo `pranav6226/grist`.
+  `publish-grist.yml`, repo `grist-ai/grist`.
 - Do **not** set `NODE_AUTH_TOKEN` or setup-node `registry-url` (empty
   `_authToken` skips OIDC → `ENEEDAUTH` / fake 404).
 - Do **not** set `OPENCODE_RELEASE` (calls `gh release upload` with no token).

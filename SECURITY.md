@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Do not open a public issue. Use the GitHub Security Advisory
-["Report a Vulnerability"](https://github.com/pranav6226/grist/security/advisories/new)
+["Report a Vulnerability"](https://github.com/grist-ai/grist/security/advisories/new)
 tab on this repo.
 
 We do not accept AI-generated security reports — they are closed on sight.

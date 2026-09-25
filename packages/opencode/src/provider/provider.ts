@@ -486,7 +486,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
             apiKey: "grist-invite",
             baseURL: `${invite.gatewayUrl}/v1`,
             headers: {
-              "HTTP-Referer": "https://github.com/pranav6226/grist",
+              "HTTP-Referer": "https://github.com/grist-ai/grist",
               "X-Title": "Grist",
               ...gatewayAuthHeaders(invite),
             },
@@ -497,7 +497,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://github.com/pranav6226/grist",
+            "HTTP-Referer": "https://github.com/grist-ai/grist",
             "X-Title": "Grist",
           },
         },

@@ -601,7 +601,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       headers: {
         Authorization: `Bearer ${target.key}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/pranav6226/grist",
+        "HTTP-Referer": "https://github.com/grist-ai/grist",
         "X-Title": "Grist",
       },
       body: JSON.stringify(payload),
