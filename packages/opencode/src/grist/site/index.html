@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Grist — a coding agent that gets smarter and cheaper on your project</title>
+    <title>Grist — a complete coding-agent harness</title>
     <meta
       name="description"
       content="Grist is a coding agent for your project. It remembers what shipped, and routes more of the work to the cheapest model that can handle it. Open to everyone."
@@ -36,7 +36,6 @@
         <a href="/#product">Product</a>
         <a href="/#architecture">Architecture</a>
         <a href="/docs">Docs</a>
-        <a href="/plans">Pricing</a>
         <a class="btn" href="/#get-started" data-auth="out">Get started</a>
         <a class="btn btn-light" href="/login" data-auth="out">Sign in</a>
         <a href="/admin" data-auth="admin" hidden>Admin</a>
@@ -47,13 +46,13 @@
     <main id="view-home">
       <section class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">[ coding agent ]</p>
-          <h1>A coding agent that gets<br />smarter and cheaper on your project.</h1>
+          <p class="eyebrow">[ coding-agent harness ]</p>
+          <h1>A complete coding-agent<br />harness.</h1>
           <p class="lede">
-            Grist writes and edits code in your working tree. Changes you approve,
-            and changes tests prove, become memory, so the next session starts
-            briefed. As it learns this project, routine work stays on the cheap
-            model. Hard tasks still get a frontier one.
+            Confidence-gated model routing, institutional memory, and BYOK
+            economics. Grist writes and edits code in your working tree —
+            every task routed to the cheapest capable rung, every verified
+            change remembered, inference billed to your own provider key.
           </p>
           <div class="hero-install">
             <div class="diagram-bar">
@@ -319,8 +318,8 @@ grist</pre>
           <h2>The repo never leaves the machine.</h2>
           <p class="lede">
             Tools run in your working tree. The prompt goes out. The source
-            does not. We hold the key. You keep the files. We do not train on
-            tester repos.
+            does not. Your provider key stays yours. We never train on
+            your code.
           </p>
         </div>
         <div class="bound-stage" aria-hidden="true">
@@ -534,17 +533,23 @@ GRIST_OBS_PACK=off       # pack only</pre>
 
         <h2 id="spend">Spend</h2>
         <p>
-          Completions are metered against your spend cap. At the cap the gateway
-          returns 402 and the CLI stops — raise the cap on the dashboard to keep
-          going. The dashboard shows remaining USD, rung mix, and expiry.
-          Agent API keys spend against the same cap but can never raise it.
-          Inference runs on your own provider key. We do not train on tester repos.
+          Inference runs on your own provider key — OpenRouter, Vercel AI
+          Gateway, or any OpenAI-compatible endpoint — at your provider's
+          prices, with zero markup from us. <code>grist usage</code> and the
+          dashboard show spend broken down by rung, so you can see exactly
+          where the money went.
+        </p>
+        <p>
+          Hard spend caps are enforced on the house key: at the cap the gateway
+          returns 402 and the run stops. Per-account caps on BYOK keys are soft
+          today. Agent API keys spend against the same account but can never
+          raise its cap. We never train on your repos.
         </p>
 
         <h2 id="agents">Agents</h2>
         <p>
-          An agent on a VM (Muse, Cursor, and the like) can run Grist billed to
-          your account. Mint a key on the <a href="/dashboard/api">API keys</a>
+          An agent on a VM (Muse, Cursor, and the like) can run Grist with spend
+          attributed to your account. Mint a key on the <a href="/dashboard/api">API keys</a>
           tab. Store it in a vault as <code>GRIST_API_KEY</code> — never in chat
           and never in the skill file. Then on the VM:
         </p>
@@ -727,7 +732,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           <h1 id="dash-title">Usage</h1>
         </div>
         <div class="dash-actions">
-          <a href="/plans">Plans</a>
           <a href="/admin" data-auth="admin" hidden>Admin</a>
           <button class="text-btn sign-out" type="button">Sign out</button>
         </div>
@@ -832,30 +836,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
         <button type="button" class="copy" id="copy-mint-mail">Copy email</button>
       </section>
       <section class="admin-list" id="admin-invites"></section>
-    </main>
-
-    <main id="view-plans" hidden>
-      <section class="dash-head">
-        <div>
-          <p class="eyebrow">[ pricing ]</p>
-          <h1>Plans</h1>
-        </div>
-        <a href="/dashboard">Usage</a>
-      </section>
-      <div class="plans">
-        <article class="plan on">
-          <p class="eyebrow">Current</p>
-          <h2>Beta</h2>
-          <p class="price">$5 included</p>
-          <p>Open to everyone. Stops at the cap. Sign in with Google and you’re in.</p>
-        </article>
-        <article class="plan">
-          <p class="eyebrow">After beta</p>
-          <h2>Subscription</h2>
-          <p class="price">TBD</p>
-          <p>Same dashboard, billed to you. Nothing to manage yet.</p>
-        </article>
-      </div>
     </main>
 
     <main id="view-privacy" hidden>
@@ -1361,7 +1341,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
       <nav class="foot-nav" aria-label="Legal and site">
         <a href="/docs">Docs</a>
         <a href="/docs/skills">Agent skills</a>
-        <a href="/plans">Pricing</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
         <a href="/acceptable-use">Acceptable use</a>
@@ -1384,7 +1363,6 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           "/dashboard/models": "view-dashboard",
           "/admin": "view-admin",
           "/admin/requests": "view-admin",
-          "/plans": "view-plans",
           "/docs": "view-docs",
           "/docs/skills": "view-docs-skills",
           "/privacy": "view-privacy",

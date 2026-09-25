@@ -28,7 +28,6 @@ const views = {
   "/dashboard/api": "view-dashboard",
   "/dashboard/models": "view-dashboard",
   "/admin": "view-admin",
-  "/plans": "view-plans",
   "/docs": "view-docs",
   "/docs/skills": "view-docs-skills",
   "/privacy": "view-privacy",
@@ -38,13 +37,12 @@ const views = {
 }
 
 const titles = {
-  "/": "Grist — a coding agent that gets smarter and cheaper on your project",
+  "/": "Grist — a complete coding-agent harness",
   "/login": "Sign in — Grist",
   "/dashboard": "Usage — Grist",
   "/dashboard/api": "API keys — Grist",
   "/dashboard/models": "Models — Grist",
   "/admin": "Admin — Grist",
-  "/plans": "Plans — Grist",
   "/docs": "Docs — Grist",
   "/docs/skills": "Agent skills — Grist",
   "/privacy": "Privacy Policy — Grist",

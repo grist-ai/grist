@@ -1629,35 +1629,6 @@ pre {
   }
 }
 
-.plans {
-  display: grid;
-  gap: 0.8rem;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  max-width: 860px;
-}
-
-.plan {
-  border: 1px solid var(--line);
-  padding: 1.3rem;
-  border-radius: 4px;
-}
-
-.plan.on {
-  border-color: var(--accent);
-}
-
-.plan h2 {
-  font-family: var(--display);
-  font-size: 1.6rem;
-  margin: 0.2rem 0;
-}
-
-.price {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin: 0.2rem 0 0.6rem;
-}
-
 .docs {
   max-width: 72ch;
 }
