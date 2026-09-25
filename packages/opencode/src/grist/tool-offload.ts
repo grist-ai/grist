@@ -14,6 +14,10 @@
  *   mode-owned:     plan_exit (plan mode)
  *   rare:           websearch, todowrite, question, lsp, code_map, execute, MCP
  *
+ * On by default under BYOK — every tool schema rides every request and bills
+ * the user's provider key directly. Set GRIST_TOOL_OFFLOAD=0 to disable and
+ * send the full registry (the pre-BYOK behavior).
+ *
  * Usage share from in-repo call sites / tests (not production logs):
  *   read/grep/glob/edit/write/bash — nearly every coding path
  *   task/webfetch/memory/skill     — first turn or doctrine
@@ -166,7 +170,7 @@ const loadedGroups = new Map<string, Set<string>>()
 const calls: CallRecord[] = []
 
 export function offloadEnabled(env: NodeJS.ProcessEnv = process.env) {
-  return env.GRIST_TOOL_OFFLOAD === "1"
+  return env.GRIST_TOOL_OFFLOAD !== "0"
 }
 
 export function staticIds(split: Split = "default"): Set<string> {

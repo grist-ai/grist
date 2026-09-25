@@ -150,8 +150,9 @@ function frontierTools(): ToolPayload[] {
 }
 
 describe("GRIST_TOOL_OFFLOAD", () => {
-  test("flag is off unless GRIST_TOOL_OFFLOAD=1", () => {
-    expect(offloadEnabled({})).toBe(false)
+  test("flag is on by default; GRIST_TOOL_OFFLOAD=0 disables", () => {
+    expect(offloadEnabled({})).toBe(true)
+    expect(offloadEnabled({ GRIST_TOOL_OFFLOAD: "0" })).toBe(false)
     expect(offloadEnabled({ GRIST_TOOL_OFFLOAD: "1" })).toBe(true)
   })
 

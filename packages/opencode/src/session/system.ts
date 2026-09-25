@@ -75,14 +75,11 @@ const layer = Layer.effect(
         }).pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))))
         return [
           [
-            `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
-            `Here is some useful information about the environment you are running in:`,
             `<env>`,
+            `  Model: ${model.providerID}/${model.api.id}`,
             `  Working directory: ${ctx.directory}`,
-            `  Workspace root folder: ${ctx.worktree}`,
-            `  Is directory a git repo: ${ctx.project.vcs === "git" ? "yes" : "no"}`,
-            `  Platform: ${process.platform}`,
-            `  Today's date: ${new Date().toDateString()}`,
+            `  Workspace root: ${ctx.worktree} · git: ${ctx.project.vcs === "git" ? "yes" : "no"}`,
+            `  Platform: ${process.platform} · date: ${new Date().toDateString()}`,
             `</env>`,
           ].join("\n"),
           references.length === 0
