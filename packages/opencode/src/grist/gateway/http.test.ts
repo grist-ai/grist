@@ -671,10 +671,10 @@ describe("gateway HTTP", () => {
     process.env.FIREBASE_APP_ID = "1:1:web:abc"
     const gateway = createGateway({
       adminToken: "secret",
-      adminEmail: "pranavmm25@gmail.com",
+      adminEmail: "admin@grist.lol",
       fetch: async (_input, init) => {
         const body = JSON.parse(String(init?.body ?? "{}")) as { idToken?: string }
-        const email = body.idToken === "admin-tok" ? "pranavmm25@gmail.com" : "tester@beta"
+        const email = body.idToken === "admin-tok" ? "admin@grist.lol" : "tester@beta"
         const localId = body.idToken === "admin-tok" ? "uid_admin" : "uid_tester"
         return new Response(JSON.stringify({ users: [{ localId, email }] }), {
           status: 200,
