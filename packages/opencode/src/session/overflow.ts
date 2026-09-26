@@ -28,7 +28,15 @@ export function isOverflow(input: {
   if (input.cfg.compaction?.auto === false) return false
   if (input.model.limit.context === 0) return false
 
+  const budget = usable(input)
+  // A degenerate (<= 0) budget means the model's real limit is unknown.
+  // Never auto-compact in that case: spurious compaction injects synthetic
+  // continue-nudges that defeat the agent loop's exit check and run the
+  // session away. Failing visibly at the provider's real limit is always
+  // better than looping silently.
+  if (budget <= 0) return false
+
   const count =
     input.tokens.total || input.tokens.input + input.tokens.output + input.tokens.cache.read + input.tokens.cache.write
-  return count >= usable(input)
+  return count >= budget
 }
