@@ -14,6 +14,10 @@
   <img src="https://img.shields.io/badge/BYOK-your%20key%2C%20zero%20markup-blue" alt="BYOK" />
 </p>
 
+```bash
+npm install -g grist-ai
+```
+
 Grist is a coding-agent harness — a rebranded fork of [OpenCode](https://github.com/anomalyco/opencode) (MIT).
 The agent loop *is* this codebase: the same binary runs the chat, the IDE integration,
 the CLI, and the desktop app. There is no separate wrapper process.
