@@ -64,8 +64,23 @@ Jev client, rung definitions, gateway client, thresholds, doctrine text, burn-in
       typecheck clean ×3, 101/101 gateway tests, live boot + admin invite mint +
       `/v1/gate/route` E2E and client `routeTask` → `via gateway/shadow`.
       (Railway deploy wiring is Phase 6.)
-- [ ] **5. CLI** — `grist` binary name, always-on plugin loading for the grist binary,
+- [x] **5. CLI** — `grist` binary name, always-on plugin loading for the grist binary,
       `grist run` flags. Build script.
+      Injection answer: `packages/core/src/location-services.ts` gained an additive
+      `registerInstancePlugin()` registry (no behavior change when empty); the grist
+      binary registers `@grist-ai/plugin` at startup in `packages/cli/src/index.ts`,
+      gated on the `GRIST_BINARY` build define — so every instance is born with the
+      plugin and no user config is needed. No other upstream core edits.
+      `packages/grist/script/build.ts` compiles the v2 CLI single-file as `grist`
+      (headless: web-UI embed stubbed, pty binary embedded like the main build;
+      needs `bun install --os="*" --cpu="*"` first). `grist run` flags all present
+      (`--session/-s`, `--format`, `--model/-m`, `--continue/-c`, `--file/-f`,
+      `--agent`, `--title`, `--thinking`; v2 has no `--dir` — run from the cwd).
+      Verified: typecheck clean (core, cli), binary boots as `grist v0.0.0`,
+      headless `grist run` smoke under the live Jev gate returned on
+      `grist/cheapest` (session export: `providerID: "grist"`, `model.id: "cheapest"`).
+      (The 136M `dist/grist` build output is git-ignored; replacing the live
+      installed binary is Phase 7.)
 - [ ] **6. Identity & docs** — grist.json / `.grist/` (pending his rebrand-patch decision),
       skill, README/docs updates, `patches/` review (v1-era patch-package files).
 - [ ] **7. Verify** — typecheck, build, headless `grist run` smoke test under the live Jev

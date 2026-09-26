@@ -15,6 +15,18 @@ import { Npm } from "@opencode/util/npm"
 import { Heap } from "./heap"
 import { CpuProfile } from "./cpu-profile"
 
+declare const GRIST_BINARY: boolean | undefined
+
+// The grist binary bakes the grist plugin in at build time (GRIST_BINARY
+// define): register it as an always-on instance plugin so every `grist run`
+// loads it without any user config. Builds without the define (upstream
+// opencode) register nothing and behave exactly as before.
+if (typeof GRIST_BINARY !== "undefined" && GRIST_BINARY) {
+  const { registerInstancePlugin } = await import("@opencode/core/location-services")
+  const { GristPlugin } = await import("@grist-ai/plugin")
+  registerInstancePlugin(GristPlugin.Plugin)
+}
+
 if (process.env.OPENCODE_SSH_ASKPASS_PORT) {
   const { askpass } = await import("./ssh-askpass")
   process.exit(await Effect.runPromise(askpass.pipe(Effect.provide(NodeServices.layer))))

@@ -1,5 +1,6 @@
 import { Context, Duration, Effect, Exit, Layer, LayerMap, MutableHashMap, Option } from "effect"
 import { LayerNode } from "@opencode/util/effect/layer-node"
+import type { Plugin } from "@opencode/plugin/effect/plugin"
 import { Instance } from "./instance.js"
 import { Location } from "./location.js"
 import { LocationLifecycle } from "./location-lifecycle.js"
@@ -9,6 +10,18 @@ export { LocationServiceMap } from "./location-service-map.js"
 
 export type LocationServices = Instance.Services
 export type LocationError = Instance.Error
+
+/**
+ * Host-registered instance plugins. Every location instance is born with
+ * these in addition to its bound list. The grist binary registers its
+ * built-in plugin here at startup so `grist run` always loads it; hosts
+ * that register nothing (upstream opencode) behave exactly as before.
+ */
+const extraInstancePlugins: Plugin[] = []
+
+export function registerInstancePlugin(plugin: Plugin) {
+  extraInstancePlugins.push(plugin)
+}
 
 export function buildLocationServiceMap(
   replacements: LayerNode.Replacements = [],
@@ -24,7 +37,11 @@ export function buildLocationServiceMap(
           MutableHashMap.set(builds, ref, build)
           return Layer.fromBuild((memoMap, scope) =>
             Effect.suspend(() =>
-              Layer.buildWithMemoMap(Instance.layer(ref, { replacements: bindings }), memoMap, scope),
+              Layer.buildWithMemoMap(
+                Instance.layer(ref, { replacements: bindings, plugins: extraInstancePlugins }),
+                memoMap,
+                scope,
+              ),
             ).pipe(
               Effect.onExit((exit) => {
                 const finish = Effect.suspend(() => {
