@@ -42,3 +42,25 @@ export function publicRungFor(model: string): Rung | undefined {
 export function publicModelRef(rung: Rung): ModelRef {
   return { providerID: "openrouter", modelID: rung }
 }
+
+/**
+ * Conservative context-window floor per rung, in tokens. Client-safe by
+ * design: plain numbers only, no upstream model identities (B1). The gateway
+ * resolves a rung to its upstream model server-side, so the client never
+ * knows the real limit; these floors sit safely below every ladder model's
+ * real context window.
+ *
+ * Why this exists: when a rung is pinned via `-m`, the session's model record
+ * is built from an arbitrary template model in the provider registry. If that
+ * template carries a tiny (or zero) context limit, the compaction budget
+ * collapses and auto-compaction fires on nearly every step; each spurious
+ * compaction injects a synthetic continue-nudge whose reply can never satisfy
+ * the headless loop's exit check, so the session runs away until killed.
+ * Pinning the floors here keeps that budget sane.
+ */
+export const RUNG_CONTEXT_FLOOR: Record<Rung, number> = {
+  cheapest: 131072,
+  medium: 131072,
+  frontier: 131072,
+  premium: 131072,
+}

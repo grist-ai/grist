@@ -17,7 +17,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import { gatewayAuthHeaders, loadInviteConfig } from "@/grist/invite/config"
-import { PUBLIC_RUNG_NAME, PUBLIC_RUNGS, publicModelRef, publicRungFor } from "@/grist/rung"
+import { PUBLIC_RUNG_NAME, PUBLIC_RUNGS, publicModelRef, publicRungFor, RUNG_CONTEXT_FLOOR } from "@/grist/rung"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -1346,11 +1346,18 @@ function ensureGristLadderModels(providers: Record<string, Info>) {
   openrouter.name = "Grist"
   const models: Record<string, Model> = {}
   for (const rung of PUBLIC_RUNGS) {
+    // The template is an arbitrary registry model: never inherit its context
+    // limit. A rung pinned via -m gets a conservative per-rung floor instead;
+    // without it the compaction budget can collapse to ~0, auto-compaction
+    // fires on every step, and the headless loop runs away (the synthetic
+    // continue-nudge reply can never satisfy the loop's exit check).
+    const floor = RUNG_CONTEXT_FLOOR[rung]
     models[rung] = {
       ...template,
       id: ModelV2.ID.make(rung),
       name: PUBLIC_RUNG_NAME[rung],
       api: { ...template.api, id: rung },
+      limit: { ...template.limit, context: floor, input: floor },
     }
   }
   openrouter.models = models
