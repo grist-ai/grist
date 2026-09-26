@@ -35,10 +35,10 @@ Jev client, rung definitions, gateway client, thresholds, doctrine text, burn-in
       (A merge with `--allow-unrelated-histories` was tried first but the shallow
       upstream fetch broke the push; the single-commit import pushes cleanly.
       Future upstream updates re-import the same way.)
-- [ ] **2. Plugin scaffold** — `packages/grist/` (`@grist-ai/plugin`) created and typechecking:
+- [x] **2. Plugin scaffold** — `packages/grist/` (`@grist-ai/plugin`) created and typechecking:
   `grist-ai.plugin` adds the `grist` provider (openai-compatible transport at the
   gateway URL, gateway auth headers) with the 4 ladder rungs as models, using the
-  per-rung context floors. Inert without an invite config. (commit eca47f90)
+  per-rung context floors. Inert without an invite config. (folded into 605884d1)
 - [ ] **3. Hooks** — model.request (Jev gate), context (doctrine), compaction (guards),
       tool.execute.before (budget), permission. Port control-plane logic from history.
 - [ ] **4. Gateway** — `packages/grist-gateway/`, ported from history.
