@@ -19,43 +19,48 @@ npm install -g grist-ai
 
 ## Auth
 
-The human signs in once per machine. Two ways:
+The human's Grist API key (`grist_sk_…`, 64 hex chars) reaches the CLI one of
+two ways:
 
-**Interactive** (recommended): `grist auth login` opens the Grist site and the
-account is created on first sign-in. After login it asks for the inference
-provider key (BYOK): OpenRouter, Vercel AI Gateway, or a custom
-OpenAI-compatible endpoint. The key is stored encrypted on the gateway and
-only ever runs inference for that account.
+- Environment: export `GRIST_API_KEY` (mode-0600 env, never paste it into chat).
+- Config file: `~/.grist/config.json` (or `GRIST_CONFIG_PATH`), holding the
+  key and gateway URL.
 
-**Headless** (agents/VMs): mint an API key at
-`https://grist.lol/dashboard/api`, then either run
-`grist auth login --provider grist --api-key "$GRIST_API_KEY"` or just export
-`GRIST_API_KEY` — the CLI picks it up. The key looks like `grist_sk_…`
-(64 hex chars). Self-hosted gateway: add `--gateway <url>` (default
-`https://grist.lol`).
+`GRIST_GATEWAY_URL` selects the gateway (default `https://grist.lol`;
+self-hosted setups override it).
 
 Key hygiene (non-negotiable): never print, log, commit, or paste the key into
 chat. Pass it via environment variable only. If it leaks, tell the human to
 revoke it on the dashboard and stop.
 
-Verify without exposing anything: `grist usage` shows spend against the
-account cap.
+Verify without exposing anything:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -H "X-Grist-Api-Key: $GRIST_API_KEY" "$GRIST_GATEWAY_URL/v1/usage"
+# 200 = key is good; also shows spend against the account cap
+```
+
+If `grist` is missing or the usage check fails, stop and tell the human. Do
+not invent a key.
 
 ## Billing (BYOK)
 
 Inference bills to the human's own provider key — not to Grist. The Grist
 account carries a spend cap that the gateway meters per (provider, resolved
-model); `grist usage` shows the remaining budget and per-rung spend. The cap
+model); `/v1/usage` shows the remaining budget and per-rung spend. The cap
 is hard: at the cap the run 402s, and only the human can raise it (on the
 dashboard — a `grist_sk_…` key can never raise its own cap). Keep
 tasks scoped: one feature or fix per run.
 
 ## Run
 
-Headless, JSON on stdout, `--dir` pointing at the git checkout:
+Headless, JSON on stdout. `cd` into the git checkout first — there is no
+`--dir` flag; the run inherits the calling directory:
 
 ```bash
-grist run --format json --auto --dir /path/to/repo "Precise task: what to change, where, and how to verify."
+cd /path/to/repo
+grist run --format json --auto "Precise task: what to change, where, and how to verify." < /dev/null
 ```
 
 - Do NOT pass `-m`. The Jev gate picks the rung per run; pinning one
@@ -63,7 +68,9 @@ grist run --format json --auto --dir /path/to/repo "Precise task: what to change
   explicitly asks for it.
 - `--auto` auto-approves tool permissions that are not explicitly denied.
   Headless runs need it (nothing can answer a prompt), and it is dangerous —
-  keep `--dir` scoped to the repo you intend to change.
+  keep the checkout scoped to the repo you intend to change.
+- `< /dev/null`: `grist run` waits for stdin EOF even with a message argument;
+  on a non-interactive shell it hangs silently without the redirect.
 - Do not use the interactive TUI.
 
 Each stdout line is one JSON event: capture `sessionID` from the first event;
@@ -72,11 +79,11 @@ file edits and shell; `type: "error"` means failure — stop and report. When
 the process exits, Grist is done: inspect the tree yourself (`git status`,
 `git diff`).
 
-Resume the same session:
+Resume the same session (it restores its own working directory):
 
 ```bash
-grist run --format json --auto --dir /path/to/repo -c "Continue: address the test failure in …"
-grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: …"
+grist run --format json --auto --session "$SESSION_ID" "Continue: …" < /dev/null
+# or shorthand: grist run --format json --auto -c "Continue: …" < /dev/null
 ```
 
 ## Workflow
@@ -99,4 +106,4 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
 ## Report
 
 What changed (files and behavior), the branch name, test results, and cost
-(`grist usage` before/after, or remaining budget).
+(`/v1/usage` before/after, or remaining budget).

@@ -15,7 +15,9 @@
   "name": "@grist-ai/plugin",
   "scripts": {
     "typecheck": "tsgo --noEmit",
-    "build": "bun run script/build.ts"
+    "build": "bun run script/build.ts",
+    "build:all": "bun run script/build.ts --all-targets",
+    "publish": "bun run script/publish.ts",
   },
   "type": "module",
   "version": "0.0.0",

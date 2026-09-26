@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "packages/opencode/Dockerfile.gateway"
+    "dockerfilePath": "packages/grist-gateway/Dockerfile"
   },
   "deploy": {
     "healthcheckPath": "/health",

@@ -81,8 +81,30 @@ Jev client, rung definitions, gateway client, thresholds, doctrine text, burn-in
       `grist/cheapest` (session export: `providerID: "grist"`, `model.id: "cheapest"`).
       (The 136M `dist/grist` build output is git-ignored; replacing the live
       installed binary is Phase 7.)
-- [ ] **6. Identity & docs** — grist.json / `.grist/` (pending his rebrand-patch decision),
-      skill, README/docs updates, `patches/` review (v1-era patch-package files).
+- [x] **6. Identity & docs** — DONE 2026-09-26:
+  - Railway deploy wiring: `packages/grist-gateway/Dockerfile` (multi-stage; bun
+    build bundles gateway+logic to one file, non-root `grist` user via su-exec,
+    `/data` volume, `/health` healthcheck) + `entrypoint.sh`; root
+    `railway.json` now points at it. Bundle layout verified live
+    (health 200, landing page 200).
+  - Skill: `skills/grist/SKILL.md` rewritten for v2 (no `--dir` — cd first; no
+    `-m` pin — Jev gate decides; auth via `GRIST_API_KEY`/`~/.grist/config.json`;
+    spend check via `/v1/usage`; `< /dev/null` gotcha), bumped to 0.2.0.
+    `packages/grist-gateway/site/grist-skill.md` is now a symlink to the
+    canonical skill (Dockerfile materializes it); landing-page skill tests pass.
+  - `patches/`: removed 9 unreferenced v1-era patch files (target versions
+    absent from the v2 lockfile); now matches upstream v2.0.9 exactly.
+  - `publish-grist.yml` reworked for v2: `packages/grist/script/build.ts`
+    gained `--all-targets` (8 platform binaries + platform package.jsons into
+    `dist/grist-<os>-<arch>[-musl]/`); new `packages/grist/script/publish.ts`
+    stages the `grist-ai` wrapper (reuses upstream postinstall.mjs for
+    musl/glibc selection), stages `@grist-ai/grist-skills`, skip-if-published,
+    forbidden-file gate, `--provenance` in CI. Prepare flow verified with stub
+    dist. Manual-dispatch + gitleaks + OIDC guardrails kept; version input now
+    required (no auto-bump).
+  - README.md rewritten for the v2 plugin architecture (ladder table with
+    checked-in prices, quickstart, hook inventory, repo layout, dev commands).
+  - Still pending his verdict: `grist.json`/`.grist/` rebrand patch.
 - [ ] **7. Verify** — typecheck, build, headless `grist run` smoke test under the live Jev
       gate, then the repo test suite.
 
