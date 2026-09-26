@@ -1,0 +1,350 @@
+import { publicModelRef, type ModelRef, type Rung } from "./rung.js"
+import { loadThresholds, type GateThresholds } from "./thresholds.js"
+import { createBurnInLog } from "./burn-in.js"
+import { applyModeCap, loadOperatingMode, type OperatingMode } from "./mode.js"
+import {
+  composeMechanisms,
+  loadMechanismProfile,
+  rememberSessionMechanisms,
+  type MechanismSet,
+} from "./mechanisms.js"
+import { recordGristEvent } from "./usage-log.js"
+import { rememberSessionControl } from "./control-plane.js"
+import { gristLog, gristWarn } from "./debug.js"
+import {
+  askSystemOne,
+  JEV_ENDPOINT,
+  JEV_MODEL,
+  noul01,
+  score01,
+  type NoulAnswer,
+  type ScoreAnswer,
+} from "./jev-client.js"
+import { resolveJevRoute, type JevRoute } from "./jev-route.js"
+
+export type GateDecision = {
+  rung: Rung
+  model: ModelRef
+  provider: "jev" | "shadow"
+  mode: OperatingMode
+  mechanisms: MechanismSet
+  difficulty: number
+  sensitivity: number
+  underspecified: number
+  reasons: string[]
+  latencyMs: number
+}
+
+export type GateInput = {
+  text: string
+  current: ModelRef
+  /** When true, never rewrite model (explicit user/agent pin). */
+  pinned?: boolean
+  sessionID?: string
+  /**
+   * Ceiling for the decided rung. Used when re-gating subagent tasks: the
+   * subagent may drop to a cheaper rung than its parent, never above it.
+   */
+  maxRung?: Rung
+}
+
+/** Rung order, cheapest → premium. Shared by composeRung and applyRungCeiling. */
+const RUNG_ORDER = { cheapest: 0, medium: 1, frontier: 2, premium: 3 } as const
+
+/**
+ * Clamp a gated rung to a ceiling. Returns the effective rung and whether the
+ * gate's first choice was capped. Never raises the rung.
+ */
+export function applyRungCeiling(rung: Rung, maxRung?: Rung): { rung: Rung; capped: boolean } {
+  if (!maxRung) return { rung, capped: false }
+  const capped = RUNG_ORDER[rung] > RUNG_ORDER[maxRung]
+  return { rung: capped ? maxRung : rung, capped }
+}
+
+/**
+ * Compose rung from difficulty + sensitivity + underspecified (pre-POC §4).
+ * Underspecified tasks stay on cheapest (no ask-human rung).
+ * Thresholds default until shadow burn-in calibrates them (§8.6).
+ */
+export function composeRung(
+  input: {
+    difficulty: number
+    sensitivity: number
+    underspecified: number
+  },
+  thresholds: GateThresholds = loadThresholds(),
+  mode: OperatingMode = loadOperatingMode(),
+): { rung: Rung; reasons: string[]; mode: OperatingMode } {
+  const reasons: string[] = []
+
+  // Sensitivity caps how high we may escalate.
+  let max: Rung = "premium"
+  if (input.sensitivity >= thresholds.sensitivityCapCheapest) {
+    max = "cheapest"
+    reasons.push("sensitivity_cap_cheapest")
+  } else if (input.sensitivity >= thresholds.sensitivityCapMedium) {
+    max = "medium"
+    reasons.push("sensitivity_cap_medium")
+  }
+
+  let want: Rung = "cheapest"
+  if (input.underspecified >= thresholds.underspecifiedCheapest) {
+    want = "cheapest"
+    reasons.push("underspecified_cheapest")
+  } else if (input.difficulty >= thresholds.difficultyPremium) {
+    want = "premium"
+    reasons.push("difficulty_premium")
+  } else if (input.difficulty >= thresholds.difficultyFrontier) {
+    want = "frontier"
+    reasons.push("difficulty_frontier")
+  } else if (input.difficulty >= thresholds.difficultyMedium) {
+    want = "medium"
+    reasons.push("difficulty_medium")
+  } else {
+    reasons.push("difficulty_cheapest")
+  }
+
+  const sensitivityCapped = RUNG_ORDER[want] <= RUNG_ORDER[max] ? want : max
+  if (sensitivityCapped !== want) reasons.push(`capped_to_${sensitivityCapped}`)
+
+  // Operating mode (§10) — degrades, never hard-stops.
+  const modeCap = applyModeCap(sensitivityCapped, mode)
+  reasons.push(...modeCap.reasons)
+  return { rung: modeCap.rung, reasons, mode }
+}
+
+/**
+ * Reduce a prompt to its task essence so verbosity cannot inflate difficulty.
+ * First paragraph, capped at ~500 chars; a long well-specified prompt is an
+ * easy task, not a hard one.
+ */
+export function normalizeTaskText(text: string): string {
+  const trimmed = text.trim()
+  const firstParagraph = trimmed.split(/\n\s*\n/)[0] ?? trimmed
+  return firstParagraph.slice(0, 500)
+}
+
+/** Heuristic shadow evaluator when no Jev provider key is present. */
+export function shadowScores(text: string): {
+  difficulty: number
+  sensitivity: number
+  underspecified: number
+} {
+  const t = text.trim()
+  const lower = t.toLowerCase()
+  const words = t.split(/\s+/).filter(Boolean).length
+
+  let underspecified = 0.1
+  if (words < 4 || /^(fix|help|it|this|that)[.!]?$/i.test(t)) underspecified = 0.95
+  else if (words < 8 && !/[./\\]/.test(t)) underspecified = 0.75
+
+  let sensitivity = 0.1
+  if (/(auth|secret|password|credential|pii|hipaa|gdpr|prod(uction)?\s+migrat)/i.test(lower)) {
+    sensitivity = 0.85
+  } else if (/(ledger|payment|billing|refund|deploy|infra)/i.test(lower)) {
+    sensitivity = 0.55
+  }
+
+  let difficulty = 0.2
+  if (/(redesign|architect|migrat|distributed|idempotent|rewrite)/i.test(lower)) difficulty = 0.85
+  else if (/(refactor|multi-?file|across|race|concurren)/i.test(lower)) difficulty = 0.55
+  else if (/(rename|typo|comment|lint|format|test for)/i.test(lower)) difficulty = 0.15
+
+  return { difficulty, sensitivity, underspecified }
+}
+
+export async function scoreTask(
+  text: string,
+  auth?: string | JevRoute,
+  options?: { fetch?: (input: string, init?: RequestInit) => Promise<Response> },
+): Promise<{
+  scores: { difficulty: number; sensitivity: number; underspecified: number }
+  provider: "jev" | "shadow"
+}> {
+  const essence = normalizeTaskText(text)
+  const route = resolveScoreAuth(auth)
+  if (!route) return { scores: shadowScores(essence), provider: "shadow" }
+  try {
+    return { scores: await evaluateWithJev(essence, route, options?.fetch), provider: "jev" }
+  } catch (error) {
+    gristWarn("[grist] Jev call failed; using shadow gate", error)
+    return { scores: shadowScores(essence), provider: "shadow" }
+  }
+}
+
+function resolveScoreAuth(auth?: string | JevRoute): JevRoute | undefined {
+  if (typeof auth === "object") return auth
+  if (typeof auth === "string") {
+    if (!auth) return
+    return {
+      provider: "typesafe",
+      endpoint: JEV_ENDPOINT,
+      model: JEV_MODEL,
+      apiKey: auth,
+    }
+  }
+  return resolveJevRoute()
+}
+
+async function evaluateWithJev(
+  text: string,
+  route: JevRoute,
+  fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>,
+): Promise<{
+  difficulty: number
+  sensitivity: number
+  underspecified: number
+}> {
+  const result = await askSystemOne({
+    apiKey: route.apiKey,
+    endpoint: route.endpoint,
+    model: route.model,
+    fetch: fetchImpl,
+    state: {
+      task: text,
+      product: "Grist",
+      ladder: "cheapest, medium, frontier, premium",
+    },
+    questions: {
+      difficulty: {
+        type: "score",
+        instructions:
+          "How hard is this coding task for a capable agent with repo tools? Judge the task's inherent difficulty only, never the prompt's length or level of detail. A long, well-specified prompt is an easy task, not a hard one.",
+        criteria: [
+          "Trivial scoped edit or question",
+          "Routine change with clear files",
+          "Multi-step but well-specified",
+          "Hard: redesign, subtle correctness, or broad blast radius",
+          "Premium-grade: the hardest problems, worth the top-tier model — novel architecture, extreme correctness demands, or bet-the-company production change",
+        ],
+      },
+      sensitivity: {
+        type: "score",
+        instructions:
+          "How sensitive is the code/context (secrets, auth, proprietary, irreversible prod)?",
+        criteria: [
+          "Public or disposable",
+          "Normal product code",
+          "Business-sensitive logic",
+          "Auth, secrets, or compliance-adjacent",
+          "Must not leave cheapest tier without human review",
+        ],
+      },
+      underspecified: {
+        type: "noul",
+        instructions:
+          "Is the task vague (missing goal/files)? High yes should prefer the cheapest rung, not invent scope.",
+        criteria: {
+          true: "Missing goal, files, or success criteria",
+          false: "Clear enough to attempt",
+        },
+      },
+    },
+  })
+  return {
+    difficulty: score01(result.answers.difficulty as ScoreAnswer, 5),
+    sensitivity: score01(result.answers.sensitivity as ScoreAnswer, 5),
+    underspecified: noul01(result.answers.underspecified as NoulAnswer | undefined),
+  }
+}
+
+function modelForRung(rung: Rung, _current: ModelRef): ModelRef {
+  return publicModelRef(rung)
+}
+
+/**
+ * Route a user task onto the model ladder.
+ * Passthrough when pinned or when GRIST_GATE=off.
+ */
+export async function routeTask(input: GateInput): Promise<GateDecision> {
+  const started = Date.now()
+  const mode = loadOperatingMode()
+  const mechanisms = composeMechanisms(input.text, loadMechanismProfile())
+  if (input.sessionID) rememberSessionMechanisms(input.sessionID, mechanisms)
+
+  if (input.pinned || process.env.GRIST_GATE === "off") {
+    if (input.sessionID) {
+      const scores = shadowScores(input.text)
+      rememberSessionControl(input.sessionID, {
+        rung: "cheapest",
+        difficulty: scores.difficulty,
+        sensitivity: scores.sensitivity,
+        underspecified: scores.underspecified,
+        task: input.text,
+        passthrough: true,
+      })
+    }
+    return {
+      rung: "cheapest",
+      model: input.current,
+      provider: "shadow",
+      mode,
+      mechanisms,
+      difficulty: 0,
+      sensitivity: 0,
+      underspecified: 0,
+      reasons: ["passthrough"],
+      latencyMs: Date.now() - started,
+    }
+  }
+
+  // Phase 4: the gateway gate (routeViaGateway) returns here once the
+  // gateway package is ported. Until then the local Jev/shadow route decides.
+
+  const { scores, provider } = await scoreTask(input.text)
+
+  const { rung, reasons } = composeRung(scores, loadThresholds(), mode)
+  const ceiling = applyRungCeiling(rung, input.maxRung)
+  if (ceiling.capped) reasons.push(`capped_to_${ceiling.rung}`)
+  const model = modelForRung(ceiling.rung, input.current)
+  const decision: GateDecision = {
+    rung: ceiling.rung,
+    model,
+    provider,
+    mode,
+    mechanisms,
+    ...scores,
+    reasons,
+    latencyMs: Date.now() - started,
+  }
+  if (input.sessionID) {
+    rememberSessionControl(input.sessionID, {
+      rung: ceiling.rung,
+      difficulty: scores.difficulty,
+      sensitivity: scores.sensitivity,
+      underspecified: scores.underspecified,
+      task: input.text,
+    })
+  }
+  gristLog(
+    `[grist:gate] ${rung} via ${provider} mode=${mode} · diff=${scores.difficulty.toFixed(2)} sens=${scores.sensitivity.toFixed(2)} under=${scores.underspecified.toFixed(2)} · ${reasons.join(",")} · ${decision.latencyMs}ms`,
+  )
+  gristLog(
+    `[grist:mech] ${mechanisms.resolved} pack=${mechanisms.observationPack} compress=${mechanisms.observationPackCompressor} fusion=${mechanisms.actionFusion} · ${mechanisms.reasons.join(",")}`,
+  )
+  if (reasons.some((r) => r.startsWith("mode_"))) {
+    recordGristEvent("grist-mode-cap", {
+      sessionID: input.sessionID,
+      mode,
+      rung,
+      reasons: reasons.filter((r) => r.startsWith("mode_")),
+    })
+  }
+  // Shadow burn-in: durable JSONL for calibration (§8.6). Never blocks the turn.
+  void createBurnInLog()
+    .recordDecision({
+      decision,
+      sessionID: input.sessionID,
+      text: input.text,
+    })
+    .catch((error) => gristWarn("[grist:burn-in] record failed", error))
+  return decision
+}
+
+export function textFromParts(parts: ReadonlyArray<{ type: string; text?: string }>): string {
+  return parts
+    .filter((p) => p.type === "text" && typeof p.text === "string")
+    .map((p) => p.text!)
+    .join("\n")
+    .trim()
+}

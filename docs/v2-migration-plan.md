@@ -16,11 +16,13 @@ upstream updates are plain tag merges.
 | Grist v1 (surgical edit) | Grist v2 (plugin) |
 |---|---|
 | `ensureGristLadderModels` injected into provider loading | Provider plugin: `ctx.provider.add()` a `grist` provider with the 4 rung models (cheapest/medium/frontier/premium), routed to the gateway |
-| Jev gate model routing (control plane) | `session."model.request"` hook — rewrite model per turn |
+| Jev gate model routing (control plane) | `session.prompt` hook — routeTask, then `session.switchModel` to the gated rung (non-pinned sessions) |
+| Between-turn judgment (escalate) | `session."model.request"` hook (primary, step>1) — escalate via `session.switchModel`; stop not acted on (heuristics removed by his order) |
 | Doctrine / instructions injection | `session.context` hook |
-| Compaction guards + runaway-loop fix (`RUNG_CONTEXT_FLOOR`, `isOverflow`) | `session.compaction` hook |
-| Tool budget (`decideToolBudget`) | `tool."execute.before"` hook (can reject the call) |
-| Permission decisions (`decidePermission`) | `permission` domain hooks |
+| Compaction guards + runaway-loop fix (`RUNG_CONTEXT_FLOOR`, `isOverflow`) | `session.compaction` hook (logging guard; floors in rung model definitions are the fix) |
+| Tool budget (`decideToolBudget`) | `tool."execute.before"` hook (rejects the call with `Tool.Error`) |
+| Tool stats + post-edit verify nudge | `tool."execute.after"` hook |
+| Permission decisions (`decidePermission`) | `permission.evaluate` hook (auto-allow only) |
 | `src/grist/gateway/` (own HTTP service) | `packages/grist-gateway/` — port as-is, fix imports |
 | `grist run` headless | v2 `runV1Bridge` keeps `opencode run` CLI compat — verify `grist run` end-to-end |
 | `.agents/skills/typesafe-ai/` | moves over unchanged |
@@ -39,8 +41,15 @@ Jev client, rung definitions, gateway client, thresholds, doctrine text, burn-in
   `grist-ai.plugin` adds the `grist` provider (openai-compatible transport at the
   gateway URL, gateway auth headers) with the 4 ladder rungs as models, using the
   per-rung context floors. Inert without an invite config. (folded into 605884d1)
-- [ ] **3. Hooks** — model.request (Jev gate), context (doctrine), compaction (guards),
-      tool.execute.before (budget), permission. Port control-plane logic from history.
+- [x] **3. Hooks** — `session.prompt` (Jev gate → switchModel), `session.context`
+      (doctrine), `session."model.request"` (between-turn judgment; escalate only —
+      stop heuristics stay removed per his order), `session.compaction` (logging guard;
+      the runaway fix lives in the Phase 2 rung floors), `tool.execute.before` (budget
+      → Tool.Error), `tool.execute.after` (tool stats + verify nudge), `permission.evaluate`
+      (auto-allow). Ported: jev-gate, control-plane (minus rankContextNodes → code-map port),
+      doctrine, mechanisms, mode, thresholds, jev-client, jev-route, burn-in, usage-log, debug.
+      Gateway gate deferred to Phase 4. Hooks active with shadow fallbacks when no Jev
+      route resolves; `GRIST_CTRL=off` disables. Typecheck clean; shadow-path smoke green.
 - [ ] **4. Gateway** — `packages/grist-gateway/`, ported from history.
 - [ ] **5. CLI** — `grist` binary name, always-on plugin loading for the grist binary,
       `grist run` flags. Build script.

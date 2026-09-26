@@ -3,6 +3,7 @@ import { Model } from "@opencode/schema/model"
 import { Provider } from "@opencode/schema/provider"
 import { Effect } from "effect"
 import { gatewayAuthHeaders, loadInviteConfig } from "./invite-config.js"
+import { registerGristHooks } from "./hooks.js"
 import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "./rung.js"
 
 function rungModel(rung: Rung): Model.Info {
@@ -20,16 +21,21 @@ function rungModel(rung: Rung): Model.Info {
  * - Adds the `grist` provider (OpenAI-compatible transport pointed at the
  *   Grist gateway) with the four ladder rungs as its models. The gateway
  *   resolves each rung to its upstream model server-side; vendor ids never
- *   ship in the client.
- * - Later phases wire the hooks: `session."model.request"` (Jev gate),
- *   `session.context` (doctrine), `session.compaction` (compaction guards),
- *   `tool."execute.before"` (tool budget), `permission` (decisions).
+ *   ship in the client. Provider registration is invite-gated.
+ * - Registers the control-plane hooks: `session.prompt` (Jev gate),
+ *   `session.context` (doctrine), `session."model.request"` (between-turn
+ *   judgment), `session.compaction` (compaction guard), `tool.execute.before`
+ *   (tool budget), `tool.execute.after` (tool stats + verify nudge), and
+ *   `permission.evaluate` (auto-allow). The hooks run with shadow fallbacks
+ *   when no Jev route resolves; `GRIST_CTRL=off` disables them.
  *
- * Without an invite config the plugin is inert: opencode behaves vanilla.
+ * Without an invite config the provider is not registered, but the hooks stay
+ * active: opencode behaves vanilla only when `GRIST_CTRL=off`.
  */
 export const Plugin = define({
   id: "grist-ai.plugin",
   effect: Effect.fn(function* (ctx) {
+    yield* registerGristHooks(ctx)
     const invite = loadInviteConfig()
     if (!invite) return
     yield* ctx.provider.transform((editor) => {
