@@ -30,9 +30,11 @@ Jev client, rung definitions, gateway client, thresholds, doctrine text, burn-in
 
 ## Phases
 
-- [x] **1. Tree** — branch from `main`, merge upstream v2.0.9 (`--allow-unrelated-histories`,
-      `-X theirs`), remove superseded v1 tree + stale v2-snapshot files. Diff vs upstream
-      is now exactly Grist's own files (docs, skills, assets, workflows).
+- [x] **1. Tree** — branch `v2-migration` from `main` (95b2e0c0); tree replaced with
+      upstream `anomalyco/opencode` v2.0.9 in a single import commit (605884d1).
+      (A merge with `--allow-unrelated-histories` was tried first but the shallow
+      upstream fetch broke the push; the single-commit import pushes cleanly.
+      Future upstream updates re-import the same way.)
 - [ ] **2. Plugin scaffold** — `packages/grist/` (`@grist-ai/plugin`) created and typechecking:
   `grist-ai.plugin` adds the `grist` provider (openai-compatible transport at the
   gateway URL, gateway auth headers) with the 4 ladder rungs as models, using the
