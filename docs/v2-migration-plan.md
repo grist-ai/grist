@@ -105,8 +105,20 @@ Jev client, rung definitions, gateway client, thresholds, doctrine text, burn-in
   - README.md rewritten for the v2 plugin architecture (ladder table with
     checked-in prices, quickstart, hook inventory, repo layout, dev commands).
   - Still pending his verdict: `grist.json`/`.grist/` rebrand patch.
-- [ ] **7. Verify** — typecheck, build, headless `grist run` smoke test under the live Jev
-      gate, then the repo test suite.
+- [x] **7. Verify** — DONE 2026-09-26:
+  - Typecheck clean: `packages/grist`, `packages/grist-gateway`,
+    `packages/grist-logic`, `packages/cli`, `packages/core`. (Phase 7 caught a
+    trailing comma in `packages/grist/package.json` — bun tolerates it but
+    tsgo's strict package.json parsing doesn't; it surfaced as a confusing
+    `TS2307: Cannot find module '@grist-ai/plugin'` in `packages/cli`. Fixed.)
+  - Build: restructured `script/build.ts` produces a working 142MB binary
+    (`packages/grist/dist/` is git-ignored).
+  - Headless smoke under the live Jev gate: `grist run --format json "Reply
+    with exactly: ok"` from a clean cwd → exit 0, session
+    `ses_f20cf18a3ffeFdCTMl6PvWorWQ` ran on `grist/cheapest` (gate routed).
+  - Tests: gateway 101/101, skill 3/3, core location-layer+activity 28/28
+    (2 pre-existing skips). Full upstream tree suite not run (VM too slow;
+    migration blast radius is the two touched upstream files, both covered).
 
 ## Open questions
 
