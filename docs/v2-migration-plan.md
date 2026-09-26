@@ -50,7 +50,20 @@ Jev client, rung definitions, gateway client, thresholds, doctrine text, burn-in
       doctrine, mechanisms, mode, thresholds, jev-client, jev-route, burn-in, usage-log, debug.
       Gateway gate deferred to Phase 4. Hooks active with shadow fallbacks when no Jev
       route resolves; `GRIST_CTRL=off` disables. Typecheck clean; shadow-path smoke green.
-- [ ] **4. Gateway** — `packages/grist-gateway/`, ported from history.
+- [x] **4. Gateway** — `packages/grist-gateway/` (`@grist-ai/gateway`) ported from history
+      with its 4 test files and the served `site/` landing page: `Bun.serve` + `bun:sqlite`
+      store, `/v1/gate/route`, `/v1/completions`, `/v1/chat/completions`, `/v1/provider`
+      (BYOK attach), `/v1/api-keys`, `/v1/usage`, `/v1/account/cap`, device-flow auth,
+      Firebase ID-token verify (REST, no admin SDK), invite/admin APIs. Shared logic
+      factored into **`packages/grist-logic/` (`@grist-ai/logic`)** — rung, mode,
+      thresholds, mechanisms, jev-client, jev-route, jev-gate, control-plane, doctrine,
+      debug, burn-in, usage-log, invite-config, invite-client, codes — consumed by both
+      the plugin (thin: plugin.ts + hooks.ts) and the gateway. The gateway gate
+      (`routeViaGateway` via `fetchGateRoute`) is restored in jev-gate: invite present →
+      remote route, 402 rethrown, other failures fall back to local shadow. Verified:
+      typecheck clean ×3, 101/101 gateway tests, live boot + admin invite mint +
+      `/v1/gate/route` E2E and client `routeTask` → `via gateway/shadow`.
+      (Railway deploy wiring is Phase 6.)
 - [ ] **5. CLI** — `grist` binary name, always-on plugin loading for the grist binary,
       `grist run` flags. Build script.
 - [ ] **6. Identity & docs** — grist.json / `.grist/` (pending his rebrand-patch decision),

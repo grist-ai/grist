@@ -18,17 +18,17 @@ import { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
 import { Effect, Scope } from "effect"
 
-import { controlPlaneEnabled } from "./jev-client.js"
-import { routeTask } from "./jev-gate.js"
+import { controlPlaneEnabled } from "@grist-ai/logic"
+import { routeTask } from "@grist-ai/logic"
 import {
   decideContinue,
   decidePermission,
   decideToolBudget,
   decideVerify,
-} from "./control-plane.js"
-import { surgicalEngineer } from "./doctrine.js"
-import { gristLog, gristWarn } from "./debug.js"
-import { GRIST_PROVIDER_ID, publicRungFor, type Rung } from "./rung.js"
+} from "@grist-ai/logic"
+import { surgicalEngineer } from "@grist-ai/logic"
+import { gristLog, gristWarn } from "@grist-ai/logic"
+import { GRIST_PROVIDER_ID, publicRungFor, type Rung } from "@grist-ai/logic"
 
 /** v1 ToolPartLike shape, accumulated per session from `tool.execute.after`. */
 type ToolPartLike = {

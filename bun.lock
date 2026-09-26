@@ -511,11 +511,28 @@
       "name": "@grist-ai/plugin",
       "version": "0.0.0",
       "dependencies": {
+        "@grist-ai/logic": "workspace:*",
         "@opencode/ai": "workspace:*",
         "@opencode/plugin": "workspace:*",
         "@opencode/schema": "workspace:*",
         "@types/node": "catalog:",
         "effect": "catalog:",
+      },
+    },
+    "packages/grist-gateway": {
+      "name": "@grist-ai/gateway",
+      "version": "0.0.0",
+      "dependencies": {
+        "@grist-ai/logic": "workspace:*",
+        "@types/node": "catalog:",
+        "bun-types": "catalog:",
+      },
+    },
+    "packages/grist-logic": {
+      "name": "@grist-ai/logic",
+      "version": "0.0.0",
+      "dependencies": {
+        "@types/node": "catalog:",
       },
     },
     "packages/http-recorder": {
@@ -1845,6 +1862,10 @@
     "@gar/promise-retry": ["@gar/promise-retry@1.0.3", "", {}, "sha512-GmzA9ckNokPypTg10pgpeHNQe7ph+iIKKmhKu3Ob9ANkswreCx7R3cKmY781K8QK3AqVL3xVh9A42JvIAbkkSA=="],
 
     "@graphql-typed-document-node/core": ["@graphql-typed-document-node/core@3.2.0", "", { "peerDependencies": { "graphql": "^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0" } }, "sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ=="],
+
+    "@grist-ai/gateway": ["@grist-ai/gateway@workspace:packages/grist-gateway"],
+
+    "@grist-ai/logic": ["@grist-ai/logic@workspace:packages/grist-logic"],
 
     "@grist-ai/plugin": ["@grist-ai/plugin@workspace:packages/grist"],
 

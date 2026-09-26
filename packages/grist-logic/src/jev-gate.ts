@@ -20,6 +20,8 @@ import {
   type NoulAnswer,
   type ScoreAnswer,
 } from "./jev-client.js"
+import { fetchGateRoute, GatewayHttpError } from "./invite-client.js"
+import { loadInviteConfig } from "./invite-config.js"
 import { resolveJevRoute, type JevRoute } from "./jev-route.js"
 
 export type GateDecision = {
@@ -288,8 +290,15 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
     }
   }
 
-  // Phase 4: the gateway gate (routeViaGateway) returns here once the
-  // gateway package is ported. Until then the local Jev/shadow route decides.
+  const invite = loadInviteConfig()
+  if (invite) {
+    try {
+      return await routeViaGateway(input, started, mode, mechanisms)
+    } catch (error) {
+      if (error instanceof GatewayHttpError && error.status === 402) throw error
+      gristWarn("[grist] gateway gate failed; using local shadow", error)
+    }
+  }
 
   const { scores, provider } = await scoreTask(input.text)
 
@@ -338,6 +347,60 @@ export async function routeTask(input: GateInput): Promise<GateDecision> {
       text: input.text,
     })
     .catch((error) => gristWarn("[grist:burn-in] record failed", error))
+  return decision
+}
+
+
+async function routeViaGateway(
+  input: GateInput,
+  started: number,
+  mode: OperatingMode,
+  fallback: MechanismSet,
+): Promise<GateDecision> {
+  const remote = await fetchGateRoute({ text: input.text, sessionID: input.sessionID })
+  const mechanisms: MechanismSet = {
+    profile: fallback.profile,
+    resolved: remote.mechanisms.observation_pack ? "efficiency" : "performance",
+    observationPack: remote.mechanisms.observation_pack,
+    observationPackCompressor: remote.mechanisms.observation_pack_compressor ?? false,
+    actionFusion: remote.mechanisms.action_fusion,
+    reasons: ["gateway"],
+  }
+  if (input.sessionID) rememberSessionMechanisms(input.sessionID, mechanisms)
+  const ceiling = applyRungCeiling(remote.rung, input.maxRung)
+  const reasons = ceiling.capped ? [...remote.reasons, `capped_to_${ceiling.rung}`] : remote.reasons
+  // When capped, address the gateway by rung name; it resolves the same
+  // ladder model it would have returned for that rung.
+  const model: ModelRef = ceiling.capped
+    ? publicModelRef(ceiling.rung)
+    : {
+        providerID: remote.model.provider_id,
+        modelID: remote.model.model_id,
+      }
+  const decision: GateDecision = {
+    rung: ceiling.rung,
+    model,
+    provider: remote.provider ?? "jev",
+    mode: remote.mode ?? mode,
+    mechanisms,
+    difficulty: remote.difficulty,
+    sensitivity: remote.sensitivity,
+    underspecified: remote.underspecified,
+    reasons,
+    latencyMs: Date.now() - started,
+  }
+  if (input.sessionID) {
+    rememberSessionControl(input.sessionID, {
+      rung: ceiling.rung,
+      difficulty: remote.difficulty,
+      sensitivity: remote.sensitivity,
+      underspecified: remote.underspecified,
+      task: input.text,
+    })
+  }
+  gristLog(
+    `[grist:gate] ${decision.rung} via gateway/${decision.provider} mode=${decision.mode} · ${decision.reasons.join(",")} · ${decision.latencyMs}ms`,
+  )
   return decision
 }
 

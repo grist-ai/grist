@@ -2,18 +2,18 @@
   "$schema": "https://json.schemastore.org/package.json",
   "dependencies": {
     "@grist-ai/logic": "workspace:*",
-    "@opencode/ai": "workspace:*",
-    "@opencode/plugin": "workspace:*",
-    "@opencode/schema": "workspace:*",
     "@types/node": "catalog:",
-    "effect": "catalog:"
+    "bun-types": "catalog:"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/http.ts",
+    "./package.json": "./package.json"
   },
   "license": "MIT",
-  "name": "@grist-ai/plugin",
+  "name": "@grist-ai/gateway",
   "scripts": {
+    "start": "bun src/entry.ts",
+    "test": "bun test",
     "typecheck": "tsgo --noEmit"
   },
   "type": "module",

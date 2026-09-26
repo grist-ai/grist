@@ -2,9 +2,9 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Model } from "@opencode/schema/model"
 import { Provider } from "@opencode/schema/provider"
 import { Effect } from "effect"
-import { gatewayAuthHeaders, loadInviteConfig } from "./invite-config.js"
+import { gatewayAuthHeaders, loadInviteConfig } from "@grist-ai/logic"
 import { registerGristHooks } from "./hooks.js"
-import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "./rung.js"
+import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "@grist-ai/logic"
 
 function rungModel(rung: Rung): Model.Info {
   const floor = RUNG_CONTEXT_FLOOR[rung]
