@@ -1,15 +1,15 @@
-import { useFilteredList } from "@opencode-ai/ui/hooks"
-import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
+import { useFilteredList } from "@opencode/ui/hooks"
+import { getDirectory, getFilename } from "@opencode/util/path"
 import { createSignal, For, onMount, Show, splitProps, type JSX } from "solid-js"
-import { Button } from "@opencode-ai/ui/button"
-import { FileIcon } from "@opencode-ai/ui/file-icon"
-import { Icon } from "@opencode-ai/ui/icon"
+import { Button } from "@opencode/ui/button"
+import { FileIcon } from "@opencode/ui/file-icon"
+import { Icon } from "@opencode/ui/icon"
 import { installLineCommentStyles } from "./line-comment-styles"
-import { useI18n } from "@opencode-ai/ui/context/i18n"
+import { useI18n } from "@opencode/ui/context/i18n"
 
 installLineCommentStyles()
 
-export type LineCommentVariant = "default" | "editor" | "add"
+export type LineCommentVariant = "default" | "editor"
 
 function InlineGlyph(props: { icon: "comment" | "plus" }) {
   return (
@@ -39,9 +39,9 @@ export type LineCommentAnchorProps = {
   variant?: LineCommentVariant
   icon?: "comment" | "plus"
   buttonLabel?: string
-  onClick?: JSX.EventHandlerUnion<HTMLButtonElement, MouseEvent>
-  onMouseEnter?: JSX.EventHandlerUnion<HTMLButtonElement, MouseEvent>
-  onPopoverFocusOut?: JSX.EventHandlerUnion<HTMLDivElement, FocusEvent>
+  onClick?: (event: MouseEvent) => void
+  onMouseEnter?: (event: MouseEvent) => void
+  onPopoverFocusOut?: (event: FocusEvent) => void
   class?: string
   popoverClass?: string
   children?: JSX.Element
@@ -82,10 +82,10 @@ export const LineCommentAnchor = (props: LineCommentAnchorProps) => {
               type="button"
               aria-label={props.buttonLabel}
               data-slot="line-comment-button"
-              on:mousedown={(e) => e.stopPropagation()}
-              on:mouseup={(e) => e.stopPropagation()}
-              on:click={props.onClick as any}
-              on:mouseenter={props.onMouseEnter as any}
+              onMouseDown={(event) => event.stopPropagation()}
+              onMouseUp={(event) => event.stopPropagation()}
+              onClick={props.onClick}
+              onMouseEnter={props.onMouseEnter}
             >
               <Show
                 when={props.inline}
@@ -100,8 +100,8 @@ export const LineCommentAnchor = (props: LineCommentAnchorProps) => {
                 classList={{
                   [props.popoverClass ?? ""]: !!props.popoverClass,
                 }}
-                on:mousedown={(e) => e.stopPropagation()}
-                on:focusout={props.onPopoverFocusOut as any}
+                onMouseDown={(event) => event.stopPropagation()}
+                onFocusOut={props.onPopoverFocusOut}
               >
                 {props.children}
               </div>
@@ -115,10 +115,10 @@ export const LineCommentAnchor = (props: LineCommentAnchorProps) => {
           classList={{
             [props.popoverClass ?? ""]: !!props.popoverClass,
           }}
-          on:mousedown={(e) => e.stopPropagation()}
-          on:click={props.onClick as any}
-          on:mouseenter={props.onMouseEnter as any}
-          on:focusout={props.onPopoverFocusOut as any}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={props.onClick}
+          onMouseEnter={props.onMouseEnter}
+          onFocusOut={props.onPopoverFocusOut}
         >
           {props.children}
         </div>
@@ -153,25 +153,6 @@ export const LineComment = (props: LineCommentProps) => {
         </div>
       </div>
     </LineCommentAnchor>
-  )
-}
-
-export type LineCommentAddProps = Omit<LineCommentAnchorProps, "children" | "variant" | "open" | "icon"> & {
-  label?: string
-}
-
-export const LineCommentAdd = (props: LineCommentAddProps) => {
-  const [split, rest] = splitProps(props, ["label"])
-  const i18n = useI18n()
-
-  return (
-    <LineCommentAnchor
-      {...rest}
-      open={false}
-      variant="add"
-      icon="plus"
-      buttonLabel={split.label ?? i18n.t("ui.lineComment.submit")}
-    />
   )
 }
 
@@ -315,9 +296,11 @@ export const LineCommentEditor = (props: LineCommentEditorProps) => {
             refs.textarea = el
           }}
           data-slot="line-comment-textarea"
+          dir="auto"
           rows={split.rows ?? 3}
           placeholder={split.placeholder ?? i18n.t("ui.lineComment.placeholder")}
           value={split.value}
+          style={{ "unicode-bidi": "plaintext", "text-align": "start" }}
           on:input={(e) => {
             const value = (e.currentTarget as HTMLTextAreaElement).value
             split.onInput(value)
@@ -407,8 +390,8 @@ export const LineCommentEditor = (props: LineCommentEditorProps) => {
                   type="button"
                   data-slot="line-comment-action"
                   data-variant="ghost"
-                  on:mousedown={hold as any}
-                  on:click={click(split.onCancel) as any}
+                  onMouseDown={hold}
+                  onClick={click(split.onCancel)}
                 >
                   {split.cancelLabel ?? i18n.t("ui.common.cancel")}
                 </button>
@@ -417,8 +400,8 @@ export const LineCommentEditor = (props: LineCommentEditorProps) => {
                   data-slot="line-comment-action"
                   data-variant="primary"
                   disabled={split.value.trim().length === 0}
-                  on:mousedown={hold as any}
-                  on:click={click(submit) as any}
+                  onMouseDown={hold}
+                  onClick={click(submit)}
                 >
                   {split.submitLabel ?? i18n.t("ui.lineComment.submit")}
                 </button>
@@ -428,7 +411,7 @@ export const LineCommentEditor = (props: LineCommentEditorProps) => {
             <Button size="small" variant="ghost" onClick={split.onCancel}>
               {split.cancelLabel ?? i18n.t("ui.common.cancel")}
             </Button>
-            <Button size="small" variant="primary" disabled={split.value.trim().length === 0} onClick={submit}>
+            <Button size="small" variant="contrast" disabled={split.value.trim().length === 0} onClick={submit}>
               {split.submitLabel ?? i18n.t("ui.lineComment.submit")}
             </Button>
           </Show>

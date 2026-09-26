@@ -4,7 +4,7 @@ import { createMemo, createSignal, For, Match, onMount, Show, Switch } from "sol
 import { PlanIcon, plans } from "./common"
 import { useI18n } from "~/context/i18n"
 import { useLanguage } from "~/context/language"
-import { Resource } from "@opencode-ai/console-resource"
+import { Resource } from "@opencode/console-resource"
 
 const getPaused = query(async () => {
   "use server"
@@ -103,6 +103,9 @@ export default function Black() {
                       <button type="button" onClick={() => cancel()} data-slot="cancel">
                         {i18n.t("common.cancel")}
                       </button>
+                      <a href={`/black/subscribe/${plan().id}`} data-slot="continue">
+                        {i18n.t("black.action.continue")}
+                      </a>
                     </div>
                   </div>
                 </div>

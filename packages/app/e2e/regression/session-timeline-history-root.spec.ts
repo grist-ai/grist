@@ -1,4 +1,5 @@
-import { base64Encode } from "@opencode-ai/core/util/encode"
+import { base64Encode } from "@opencode/util/encode"
+import type { SessionMessageAssistant } from "@opencode/client/promise"
 import { expect, test, type Page } from "@playwright/test"
 import {
   assistantMessage,
@@ -10,36 +11,39 @@ import {
   status,
   textPart,
   title,
-  userID,
   userMessage,
 } from "../performance/timeline-stability/fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { installSseTransport } from "../utils/sse-transport"
 import { expectSessionTitle } from "../utils/waits"
 
-const initialPageSize = 20
-const historyPageSize = 200
-const assistants = Array.from({ length: initialPageSize + 1 }, (_, index) =>
-  assistantMessage([textPart(`prt_history_root_${index}`, `Assistant response ${index}`)], {
-    id: `msg_${String(index + 1001).padStart(4, "0")}_history_root_assistant`,
-    parentID: userID,
-    created: 1700000001000 + index * 1_000,
-    completed: index < initialPageSize,
-  }),
-)
-const messages = [userMessage(), ...assistants]
+const messagePageSize = 40
+const server = `http://${process.env.PLAYWRIGHT_SERVER_HOST ?? "127.0.0.1"}:${process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"}`
+const messages = Array.from({ length: messagePageSize / 2 + 1 }, (_, index) => {
+  const id = `msg_${String(index + 1001).padStart(4, "0")}_history_root_user`
+  return [
+    userMessage(undefined, { id, created: 1700000000000 + index * 2_000 }),
+    assistantMessage([textPart(`prt_history_root_${index}`, `Assistant response ${index}`)], {
+      id: `msg_${String(index + 1001).padStart(4, "0")}_history_root_assistant`,
+      parentID: id,
+      created: 1700000001000 + index * 2_000,
+      completed: index < messagePageSize / 2,
+    }),
+  ]
+}).flat()
+const assistants = messages.filter((message): message is SessionMessageAssistant => message.type === "assistant")
 const lastAssistant = assistants.at(-1)!
-const lastPartID = assistants.at(-1)!.parts[0]!.id
-const userPartID = `prt_${userID}_text`
+const lastPartID = `${assistants.at(-1)!.id}:text:0`
+const userPartID = `${messages.at(-2)!.id}:text:0`
 const completed = {
-  ...lastAssistant.info,
-  time: { ...lastAssistant.info.time, completed: lastAssistant.info.time.created + 15_000 },
+  ...lastAssistant,
+  time: { ...lastAssistant.time, completed: lastAssistant.time.created + 15_000 },
 }
 const scenarios = [
   { name: "completion", info: completed, idleFirst: false, interrupted: false },
   {
     name: "interruption",
-    info: { ...completed, error: { name: "MessageAbortedError", data: { message: "Stopped" } } },
+    info: { ...completed, error: { type: "MessageAbortedError", message: "Stopped" } },
     idleFirst: true,
     interrupted: true,
   },
@@ -54,8 +58,8 @@ for (const scenario of scenarios) {
     const roots: { sessionID: string; messageID: string }[] = []
     const sequence: string[] = []
     const history = Promise.withResolvers<void>()
-    const transport = await installSseTransport<{ directory: string; payload: Record<string, unknown> }>(page, {
-      server: `http://${process.env.PLAYWRIGHT_SERVER_HOST ?? "127.0.0.1"}:${process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"}`,
+    const transport = await installSseTransport(page, {
+      server,
       retry: 20,
     })
     await mockOpenCodeServer(page, {
@@ -91,15 +95,15 @@ for (const scenario of scenarios) {
       },
       message: (requestedSessionID, messageID) => {
         if (requestedSessionID !== sessionID) return
-        return messages.find((item) => item.info.id === messageID)
+        return messages.find((item) => item.id === messageID)
       },
       pageMessages: (_, limit, before) => {
         pages.push({ before, limit })
-        const end = before ? messages.findIndex((message) => message.info.id === before) : messages.length
+        const end = before ? messages.findIndex((message) => message.id === before) : messages.length
         const start = Math.max(0, end - limit)
         return {
           items: messages.slice(start, end),
-          cursor: start > 0 ? messages[start]!.info.id : undefined,
+          cursor: start > 0 ? messages[start]!.id : undefined,
         }
       },
     })
@@ -149,20 +153,25 @@ for (const scenario of scenarios) {
       requestAnimationFrame(() => setTimeout(sample, 0))
     })
 
-    await page.goto(`/${base64Encode(directory)}/session/${sessionID}`)
+    await page.goto(`/server/${base64Encode(server)}/session/${sessionID}`)
     await transport.waitForConnection()
     await expectSessionTitle(page, title)
     await expect(page.locator(`[data-timeline-part-id="${lastPartID}"]`)).toBeVisible()
     await expect(page.locator(`[data-timeline-part-id="${userPartID}"]`)).toBeVisible()
-    await expect.poll(() => requests.filter((request) => request.phase === "start").length).toBe(2)
+    const viewport = page.locator(".scroll-view__viewport", { has: page.locator("[data-timeline-row]") })
+    await viewport.hover()
+    const deadline = Date.now() + 30_000
+    while (requests.filter((request) => request.phase === "start").length < 2) {
+      if (Date.now() >= deadline) throw new Error("Timed out scrolling to the history boundary")
+      await page.mouse.wheel(0, -1_200)
+      await page.waitForTimeout(20)
+    }
     expect(requests.filter((request) => request.phase === "end")).toHaveLength(1)
-    expect(sequence.slice(0, 4)).toEqual([
+    expect(sequence.slice(0, 3)).toEqual([
       "messages:start:latest",
       "messages:end:latest",
-      `message:${userID}`,
-      `messages:start:${messages.at(-initialPageSize)!.info.id}`,
+      `messages:start:${messages.at(-messagePageSize)!.id}`,
     ])
-    await expect(page.locator('[data-timeline-part-id^="prt_history_root_"]')).toHaveCount(initialPageSize)
     await page.evaluate(() => {
       ;(
         window as Window & {
@@ -174,15 +183,14 @@ for (const scenario of scenarios) {
     expect(await visibleContentHidden(page)).toBe(false)
     const beforeHistory = await probeSamples(page)
     history.resolve()
-    await expect(page.locator('[data-timeline-part-id^="prt_history_root_"]')).toHaveCount(assistants.length)
     await expect.poll(() => requests.filter((request) => request.phase === "end").length).toBe(2)
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
     await waitForProbeSamples(page, beforeHistory)
     expect(pages).toEqual([
-      { before: undefined, limit: initialPageSize },
-      { before: messages.at(-initialPageSize)!.info.id, limit: historyPageSize },
+      { before: undefined, limit: messagePageSize },
+      { before: messages.at(-messagePageSize)!.id, limit: 20 },
     ])
-    expect(roots).toEqual([{ sessionID, messageID: userID }])
+    expect(roots).toEqual([])
 
     const message = messageUpdated(scenario.info)
     const idle = status("idle")

@@ -1,8 +1,8 @@
-import { Model } from "@opencode-ai/console-core/model.js"
+import { Model } from "@opencode/console-core/model.js"
 import { query, action, useParams, createAsync, json } from "@solidjs/router"
 import { createMemo, For, Show } from "solid-js"
 import { withActor } from "~/context/auth.withActor"
-import { ZenData } from "@opencode-ai/console-core/model.js"
+import { ZenData } from "@opencode/console-core/model.js"
 import styles from "./model-section.module.css"
 import { querySessionInfo } from "../common"
 import {
@@ -88,7 +88,7 @@ const updateModel = action(async (form: FormData) => {
   if (!workspaceID) return { error: formError.workspaceRequired }
   const enabled = (form.get("enabled") as string | null) === "true"
   return json(
-    await withActor(async () => {
+    withActor(async () => {
       if (enabled) {
         await Model.disable({ model })
       } else {

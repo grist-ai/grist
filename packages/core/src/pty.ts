@@ -1,15 +1,14 @@
-export * as Pty from "./pty"
+export * as Pty from "./pty.js"
 
-import { makeLocationNode } from "./effect/app-node"
+import { makeLocationNode } from "@opencode/util/effect/app-node"
 import type { Disp, Proc } from "#pty"
 import { Context, Effect, Layer, Schema, Types } from "effect"
-import { Pty } from "@opencode-ai/schema/pty"
-import { Config } from "./config"
-import { EventV2 } from "./event"
-import { Location } from "./location"
-import { PtyID } from "./pty/schema"
-import { Shell } from "./shell"
-import { lazy } from "./util/lazy"
+import { Pty } from "@opencode/schema/pty"
+import { Bus } from "./bus.js"
+import { Location } from "./location.js"
+import { PtyID } from "./pty/schema.js"
+import { ShellSelect } from "./shell/select.js"
+import { lazy } from "./util/lazy.js"
 
 const BUFFER_LIMIT = 1024 * 1024 * 2
 // Exited sessions stay observable (status, exit code, retained output) until removed explicitly.
@@ -47,7 +46,7 @@ export const UpdateInput = Pty.UpdateInput
 
 export type UpdateInput = Types.DeepMutable<typeof UpdateInput.Type>
 
-export const Event = Pty.Event
+export { Event } from "@opencode/schema/pty"
 
 export type AttachInput = {
   // Absolute output cursor to replay from. -1 tails from the current end; omitted replays the full retained buffer.
@@ -69,11 +68,11 @@ export type Attachment = {
   readonly detach: () => void
 }
 
-export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Pty.NotFoundError", {
+export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Pty.NotFoundError", {
   ptyID: PtyID,
 }) {}
 
-export class ExitedError extends Schema.TaggedErrorClass<ExitedError>()("Pty.ExitedError", {
+export class ExitedError extends Schema.TaggedError<ExitedError>()("Pty.ExitedError", {
   ptyID: PtyID,
 }) {}
 
@@ -87,14 +86,14 @@ export interface Interface {
   readonly attach: (id: PtyID, input: AttachInput) => Effect.Effect<Attachment, NotFoundError | ExitedError>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Pty") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Pty") {}
 
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const events = yield* EventV2.Service
+    const bus = yield* Bus.Service
     const location = yield* Location.Service
-    const config = yield* Config.Service
+    const shell = yield* ShellSelect.Service
     const context = yield* Effect.context()
     const runFork = Effect.runForkWith(context)
     const sessions = new Map<PtyID, Active>()
@@ -146,7 +145,7 @@ const layer = Layer.effect(
       if (index !== -1) exitOrder.splice(index, 1)
       yield* Effect.logInfo("removing session", { id })
       teardown(session)
-      yield* events.publish(Event.Deleted, { id: session.info.id })
+      yield* bus.publish(Pty.Event.Deleted, { id: session.info.id })
     })
 
     const remove = Effect.fn("Pty.remove")(function* (id: PtyID) {
@@ -164,8 +163,8 @@ const layer = Layer.effect(
 
     const create = Effect.fn("Pty.create")(function* (input: CreateInput) {
       const id = PtyID.ascending()
-      const command = input.command || Shell.preferred(Config.latest(yield* config.entries(), "shell"))
-      const args = Shell.login(command) ? [...(input.args ?? []), "-l"] : [...(input.args ?? [])]
+      const command = input.command || (yield* shell.resolve({ priority: "config" }))
+      const args = ShellSelect.login(command) ? [...(input.args ?? []), "-l"] : [...(input.args ?? [])]
       const cwd = input.cwd || location.directory
       const env = {
         ...process.env,
@@ -229,7 +228,7 @@ const layer = Layer.effect(
           runFork(
             Effect.gen(function* () {
               yield* Effect.logInfo("session exited", { id, exitCode })
-              yield* events.publish(Event.Exited, { id, exitCode })
+              yield* bus.publish(Pty.Event.Exited, { id, exitCode })
               while (exitOrder.length > EXITED_LIMIT) {
                 const oldest = exitOrder[0]
                 if (!oldest) break
@@ -239,7 +238,7 @@ const layer = Layer.effect(
           )
         }),
       )
-      yield* events.publish(Event.Created, { info })
+      yield* bus.publish(Pty.Event.Created, { info })
       return info
     })
 
@@ -247,7 +246,7 @@ const layer = Layer.effect(
       const session = yield* requireSession(id)
       if (input.title) session.info.title = input.title
       if (input.size && session.info.status === "running") session.process.resize(input.size.cols, input.size.rows)
-      yield* events.publish(Event.Updated, { info: session.info })
+      yield* bus.publish(Pty.Event.Updated, { info: session.info })
       return session.info
     })
 
@@ -313,6 +312,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const locationLayer = layer.pipe(Layer.provide(Config.locationLayer))
-
-export const node = makeLocationNode({ service: Service, layer, deps: [EventV2.node, Location.node, Config.node] })
+export const node = makeLocationNode({
+  service: Service,
+  layer,
+  deps: [Bus.node, Location.node, ShellSelect.node],
+})

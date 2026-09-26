@@ -7,15 +7,14 @@ import { RETIRED_STAT_PROVIDERS } from "./model-normalization"
 import {
   chunks,
   collapseRows,
-  DATA_SITE_TIERS,
   inserted,
-  isMissingUniqueUsersColumn,
   omitUniqueUsers,
   rankRowsWithMarketShare,
   statRowScope,
   synthesizeAllTierRows,
   toStatBaseRow,
   UPSERT_CHUNK_SIZE,
+  withUniqueUsersFallback,
   type StatBaseAggregate,
 } from "./stat"
 
@@ -70,7 +69,7 @@ export class ProviderStatRepo extends Context.Service<ProviderStatRepo, Provider
                   eq(providerStat.grain, "day"),
                   eq(providerStat.client, "all"),
                   eq(providerStat.source, "all"),
-                  inArray(providerStat.tier, DATA_SITE_TIERS),
+                  inArray(providerStat.tier, ["Go", "go"]),
                 ),
               )
               .orderBy(asc(providerStat.period_key)),
@@ -110,14 +109,8 @@ export class ProviderStatRepo extends Context.Service<ProviderStatRepo, Provider
           chunks(rows, UPSERT_CHUNK_SIZE),
           (chunk) =>
             Effect.tryPromise({
-              try: async () => {
-                try {
-                  return await upsertProviderChunk(chunk, true)
-                } catch (cause) {
-                  if (!isMissingUniqueUsersColumn(cause)) throw cause
-                  return upsertProviderChunk(chunk, false)
-                }
-              },
+              try: () =>
+                withUniqueUsersFallback((includeUniqueUsers) => upsertProviderChunk(chunk, includeUniqueUsers)),
               catch: (cause) => DatabaseError.make({ cause }),
             }),
           { discard: true },

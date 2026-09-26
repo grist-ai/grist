@@ -7,9 +7,7 @@ import { RETIRED_STAT_MODELS, RETIRED_STAT_PROVIDERS } from "./model-normalizati
 import {
   chunks,
   collapseRows,
-  DATA_SITE_TIERS,
   inserted,
-  isMissingUniqueUsersColumn,
   omitUniqueUsers,
   rankRowsWithMarketShare,
   statPeriodKey,
@@ -17,6 +15,7 @@ import {
   synthesizeAllTierRows,
   toStatBaseRow,
   UPSERT_CHUNK_SIZE,
+  withUniqueUsersFallback,
   type StatBaseAggregate,
 } from "./stat"
 
@@ -94,7 +93,7 @@ export class GeoStatRepo extends Context.Service<GeoStatRepo, GeoStatRepo.Servic
                   eq(geoStat.grain, "day"),
                   eq(geoStat.client, "all"),
                   eq(geoStat.source, "all"),
-                  inArray(geoStat.tier, DATA_SITE_TIERS),
+                  inArray(geoStat.tier, ["Go", "go"]),
                   scope,
                 ),
               )
@@ -139,14 +138,7 @@ export class GeoStatRepo extends Context.Service<GeoStatRepo, GeoStatRepo.Servic
           chunks(rows, UPSERT_CHUNK_SIZE),
           (chunk) =>
             Effect.tryPromise({
-              try: async () => {
-                try {
-                  return await upsertGeoChunk(chunk, true)
-                } catch (cause) {
-                  if (!isMissingUniqueUsersColumn(cause)) throw cause
-                  return upsertGeoChunk(chunk, false)
-                }
-              },
+              try: () => withUniqueUsersFallback((includeUniqueUsers) => upsertGeoChunk(chunk, includeUniqueUsers)),
               catch: (cause) => DatabaseError.make({ cause }),
             }),
           { discard: true },

@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm"
 
 export const UPSERT_CHUNK_SIZE = 500
-export const DATA_SITE_TIERS = ["Go", "go", "Free", "free"]
 const DAY_MS = 86_400_000
 
 export type StatGrain = "day" | "week"
@@ -152,6 +151,15 @@ export function isMissingUniqueUsersColumn(cause: unknown): boolean {
   return errorText(cause).includes("Unknown column 'unique_users'")
 }
 
+export async function withUniqueUsersFallback<T>(write: (includeUniqueUsers: boolean) => Promise<T>) {
+  try {
+    return await write(true)
+  } catch (cause) {
+    if (!isMissingUniqueUsersColumn(cause)) throw cause
+    return write(false)
+  }
+}
+
 export function omitUniqueUsers<T extends { unique_users?: number }>(rows: T[]) {
   return rows.map((row) => {
     const result = { ...row }
@@ -277,12 +285,7 @@ export function weightedAverage(
 }
 
 export function normalizeTier(value: string) {
-  const normalized = value.toLowerCase()
-  if (normalized === "paid" || normalized === "zen") return "Zen"
-  if (normalized === "go") return "Go"
-  if (normalized === "free") return "Free"
-  if (normalized === "enterprise") return "Enterprise"
-  if (normalized === "all") return "all"
+  if (value === "Paid") return "Zen"
   return value
 }
 

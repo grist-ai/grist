@@ -1,30 +1,19 @@
-import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
-import appPlugin from "@opencode-ai/app/vite"
-import * as fs from "node:fs/promises"
-import { existsSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
-import { moonshinePthreadCopy } from "./src/main/pthread-assets"
-
-const OPENCODE_SERVER_DIST = "../opencode/dist/node"
-const transformersWeb = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../app/node_modules/@huggingface/transformers/dist/transformers.web.js",
-)
+import { pickerPlugin } from "./scripts/picker"
 
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
-  if (raw === "dev" || raw === "beta" || raw === "prod") return raw
+  if (raw === "local" || raw === "dev" || raw === "beta" || raw === "prod") return raw
   if (process.env.OPENCODE_CHANNEL === "latest") return "prod"
   return "dev"
 })()
 
 const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
 
+const appPlugin = (await import("@opencode/app/vite")).default
 const sentry =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
-    ? sentryVitePlugin({
+    ? (await import("@sentry/vite-plugin")).sentryVitePlugin({
         authToken: process.env.SENTRY_AUTH_TOKEN,
         org: process.env.SENTRY_ORG,
         project: process.env.SENTRY_PROJECT,
@@ -39,17 +28,26 @@ const sentry =
       })
     : false
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   main: {
+    resolve: {
+      dedupe: ["effect"],
+    },
     define: {
-      "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel),
+      // Local renderer/server mode still uses the dev application identity and updater policy.
+      "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
     },
     build: {
-      rollupOptions: {
-        input: { index: "src/main/index.ts", sidecar: "src/main/sidecar.ts" },
+      minify: command === "build",
+      rolldownOptions: {
+        input: { index: "src/main/index.ts" },
         // Keep this identical to electron-vite's Node 20.11+ shim. Its regex insertion can
-        // corrupt bundled TypeScript, while a Rollup banner places the shim safely.
+        // corrupt bundled TypeScript, while an output banner places the shim safely.
         output: {
+          format: "es",
+          // DesktopPaths resolves resources from the main output directory,
+          // including when the lazy desktop entry shares it with other chunks.
+          chunkFileNames: "[name]-[hash].js",
           banner: `
 // -- CommonJS Shims --
 import __cjs_mod__ from 'node:module';
@@ -59,7 +57,11 @@ const require = __cjs_mod__.createRequire(import.meta.url);
 `,
         },
       },
-      externalizeDeps: { include: [nodePtyPkg] },
+      externalizeDeps: {
+        // Bundle the Effect family together.
+        exclude: ["effect", "@effect/platform-node", "@effect/platform-node-shared", "drizzle-orm"],
+        include: [nodePtyPkg],
+      },
     },
     plugins: [
       {
@@ -67,71 +69,48 @@ const require = __cjs_mod__.createRequire(import.meta.url);
         enforce: "pre",
         resolveId(s) {
           if (s === "@lydell/node-pty") return nodePtyPkg
-        },
-      },
-      {
-        name: "opencode:virtual-server-module",
-        enforce: "pre",
-        resolveId(id) {
-          if (id === "virtual:opencode-server") return this.resolve(`${OPENCODE_SERVER_DIST}/node.js`)
-        },
-      },
-      {
-        name: "opencode:copy-server-assets",
-        async writeBundle() {
-          for (const l of await fs.readdir(OPENCODE_SERVER_DIST)) {
-            if (!l.endsWith(".wasm")) continue
-            await fs.writeFile(`./out/main/chunks/${l}`, await fs.readFile(`${OPENCODE_SERVER_DIST}/${l}`))
-          }
+          return undefined
         },
       },
     ],
   },
   preload: {
     build: {
-      rollupOptions: {
+      minify: command === "build",
+      rolldownOptions: {
         input: { index: "src/preload/index.ts" },
         output: {
           format: "cjs",
-          entryFileNames: "[name].js",
+          // The package is "type": "module". Under --no-sandbox Electron loads the preload
+          // through Node's module loader, which treats a .js file as ESM and fails on
+          // require("electron"). The sandboxed path ignores the extension.
+          entryFileNames: "[name].cjs",
         },
       },
     },
   },
   renderer: {
-    plugins: [
-      appPlugin,
-      sentry,
-      {
-        name: "grist:moonshine-pthread-assets",
-        async writeBundle(output) {
-          const dir = join(output.dir ?? "out/renderer", "assets")
-          if (!existsSync(dir)) return
-          const copies = moonshinePthreadCopy(await fs.readdir(dir))
-          for (const copy of copies) {
-            await fs.copyFile(join(dir, copy.from), join(dir, copy.to))
-          }
-        },
-      },
-    ],
+    experimental: {
+      bundledDev: true,
+    },
+    define: {
+      "import.meta.env.OPENCODE_VERSION": JSON.stringify(process.env.OPENCODE_VERSION),
+      "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
+      "import.meta.env.OPENCODE_TEST_ONBOARDING": JSON.stringify(
+        command === "serve" && process.env.OPENCODE_TEST_ONBOARDING === "1",
+      ),
+    },
+    plugins: [pickerPlugin(), appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
-    resolve: {
-      alias: {
-        "@huggingface/transformers": transformersWeb,
-      },
-    },
-    optimizeDeps: {
-      exclude: ["@huggingface/transformers", "@moonshine-ai/moonshine-wasm"],
-    },
     build: {
+      minify: command === "build",
       sourcemap: true,
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           main: "src/renderer/index.html",
         },
-        external: ["onnxruntime-node", "sharp"],
       },
     },
   },
-})
+}))

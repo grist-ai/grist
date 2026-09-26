@@ -5,14 +5,13 @@ import { mockOpenCodeServer } from "../utils/mock-server"
 test.beforeEach(async ({ page }) => {
   const sessions = fixture.sessions.map((session) => ({ ...session }))
   await mockOpenCodeServer(page, {
-    protocol: "v1",
     sessions,
     provider: fixture.provider,
     directory: fixture.directory,
     project: fixture.project,
     pageMessages,
   })
-  await page.route(/\/session\/[^/]+(?:\?.*)?$/, async (route) => {
+  await page.route("**/api/session/*", async (route) => {
     if (route.request().method() !== "PATCH") return route.fallback()
     const id = new URL(route.request().url()).pathname.split("/").at(-1)
     const session = sessions.find((item) => item.id === id)
@@ -26,17 +25,8 @@ test.beforeEach(async ({ page }) => {
     )
       throw new Error("Invalid rename request")
     session.title = payload.title
-    await route.fulfill({ json: session, headers: { "access-control-allow-origin": "*" } })
+    await route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } })
   })
-  await page.addInitScript((directory) => {
-    localStorage.setItem(
-      "opencode.global.dat:server",
-      JSON.stringify({
-        projects: { local: [{ worktree: directory, expanded: true }] },
-        lastProject: { local: directory },
-      }),
-    )
-  }, fixture.directory)
   await page.goto("/")
   await page.locator('[data-component="home-session-row"]').filter({ hasText: fixture.expected.targetTitle }).click()
   await expect(page.getByRole("heading", { name: fixture.expected.targetTitle, exact: true })).toBeVisible()
@@ -50,7 +40,7 @@ for (const commit of ["Enter", "blur", "click outside"]) {
     await input.fill("Renamed session")
     if (commit === "Enter") await input.press("Enter")
     if (commit === "blur") await input.press("Tab")
-    if (commit === "click outside") await page.getByRole("textbox", { name: "Prompt", exact: true }).click()
+    if (commit === "click outside") await page.locator('[data-component="composer-editor"]').click()
     await expect(page.getByRole("heading", { name: "Renamed session", exact: true })).toBeVisible()
     await expect(page.locator('[data-slot="titlebar-tabs"] a').filter({ hasText: "Renamed session" })).toBeVisible()
     await page.reload()
@@ -69,10 +59,11 @@ test("cancels the session heading with Escape", async ({ page }) => {
 })
 
 test("keeps the draft when saving the session heading fails", async ({ page }) => {
-  await page.route(/\/session\/[^/]+(?:\?.*)?$/, (route) => {
-    if (route.request().method() !== "PATCH") return route.fallback()
-    return route.fulfill({ status: 500, headers: { "access-control-allow-origin": "*" } })
-  })
+  await page.route("**/api/session/*", (route) =>
+    route.request().method() === "PATCH"
+      ? route.fulfill({ status: 500, headers: { "access-control-allow-origin": "*" } })
+      : route.fallback(),
+  )
   await page.getByRole("heading", { name: fixture.expected.targetTitle, exact: true }).click()
   const input = page.locator('input[data-slot="session-title-child"]')
   await input.fill("Retry this title")

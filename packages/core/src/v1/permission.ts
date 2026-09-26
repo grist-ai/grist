@@ -1,16 +1,16 @@
-export * as PermissionV1 from "./permission"
+export * as PermissionV1 from "./permission.js"
 
 import { Schema } from "effect"
-export * from "@opencode-ai/schema/permission-v1"
-import { ID } from "@opencode-ai/schema/permission-v1"
+export * from "@opencode/schema/permission-v1"
+import { ID } from "@opencode/schema/permission-v1"
 
-export class RejectedError extends Schema.TaggedErrorClass<RejectedError>()("PermissionRejectedError", {}) {
+export class RejectedError extends Schema.TaggedError<RejectedError>()("PermissionRejectedError", {}) {
   override get message() {
     return "The user rejected permission to use this specific tool call."
   }
 }
 
-export class CorrectedError extends Schema.TaggedErrorClass<CorrectedError>()("PermissionCorrectedError", {
+export class CorrectedError extends Schema.TaggedError<CorrectedError>()("PermissionCorrectedError", {
   feedback: Schema.String,
 }) {
   override get message() {
@@ -18,7 +18,7 @@ export class CorrectedError extends Schema.TaggedErrorClass<CorrectedError>()("P
   }
 }
 
-export class DeniedError extends Schema.TaggedErrorClass<DeniedError>()("PermissionDeniedError", {
+export class DeniedError extends Schema.TaggedError<DeniedError>()("PermissionDeniedError", {
   ruleset: Schema.Any,
 }) {
   override get message() {
@@ -26,7 +26,7 @@ export class DeniedError extends Schema.TaggedErrorClass<DeniedError>()("Permiss
   }
 }
 
-export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Permission.NotFoundError", {
+export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Permission.NotFoundError", {
   requestID: ID,
 }) {}
 

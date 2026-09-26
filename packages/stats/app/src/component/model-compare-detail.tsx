@@ -1,12 +1,12 @@
 import { Link, Meta, Title } from "@solidjs/meta"
-import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
+import { ProviderIcon } from "@opencode/ui/provider-icon"
 import {
   getStatsModelsComparisonData,
   type ModelUsagePoint,
-  type RetentionEntry,
   type StatsModelComparisonInput,
   type StatsModelComparisonEntry,
-} from "@opencode-ai/stats-core/domain/home"
+} from "@opencode/stats-core/domain/home"
+import { runtime } from "@opencode/stats-core/runtime"
 import { createAsync, query, useParams, useSearchParams } from "@solidjs/router"
 import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js"
 import { getRequestEvent } from "solid-js/web"
@@ -24,8 +24,6 @@ import {
   findModelCatalogEntry,
   formatCatalogLabName,
   getModelCatalog,
-  isKnownCatalogLab,
-  isProviderlessLab,
   type ModelCatalog,
   type ModelCatalogEntry,
 } from "../routes/model-catalog"
@@ -47,7 +45,6 @@ import {
   type ResolvedComparisonFamily,
 } from "../lib/comparison-pages"
 import { baseUrl } from "../lib/language"
-import { runStatsEffect } from "../stats-runtime"
 
 const compareHeaderLinks: readonly HeaderLink[] = [
   { href: `${import.meta.env.BASE_URL}#top-models`, label: "Top Models" },
@@ -73,7 +70,7 @@ const comparisonModelLimit = 6
 type ComparisonModel = {
   name: string
   lab: string
-  labName?: string
+  labName: string
   slug: string
   catalog: ModelCatalogEntry | null
   stats: StatsModelComparisonEntry | null
@@ -112,7 +109,7 @@ export type ModelCompareDetailPageProps = {
 
 const getComparisonData = query(async (models: StatsModelComparisonInput[]) => {
   "use server"
-  return runStatsEffect(getStatsModelsComparisonData(models))
+  return runtime.runPromise(getStatsModelsComparisonData(models))
 }, "getStatsModelComparisonDetailData")
 
 export default function ModelCompareDetailPage(props: ModelCompareDetailPageProps = {}) {
@@ -161,19 +158,13 @@ export default function ModelCompareDetailPage(props: ModelCompareDetailPageProp
   let comparisonBodyScroll: HTMLDivElement | undefined
   const models = createMemo(() =>
     modelSelections().map((model, index) =>
-      buildComparisonModel(
-        model.lab,
-        model.slug,
-        model.catalog ?? null,
-        stats()?.models[index] ?? null,
-        catalog()?.labs.map((lab) => lab.id) ?? [],
-      ),
+      buildComparisonModel(model.lab, model.slug, model.catalog ?? null, stats()?.models[index] ?? null),
     ),
   )
   const title = createMemo(() => `${models()[0].name} vs ${models()[1].name} - AI Model Comparison`)
   const description = createMemo(
     () =>
-      `Compare ${comparisonModelLabel(models()[0])} and ${comparisonModelLabel(models()[1])} on key metrics including benchmarks, price, context length, usage, and model features.`,
+      `Compare ${models()[0].name} from ${models()[0].labName} and ${models()[1].name} from ${models()[1].labName} on key metrics including benchmarks, price, context length, usage, and model features.`,
   )
   const canonicalPath = createMemo(() => {
     if (props.family) return canonicalFamilyComparisonPath(props.family.first, props.family.second)
@@ -214,7 +205,7 @@ export default function ModelCompareDetailPage(props: ModelCompareDetailPageProp
         "@type": "SoftwareApplication",
         name: model.name,
         applicationCategory: "AI model",
-        ...(model.labName ? { provider: model.labName } : {}),
+        provider: model.labName,
       })),
     }),
   )
@@ -467,9 +458,7 @@ function CompareDetailSelectButton(props: {
       aria-expanded={props.expanded}
       onClick={props.onOpen}
     >
-      <Show when={props.model.labName}>
-        {(labName) => <LabLogo lab={props.model.lab} label={labName()} size="small" />}
-      </Show>
+      <LabLogo lab={props.model.lab} label={props.model.labName} size="small" />
       <span data-slot="compare-detail-select-name">{props.model.name}</span>
       <ChevronDownIcon />
     </button>
@@ -590,7 +579,10 @@ function CompareModelDetail(props: { model: ModelCatalogEntry }) {
         <strong>{props.model.name}</strong>
       </header>
       <div data-slot="compare-model-modal-description">
-        <p>{props.model.description ?? `${props.model.name} is an AI model.`}</p>
+        <p>
+          {props.model.description ??
+            `${props.model.name} is an AI model from ${formatCatalogLabName(props.model.lab)}.`}
+        </p>
         <span aria-hidden="true" />
       </div>
       <dl data-slot="compare-model-modal-facts">
@@ -796,11 +788,9 @@ function LabLogo(props: { lab: string; label: string; size: "large" | "small" | 
   const iconId = () => getProviderIconId(props.lab)
 
   return (
-    <Show when={!isProviderlessLab(props.lab)}>
-      <span data-slot="compare-home-avatar" data-lab={iconId()} data-size={props.size} aria-label={props.label}>
-        <ProviderIcon aria-hidden="true" id={iconId()} />
-      </span>
-    </Show>
+    <span data-slot="compare-home-avatar" data-lab={iconId()} data-size={props.size} aria-label={props.label}>
+      <ProviderIcon aria-hidden="true" id={iconId()} />
+    </span>
   )
 }
 
@@ -841,13 +831,11 @@ function buildComparisonModel(
   modelParam: string,
   catalog: ModelCatalogEntry | null,
   stats: StatsModelComparisonEntry | null,
-  catalogLabs: readonly string[],
 ): ComparisonModel {
-  const lab = catalog?.lab ?? stats?.provider ?? catalogSlug(labParam)
   return {
     name: catalog?.name ?? stats?.model ?? formatParamName(modelParam),
-    lab,
-    labName: isKnownCatalogLab(lab, catalogLabs) ? formatCatalogLabName(lab) : undefined,
+    lab: catalog?.lab ?? stats?.provider ?? catalogSlug(labParam),
+    labName: formatCatalogLabName(catalog?.lab ?? stats?.provider ?? labParam),
     slug: catalog?.slug ?? stats?.slug ?? catalogSlug(modelParam),
     catalog,
     stats,
@@ -886,7 +874,10 @@ function buildComparisonDetailSections(models: readonly ComparisonModel[]): Comp
     {
       title: "Overview",
       rows: [
-        comparisonDetailRow("Author", models.map(providerDetailCell)),
+        comparisonDetailRow(
+          "Author",
+          models.map((model) => linkedTextCell(model.stats?.author ?? model.labName, labHref(model.lab))),
+        ),
         comparisonDetailRow(
           "Context length",
           models.map((model) => limitCell(model.catalog?.limit?.context)),
@@ -905,7 +896,10 @@ function buildComparisonDetailSections(models: readonly ComparisonModel[]): Comp
           "Output modalities",
           models.map((model) => textCell(formatCatalogModalities(model.catalog?.modalities.output ?? []))),
         ),
-        comparisonDetailRow("Providers", models.map(providerDetailCell)),
+        comparisonDetailRow(
+          "Providers",
+          models.map((model) => linkedTextCell(model.labName, labHref(model.lab))),
+        ),
       ],
     },
     {
@@ -954,17 +948,6 @@ function buildComparisonDetailSections(models: readonly ComparisonModel[]): Comp
         ),
       ],
       usage: models.map((model) => model.stats?.usage ?? []),
-    },
-    {
-      title: "Retention",
-      badge: "Week 1",
-      rows: [
-        comparisonDetailRow(
-          "Returning users",
-          models.map((model) => retentionCell(model.stats?.weeklyRetention)),
-          "higher",
-        ),
-      ],
     },
   ]
 }
@@ -1018,15 +1001,6 @@ function comparisonRef(model: ComparisonModel): ComparisonModelRef {
   }
 }
 
-function comparisonModelLabel(model: ComparisonModel) {
-  return model.labName ? `${model.name} from ${model.labName}` : model.name
-}
-
-function providerDetailCell(model: ComparisonModel): ComparisonDetailCell {
-  if (!model.labName) return textCell("")
-  return linkedTextCell(model.stats?.author ?? model.labName ?? "", labHref(model.lab))
-}
-
 function textCell(value: string): ComparisonDetailCell {
   return { value }
 }
@@ -1055,15 +1029,6 @@ function usageMetricCell(value: number | undefined, format: "compact" | "integer
 
 function percentCell(value: number | undefined): ComparisonDetailCell {
   return value === undefined ? { value: "No usage" } : { value: formatPercent(value), score: value }
-}
-
-function retentionCell(value: RetentionEntry | null | undefined): ComparisonDetailCell {
-  if (!value || value.rank === null) return { value: "Pending" }
-  return {
-    value: formatPercent(value.rate),
-    unit: `${formatTokens(value.eligibleUserWeeks)} user-weeks`,
-    score: value.rate,
-  }
 }
 
 function tokenCell(value: number | undefined, trend: number | undefined): ComparisonDetailCell {

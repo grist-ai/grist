@@ -1,15 +1,10 @@
-import { Effect } from "effect"
-import { define } from "../internal"
+import { createProviderPlugin } from "./factory.js"
 
-export const VenicePlugin = define({
-  id: "venice",
-  effect: Effect.fn(function* (ctx) {
-    yield* ctx.aisdk.sdk(
-      Effect.fn(function* (evt) {
-        if (evt.package !== "venice-ai-sdk-provider") return
-        const mod = yield* Effect.promise(() => import("venice-ai-sdk-provider"))
-        evt.sdk = mod.createVenice(evt.options)
-      }),
-    )
-  }),
+export const VenicePlugin = createProviderPlugin({
+  id: "opencode.provider.venice",
+  package: "venice-ai-sdk-provider",
+  load: async (options) => {
+    const { createVenice } = await import("venice-ai-sdk-provider")
+    return createVenice(options)
+  },
 })

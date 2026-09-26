@@ -1,7 +1,7 @@
 import type { APIEvent } from "@solidjs/start/server"
-import { Workspace } from "@opencode-ai/console-core/workspace.js"
-import { safeEqual } from "@opencode-ai/console-core/util/crypto.js"
-import { Resource } from "@opencode-ai/console-resource"
+import { Workspace } from "@opencode/console-core/workspace.js"
+import { safeEqual } from "@opencode/console-core/util/crypto.js"
+import { Resource } from "@opencode/console-resource"
 import z from "zod"
 
 const Body = z.object({ workspaceID: z.string().startsWith("wrk_") })
@@ -15,7 +15,7 @@ export async function POST(event: APIEvent) {
   if (!body.success) {
     return Response.json({ error: "Invalid request", issues: body.error.issues }, { status: 400 })
   }
-  return Workspace.unblock(body.data)
+  return Workspace.unblock(body.data.workspaceID)
     .then(() => Response.json({ success: true, message: "Workspace unblocked" }))
     .catch((error) => Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }))
 }

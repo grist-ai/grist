@@ -1,10 +1,10 @@
 [Desktop Entry]
-Name=Grist
-Exec=/opt/Grist/ai.grist.desktop %U
+Name=OpenCode
+Exec=/opt/OpenCode/ai.opencode.desktop %U
 Terminal=false
 Type=Application
-Icon=ai.grist.desktop
-StartupWMClass=ai.grist.desktop
+Icon=ai.opencode.desktop
+StartupWMClass=ai.opencode.desktop
 NoDisplay=true
-Comment=Confidence-gated coding agent
+Comment=Open source AI coding agent
 Categories=Development;

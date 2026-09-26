@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "dependencies": {
+    "@opencode/plugin": "workspace:*",
+    "@opencode/schema": "workspace:*",
+    "@types/node": "catalog:",
+    "effect": "catalog:"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "MIT",
+  "name": "@grist-ai/plugin",
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
+  },
+  "type": "module",
+  "version": "0.0.0"
+}

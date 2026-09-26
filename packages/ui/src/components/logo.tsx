@@ -1,6 +1,5 @@
 import { type ComponentProps } from "solid-js"
 
-/** Compact G mark. */
 export const Mark = (props: { class?: string }) => {
   return (
     <svg
@@ -10,61 +9,53 @@ export const Mark = (props: { class?: string }) => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path fill="var(--icon-strong-base)" d="M0 0H16V4H4V16H16V20H0V0ZM12 8H16V12H8V8H12Z" />
+      <path data-slot="logo-logo-mark-shadow" d="M12 16H4V8H12V16Z" fill="var(--icon-weak-base)" />
+      <path data-slot="logo-logo-mark-o" d="M12 4H4V16H12V4ZM16 20H0V0H16V20Z" fill="var(--icon-strong-base)" />
     </svg>
   )
 }
 
-/** Loading splash — full GRIST wordmark (not the old O mark). */
-export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class" | "style">) => {
+export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => {
   return (
     <svg
       ref={props.ref}
       data-component="logo-splash"
       classList={{ [props.class ?? ""]: !!props.class }}
-      style={props.style}
-      viewBox="0 0 156 42"
+      viewBox="0 0 80 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      aria-label="Grist"
     >
-      <g fill="currentColor">
-        {/* G */}
-        <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
-        {/* R */}
-        <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
-        {/* I */}
-        <path d="M66 6H72V36H66V6Z" />
-        {/* S */}
-        <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
-        {/* T */}
-        <path d="M120 6H156V12H144V36H132V12H120V6Z" />
-      </g>
+      <path d="M60 80H20V40H60V80Z" fill="var(--icon-base)" />
+      <path d="M60 20H20V80H60V20ZM80 100H0V0H80V100Z" fill="var(--icon-strong-base)" />
     </svg>
   )
 }
 
-/** Pixel wordmark: GRIST */
 export const Logo = (props: { class?: string }) => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 156 42"
+      viewBox="0 0 234 42"
       fill="none"
       classList={{ [props.class ?? ""]: !!props.class }}
-      aria-label="Grist"
     >
-      <g fill="var(--icon-strong-base)">
-        <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
-        <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
-        <path d="M66 6H72V36H66V6Z" />
-        <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
-        <path d="M120 6H156V12H144V36H132V12H120V6Z" />
-      </g>
-      <g fill="var(--icon-weak-base)">
-        <path d="M18 18H12V24H18V30H6V12H18V18Z" />
-        <path d="M48 12H42V24H48V12Z" />
-        <path d="M102 18H90V24H102V18Z" />
+      <g>
+        <path d="M18 30H6V18H18V30Z" fill="var(--icon-weak-base)" />
+        <path d="M18 12H6V30H18V12ZM24 36H0V6H24V36Z" fill="var(--icon-base)" />
+        <path d="M48 30H36V18H48V30Z" fill="var(--icon-weak-base)" />
+        <path d="M36 30H48V12H36V30ZM54 36H36V42H30V6H54V36Z" fill="var(--icon-base)" />
+        <path d="M84 24V30H66V24H84Z" fill="var(--icon-weak-base)" />
+        <path d="M84 24H66V30H84V36H60V6H84V24ZM66 18H78V12H66V18Z" fill="var(--icon-base)" />
+        <path d="M108 36H96V18H108V36Z" fill="var(--icon-weak-base)" />
+        <path d="M108 12H96V36H90V6H108V12ZM114 36H108V12H114V36Z" fill="var(--icon-base)" />
+        <path d="M144 30H126V18H144V30Z" fill="var(--icon-weak-base)" />
+        <path d="M144 12H126V30H144V36H120V6H144V12Z" fill="var(--icon-strong-base)" />
+        <path d="M168 30H156V18H168V30Z" fill="var(--icon-weak-base)" />
+        <path d="M168 12H156V30H168V12ZM174 36H150V6H174V36Z" fill="var(--icon-strong-base)" />
+        <path d="M198 30H186V18H198V30Z" fill="var(--icon-weak-base)" />
+        <path d="M198 12H186V30H198V12ZM204 36H180V6H198V0H204V36Z" fill="var(--icon-strong-base)" />
+        <path d="M234 24V30H216V24H234Z" fill="var(--icon-weak-base)" />
+        <path d="M216 12V18H228V12H216ZM234 24H216V30H234V36H210V6H234V24Z" fill="var(--icon-strong-base)" />
       </g>
     </svg>
   )

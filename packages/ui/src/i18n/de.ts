@@ -78,7 +78,7 @@ export const dict = {
 
   "dialog.usageExceeded.freeTier.title": "Kostenloses Limit erreicht",
   "dialog.usageExceeded.freeTier.description":
-    "Grist für 10 $ pro Monat abonnieren und zuverlässigen Zugriff auf die besten Open-Source-Modelle erhalten.",
+    "OpenCode Go abonnieren und zuverlässigen Zugriff auf die besten Open-Source-Modelle erhalten, ab 5 $ pro Monat.",
   "dialog.usageExceeded.freeTier.actionLabel": "Abonnieren",
   "dialog.usageExceeded.accountRateLimit.title": "Go-Limit erreicht",
   "dialog.usageExceeded.accountRateLimit.description":
@@ -137,8 +137,6 @@ export const dict = {
   "ui.tool.websearch.provider": "{{provider}} Web-Suche",
   "ui.tool.shell": "Shell",
   "ui.tool.patch": "Patch",
-  "ui.tool.todos": "Aufgaben",
-  "ui.tool.todos.read": "Aufgaben lesen",
   "ui.tool.questions": "Fragen",
   "ui.tool.questions.numbered": "Fragen {{number}}",
   "ui.tool.agent": "{{type}}-Agent",

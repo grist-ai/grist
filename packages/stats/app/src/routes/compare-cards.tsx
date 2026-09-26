@@ -1,4 +1,4 @@
-import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
+import { ProviderIcon } from "@opencode/ui/provider-icon"
 import { For, Show } from "solid-js"
 import { catalogSlug, formatCatalogLabName, type ModelCatalogEntry } from "./model-catalog"
 
@@ -119,24 +119,17 @@ function ComparisonCardIcon() {
 }
 
 function ComparisonPanelCard(props: { pair: ComparisonPair }) {
-  const firstLabName = () => props.pair.first.labName
-  const secondLabName = () => props.pair.second.labName
-
   return (
     <a data-component="comparison-card" href={canonicalComparisonHref(props.pair.first, props.pair.second)}>
       <span>{props.pair.detail}</span>
       <strong>
         {props.pair.first.name} <em>vs</em> {props.pair.second.name}
       </strong>
-      <Show when={firstLabName() || secondLabName()}>
-        <p>
-          <Show when={firstLabName()}>{(name) => <b>{name()}</b>}</Show>
-          <Show when={firstLabName() && secondLabName()}>
-            <i />
-          </Show>
-          <Show when={secondLabName()}>{(name) => <b>{name()}</b>}</Show>
-        </p>
-      </Show>
+      <p>
+        <b>{props.pair.first.labName ?? formatCatalogLabName(props.pair.first.lab)}</b>
+        <i />
+        <b>{props.pair.second.labName ?? formatCatalogLabName(props.pair.second.lab)}</b>
+      </p>
       <Show when={props.pair.first.metric || props.pair.second.metric}>
         <small>
           {props.pair.first.metric ?? "Listed"} / {props.pair.second.metric ?? "Listed"}
@@ -150,11 +143,14 @@ function ComparisonLabLogo(props: { model: ComparisonModelRef }) {
   const iconId = () => providerIconId(props.model.lab)
 
   return (
-    <Show when={props.model.labName}>
-      <span data-slot="compare-home-avatar" data-lab={iconId()} data-size="small" aria-label={props.model.labName}>
-        <ProviderIcon aria-hidden="true" id={iconId()} />
-      </span>
-    </Show>
+    <span
+      data-slot="compare-home-avatar"
+      data-lab={iconId()}
+      data-size="small"
+      aria-label={props.model.labName ?? formatCatalogLabName(props.model.lab)}
+    >
+      <ProviderIcon aria-hidden="true" id={iconId()} />
+    </span>
   )
 }
 

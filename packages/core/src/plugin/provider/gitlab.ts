@@ -1,13 +1,14 @@
 import os from "os"
-import { InstallationVersion } from "../../installation/version"
+import { App } from "../../app.js"
 import { Effect } from "effect"
-import { define } from "../internal"
-import { ProviderV2 } from "../../provider"
+import { define } from "@opencode/plugin/effect/plugin"
+import { Provider } from "../../provider.js"
 
 export const GitLabPlugin = define({
-  id: "gitlab",
+  id: "opencode.provider.gitlab",
   effect: Effect.fn(function* (ctx) {
-    yield* ctx.aisdk.sdk(
+    yield* ctx.aisdk.hook(
+      "sdk",
       Effect.fn(function* (evt) {
         if (evt.package !== "gitlab-ai-provider") return
         const mod = yield* Effect.promise(() => import("gitlab-ai-provider"))
@@ -19,7 +20,7 @@ export const GitLabPlugin = define({
               : (process.env.GITLAB_INSTANCE_URL ?? "https://gitlab.com"),
           apiKey: typeof evt.options.apiKey === "string" ? evt.options.apiKey : process.env.GITLAB_TOKEN,
           aiGatewayHeaders: {
-            "User-Agent": `opencode/${InstallationVersion} gitlab-ai-provider/${mod.VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
+            "User-Agent": `${App.useragent(ctx.app)} gitlab-ai-provider/${mod.VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
             "anthropic-beta": "context-1m-2025-08-07",
             ...evt.options.aiGatewayHeaders,
           },
@@ -31,31 +32,30 @@ export const GitLabPlugin = define({
         })
       }),
     )
-    yield* ctx.aisdk.language(
+    yield* ctx.aisdk.hook(
+      "language",
       Effect.fn(function* (evt) {
-        if (evt.model.providerID !== ProviderV2.ID.gitlab) return
+        if (evt.model.providerID !== Provider.ID.gitlab) return
         const featureFlags =
           typeof evt.options.featureFlags === "object" && evt.options.featureFlags ? evt.options.featureFlags : {}
-        if (evt.model.api.id.startsWith("duo-workflow-")) {
-          const gitlab = yield* Effect.promise(() => import("gitlab-ai-provider")).pipe(Effect.orDie)
+        const id = evt.model.modelID ?? evt.model.id
+        if (id.startsWith("duo-workflow-")) {
+          const gitlab = yield* Effect.promise(() => import("gitlab-ai-provider"))
           const workflowRef =
-            typeof evt.model.request.body.workflowRef === "string" ? evt.model.request.body.workflowRef : undefined
+            typeof evt.model.settings?.workflowRef === "string" ? evt.model.settings.workflowRef : undefined
           const workflowDefinition =
-            typeof evt.model.request.body.workflowDefinition === "string"
-              ? evt.model.request.body.workflowDefinition
+            typeof evt.model.settings?.workflowDefinition === "string"
+              ? evt.model.settings.workflowDefinition
               : undefined
-          const language = evt.sdk.workflowChat(
-            gitlab.isWorkflowModel(evt.model.api.id) ? evt.model.api.id : "duo-workflow",
-            {
-              featureFlags,
-              workflowDefinition,
-            },
-          )
+          const language = evt.sdk.workflowChat(gitlab.isWorkflowModel(id) ? id : "duo-workflow", {
+            featureFlags,
+            workflowDefinition,
+          })
           if (workflowRef) language.selectedModelRef = workflowRef
           evt.language = language
           return
         }
-        evt.language = evt.sdk.agenticChat(evt.model.api.id, {
+        evt.language = evt.sdk.agenticChat(id, {
           aiGatewayHeaders: evt.options.aiGatewayHeaders,
           featureFlags,
         })

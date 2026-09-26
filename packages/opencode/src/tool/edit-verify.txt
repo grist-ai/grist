@@ -1,9 +1,0 @@
-Bundle a file edit with an immediate verification command in one tool call (SoL-Pi Action Fusion).
-
-Use this instead of separate `edit` then `bash` when the change has a clear check (unit test, typecheck, lint, build).
-
-Usage:
-- Same edit semantics as `edit` (exact string replace; Read the file first).
-- `verify` is a shell command run after the edit succeeds (e.g. `bun test path/to/file.test.ts`).
-- On edit failure, verification is not run.
-- Prefer reversible, observable steps: keep `verify` scoped to what the edit affects.

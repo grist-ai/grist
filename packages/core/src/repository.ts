@@ -23,7 +23,7 @@ export type FileReference = BaseReference & {
 
 export type Reference = RemoteReference | FileReference
 
-export class InvalidReferenceError extends Schema.TaggedErrorClass<InvalidReferenceError>()(
+export class InvalidReferenceError extends Schema.TaggedError<InvalidReferenceError>()(
   "RepositoryInvalidReferenceError",
   {
     repository: Schema.String,
@@ -31,7 +31,7 @@ export class InvalidReferenceError extends Schema.TaggedErrorClass<InvalidRefere
   },
 ) {}
 
-export class UnsupportedLocalRepositoryError extends Schema.TaggedErrorClass<UnsupportedLocalRepositoryError>()(
+export class UnsupportedLocalRepositoryError extends Schema.TaggedError<UnsupportedLocalRepositoryError>()(
   "RepositoryUnsupportedLocalRepositoryError",
   {
     repository: Schema.String,
@@ -39,20 +39,10 @@ export class UnsupportedLocalRepositoryError extends Schema.TaggedErrorClass<Uns
   },
 ) {}
 
-export class InvalidBranchError extends Schema.TaggedErrorClass<InvalidBranchError>()("RepositoryInvalidBranchError", {
+export class InvalidBranchError extends Schema.TaggedError<InvalidBranchError>()("RepositoryInvalidBranchError", {
   branch: Schema.String,
   message: Schema.String,
 }) {}
-
-export type Error = InvalidReferenceError | UnsupportedLocalRepositoryError | InvalidBranchError
-
-export function isError(error: unknown): error is Error {
-  return (
-    error instanceof InvalidReferenceError ||
-    error instanceof UnsupportedLocalRepositoryError ||
-    error instanceof InvalidBranchError
-  )
-}
 
 export function parse(input: string): Reference | undefined {
   const cleaned = normalizeInput(input)
@@ -211,4 +201,4 @@ function buildFile(input: { url: URL; remote: string }) {
   } satisfies FileReference
 }
 
-export * as Repository from "./repository"
+export * as Repository from "./repository.js"

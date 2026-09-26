@@ -1,12 +1,12 @@
-import type { ElectronAPI } from "../preload/types"
+import type { ElectronNative } from "../preload/types"
 
 declare global {
+  interface ImportMetaEnv {
+    readonly OPENCODE_TEST_ONBOARDING: boolean
+  }
+
   interface Window {
-    api: ElectronAPI
-    __GRIST__?: {
-      deepLinks?: string[]
-    }
-    /** @deprecated alias for __GRIST__ during migration */
+    electron: ElectronNative
     __OPENCODE__?: {
       deepLinks?: string[]
     }

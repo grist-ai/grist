@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
 import { ShikiStreamTokenizer } from "@shikijs/stream"
-import { createMarkdownParser } from "@opencode-ai/ui/context/marked-parser"
-import { OpenCodeTheme } from "@opencode-ai/ui/context/marked-theme"
+import { createMarkdownParser } from "@opencode/ui/context/marked-parser"
+import { OpenCodeTheme } from "@opencode/ui/context/marked-theme"
 import {
   bundledLanguages,
   createHighlighter,
@@ -39,7 +39,9 @@ const parser = createMarkdownParser(async (code, language) => {
   const name = language in bundledLanguages ? language : "text"
   if (!instance.getLoadedLanguages().includes(name))
     await instance.loadLanguage(bundledLanguages[name as BundledLanguage])
-  return instance.codeToHtml(code, { lang: name as BundledLanguage, theme: "Grist", tabindex: false })
+  return instance
+    .codeToHtml(code, { lang: name as BundledLanguage, theme: "OpenCode", tabindex: false })
+    .replace("<code>", `<code class="language-${name}">`)
 })
 
 self.onmessage = (event: MessageEvent<MarkdownWorkerRequest>) => {
@@ -91,7 +93,7 @@ async function highlight(request: Extract<MarkdownWorkerRequest, { type: "highli
       await instance.loadLanguage(bundledLanguages[language as BundledLanguage])
 
     if (request.complete) {
-      const result = instance.codeToTokens(request.text, { lang: language as BundledLanguage, theme: "Grist" })
+      const result = instance.codeToTokens(request.text, { lang: language as BundledLanguage, theme: "OpenCode" })
       streams.delete(request.key)
       post({
         type: "highlight",
@@ -115,7 +117,7 @@ async function highlight(request: Extract<MarkdownWorkerRequest, { type: "highli
       ? {
           language,
           source: "",
-          tokenizer: new ShikiStreamTokenizer({ highlighter: instance, lang: language, theme: "Grist" }),
+          tokenizer: new ShikiStreamTokenizer({ highlighter: instance, lang: language, theme: "OpenCode" }),
         }
       : previous
     const result = await stream.tokenizer.enqueue(request.text.slice(stream.source.length))

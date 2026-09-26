@@ -1,95 +1,52 @@
-import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
-import type { BuiltinTuiPlugin } from "../builtins"
+import { Plugin } from "@opencode/plugin/tui"
 import { createMemo, Show } from "solid-js"
-import { abbreviateHome } from "../../runtime"
-import { useTuiPaths } from "../../context/runtime"
+import { FilePath } from "../../ui/file-path"
+import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
+import { usePromptMove } from "../../component/prompt/move"
 
-const id = "internal:sidebar-footer"
-
-function View(props: { api: TuiPluginApi; sessionID: string }) {
-  const paths = useTuiPaths()
-  const theme = () => props.api.theme.current
-  const has = createMemo(() =>
-    props.api.state.provider.some(
-      (item) => item.id !== "opencode" || Object.values(item.models).some((model) => model.cost?.input !== 0),
-    ),
-  )
-  const done = createMemo(() => props.api.kv.get("dismissed_getting_started", false))
-  const show = createMemo(() => false)
-  const path = createMemo(() => {
-    const session = props.api.state.session.get(props.sessionID)
-    const dir = session?.directory || props.api.state.path.directory || paths.cwd
-    const out = abbreviateHome(dir, paths.home)
-    const branch = session?.directory === props.api.state.path.directory ? props.api.state.vcs?.branch : undefined
-    const text = branch ? out + ":" + branch : out
-    const list = text.split("/")
-    return {
-      parent: list.slice(0, -1).join("/"),
-      name: list.at(-1) ?? "",
-    }
+function View(props: { context: Plugin.Context; sessionID: string }) {
+  const move = usePromptMove({
+    projectID: () => props.context.data.session.get(props.sessionID)?.projectID,
+    sessionID: () => props.sessionID,
   })
-
+  const actions = useWorkingDirectoryActions({
+    directory: () => props.context.location?.directory,
+    onMove: () => void move.open(),
+  })
+  const directory = createMemo(() => {
+    if (!props.context.location) return undefined
+    const value = props.context.ui.format.path(props.context.location.directory)
+    const branch = props.context.data.location.vcs.info(props.context.location)?.branch.current
+    return branch ? `${value}:${branch}` : value
+  })
   return (
-    <box gap={1}>
-      <Show when={show()}>
+    <Show when={directory()}>
+      {(value) => (
         <box
-          backgroundColor={theme().backgroundElement}
-          paddingTop={1}
-          paddingBottom={1}
-          paddingLeft={2}
-          paddingRight={2}
-          flexDirection="row"
-          gap={1}
+          id="sidebar.footer.location"
+          onMouseOver={actions.onMouseOver}
+          onMouseOut={actions.onMouseOut}
+          onMouseUp={actions.onMouseUp}
         >
-          <text flexShrink={0} fg={theme().text}>
-            ⬖
-          </text>
-          <box flexGrow={1} gap={1}>
-            <box flexDirection="row" justifyContent="space-between">
-              <text fg={theme().text}>
-                <b>Getting started</b>
-              </text>
-              <text fg={theme().textMuted} onMouseDown={() => props.api.kv.set("dismissed_getting_started", true)}>
-                ✕
-              </text>
-            </box>
-            <text fg={theme().textMuted}>Grist includes free models so you can start immediately.</text>
-            <text fg={theme().textMuted}>
-              Connect from 75+ providers to use other models, including Claude, GPT, Gemini etc
-            </text>
-            <box flexDirection="row" gap={1} justifyContent="space-between">
-              <text fg={theme().text}>Connect provider</text>
-              <text fg={theme().textMuted}>/connect</text>
-            </box>
-          </box>
+          <FilePath
+            value={value()}
+            maxWidth={38}
+            fg={actions.hovered() ? props.context.theme.text.base : props.context.theme.text.muted}
+          />
         </box>
-      </Show>
-      <text>
-        <span style={{ fg: theme().textMuted }}>{path().parent}/</span>
-        <span style={{ fg: theme().text }}>{path().name}</span>
-      </text>
-      <text fg={theme().textMuted}>
-        <span style={{ fg: theme().primary }}>•</span> <b>Grist</b>{" "}
-        <span>{props.api.app.version}</span>
-      </text>
-    </box>
+      )}
+    </Show>
   )
 }
 
-const tui: TuiPlugin = async (api) => {
-  api.slots.register({
-    order: 100,
-    slots: {
-      sidebar_footer(_ctx, props) {
-        return <View api={api} sessionID={props.session_id} />
-      },
-    },
-  })
-}
-
-const plugin: BuiltinTuiPlugin = {
-  id,
-  tui,
-}
-
-export default plugin
+export default Plugin.define({
+  id: "opencode.sidebar.footer",
+  setup(context) {
+    // Append keeps the path open to additive plugin claims; an external
+    // replace still takes the boundary over.
+    context.ui.slot({
+      append: "sidebar.footer",
+      render: (props) => <View context={context} sessionID={props.sessionID} />,
+    })
+  },
+})

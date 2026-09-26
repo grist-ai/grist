@@ -1,9 +1,8 @@
 import { getRequestEvent } from "solid-js/web"
-import { and, Database, eq, inArray, isNull, sql } from "@opencode-ai/console-core/drizzle/index.js"
-import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
-import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
+import { and, Database, eq, inArray, isNull, sql } from "@opencode/console-core/drizzle/index.js"
+import { UserTable } from "@opencode/console-core/schema/user.sql.js"
 import { redirect } from "@solidjs/router"
-import { Actor } from "@opencode-ai/console-core/actor.js"
+import { Actor } from "@opencode/console-core/actor.js"
 
 import { createClient } from "@openauthjs/openauth/client"
 
@@ -13,7 +12,7 @@ export const AuthClient = createClient({
 })
 
 import { useSession } from "@solidjs/start/http"
-import { Resource } from "@opencode-ai/console-resource"
+import { Resource } from "@opencode/console-resource"
 
 export interface AuthSession {
   account?: Record<
@@ -80,15 +79,8 @@ export const getActor = async (workspace?: string): Promise<Actor.Info> => {
     if (accounts.length) {
       const user = await Database.use((tx) =>
         tx
-          .select({
-            id: UserTable.id,
-            workspaceID: UserTable.workspaceID,
-            accountID: UserTable.accountID,
-            role: UserTable.role,
-            migratedAt: WorkspaceTable.migrated_at,
-          })
+          .select()
           .from(UserTable)
-          .innerJoin(WorkspaceTable, eq(WorkspaceTable.id, UserTable.workspaceID))
           .where(
             and(
               eq(UserTable.workspaceID, workspace),
@@ -101,15 +93,6 @@ export const getActor = async (workspace?: string): Promise<Actor.Info> => {
           .then((x) => x[0]),
       )
       if (user) {
-        if (user.migratedAt) {
-          const destination = Resource.ConsoleMigration.consoleUrl
-          if (!destination) throw new Error("New Console URL is not configured")
-          evt.response.headers.set("Cache-Control", "no-store")
-          throw redirect(`${destination}/login`, {
-            status: evt.request.method === "GET" || evt.request.method === "HEAD" ? 302 : 303,
-            headers: { "Cache-Control": "no-store" },
-          })
-        }
         await Database.use((tx) =>
           tx
             .update(UserTable)

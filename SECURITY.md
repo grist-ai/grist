@@ -1,49 +1,47 @@
 # Security
 
-## Reporting a vulnerability
+## IMPORTANT
 
-Do not open a public issue. Use the GitHub Security Advisory
-["Report a Vulnerability"](https://github.com/grist-ai/grist/security/advisories/new)
-tab on this repo.
+We do not accept AI generated security reports. We receive a large number of
+these and we absolutely do not have the resources to review them all. If you
+submit one that will be an automatic ban from the project.
 
-We do not accept AI-generated security reports — they are closed on sight.
+## Threat Model
 
-## Threat model
+### Overview
 
-### The agent (local)
+OpenCode is an AI-powered coding assistant that runs locally on your machine. It provides an agent system with access to powerful tools including shell execution, file operations, and web access.
 
-Grist is an AI coding assistant that runs on your machine with access to
-powerful tools: shell execution, file operations, web access.
+### No Sandbox
 
-**No sandbox.** The permission system is a UX feature — it prompts before
-commands, writes, etc. — not security isolation. If you need true isolation,
-run Grist inside a Docker container or VM.
+OpenCode does **not** sandbox the agent. The permission system exists as a UX feature to help users stay aware of what actions the agent is taking - it prompts for confirmation before executing commands, writing files, etc. However, it is not designed to provide security isolation.
 
-### The gateway (server)
+If you need true isolation, run OpenCode inside a Docker container or VM.
 
-Self-hosters and the hosted service run a Grist gateway that holds:
+### Server Mode
 
-- per-user **provider keys** (OpenRouter / Vercel AI Gateway / OpenAI-compatible),
-  encrypted at rest, never logged, never returned by any API
-- the model ladder config and the Jev gate
-- `grist_sk_...` API key hashes (keys are shown once at creation)
+Server mode is opt-in only. When enabled, set `OPENCODE_SERVER_PASSWORD` to require HTTP Basic Auth. Without this, the server runs unauthenticated (with a warning). It is the end user's responsibility to secure the server - any functionality it provides is not a vulnerability.
 
-Provider keys are the crown jewels: a leaked gateway database is a leaked
-set of inference credentials. Secure the gateway like a secret store —
-private network, encrypted backups, minimal admin access.
+### Out of Scope
 
-### Out of scope
+| Category                        | Rationale                                                               |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| **Server access when opted-in** | If you enable server mode, API access is expected behavior              |
+| **Sandbox escapes**             | The permission system is not a sandbox (see above)                      |
+| **LLM provider data handling**  | Data sent to your configured LLM provider is governed by their policies |
+| **MCP server behavior**         | External MCP servers you configure are outside our trust boundary       |
+| **Malicious config files**      | Users control their own config; modifying it is not an attack vector    |
 
-| Category | Rationale |
-| --- | --- |
-| **Server access when opted-in** | Enabling server mode means API access is expected |
-| **Sandbox escapes** | The permission system is not a sandbox (see above) |
-| **LLM provider data handling** | Data sent to your configured provider is governed by their policies |
-| **MCP server behavior** | External MCP servers you configure are outside our trust boundary |
-| **Malicious config files** | Users control their own config; modifying it is not an attack vector |
+---
 
-### Server mode
+# Reporting Security Issues
 
-Server mode is opt-in. When enabled, set `OPENCODE_SERVER_PASSWORD` to require
-HTTP Basic Auth — without it the server runs unauthenticated (with a warning).
-Securing it is the operator's responsibility.
+We appreciate your efforts to responsibly disclose your findings, and will make every effort to acknowledge your contributions.
+
+To report a security issue, please use the GitHub Security Advisory ["Report a Vulnerability"](https://github.com/anomalyco/opencode/security/advisories/new) tab.
+
+The team will send a response indicating the next steps in handling your report. After the initial reply to your report, the security team will keep you informed of the progress towards a fix and full announcement, and may ask for additional information or guidance.
+
+## Escalation
+
+If you do not receive an acknowledgement of your report within 6 business days, you may send an email to security@anoma.ly

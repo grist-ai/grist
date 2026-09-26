@@ -11,8 +11,10 @@ node_modules
 playground
 tmp
 dist
+dist-node
 ts-dist
 .turbo
+.typecheck-profiles
 **/.serena
 .serena/
 **/.omo
@@ -24,56 +26,13 @@ Session.vim
 a.out
 target
 .scripts
+.cache
 .direnv/
 
 # Local dev files
 opencode-dev
 UPCOMING_CHANGELOG.md
+RELEASE_REVIEW.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
-
-# Phase 2 local model + PrismML llama.cpp binaries (download locally)
-/models/
-/tools/llama-prism/
-opencode.jsonc
-
-# Phase 2 local inference (large binaries / weights — not committed)
-/models/*.gguf
-/models/.cache/
-/tools/llama-prism/
-
-# Phase 2 local inference (large binaries / weights — not committed)
-/models/*.gguf
-/models/.cache/
-/tools/llama-prism/
-.grist/
-grist-gateway.sqlite
-
-# Local Cursor MCP config (API keys)
-.cursor/mcp.json
-
-# Firebase CLI
-firebase-debug.log
-.firebase/
-
-# Generated marketing video / composition
-brag-output/
-
-# Apple signing credentials
-*.p8
-*.p12
-*.certSigningRequest
-developerID_application.cer
-
-# Electron Vite output
-packages/desktop/out/
-
-# Whisper ONNX + ORT wasm downloaded at package time
-packages/desktop/resources/whisper/
-
-# Moonshine speech model downloaded into the desktop app at package time
-packages/desktop/resources/moonshine/
-
-# Desktop installers hosted by the gateway, not git
-packages/opencode/src/grist/site/download/*.dmg

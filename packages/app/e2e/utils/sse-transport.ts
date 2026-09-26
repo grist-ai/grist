@@ -1,9 +1,10 @@
 import type { Page } from "@playwright/test"
+import type { OpenCodeEvent } from "@opencode/client/promise"
 
 export type SseConnectionRecord = {
   id: number
   url: string
-  path: "/global/event" | "/event" | "/api/event"
+  path: "/api/event"
   headers: Record<string, string>
   openedAt: number
   endedAt?: number
@@ -27,7 +28,7 @@ export type SseEventOptions = {
   marker?: string
 }
 
-export type SseTransport<T> = {
+export type SseTransport<T extends OpenCodeEvent> = {
   server: string
   waitForConnection(options?: { after?: number; timeout?: number }): Promise<SseConnectionRecord>
   send(payload: T, options?: SseEventOptions): Promise<SseDeliveryAcknowledgement>
@@ -55,7 +56,7 @@ type BrowserTransport = Window & {
   }
 }
 
-export async function installSseTransport<T>(
+export async function installSseTransport<T extends OpenCodeEvent = OpenCodeEvent>(
   page: Page,
   options: { server: string; retry?: number },
 ): Promise<SseTransport<T>> {
@@ -93,21 +94,6 @@ export async function installSseTransport<T>(
           eventOptions.retry === undefined ? "" : `retry: ${eventOptions.retry}\n`,
           `data: ${JSON.stringify(payload)}\n\n`,
         ].join("")
-      const currentEvent = (input: unknown) => {
-        if (!input || typeof input !== "object" || !("payload" in input)) return input
-        const envelope = input as { directory?: string; payload?: unknown }
-        if (!envelope.payload || typeof envelope.payload !== "object") return input
-        const payload = envelope.payload as { id?: string; type?: string; properties?: unknown }
-        if (!payload.type) return input
-        return {
-          id: payload.id ?? `evt_mock_${Date.now()}`,
-          created: Date.now(),
-          type: payload.type,
-          data: payload.properties ?? {},
-          location:
-            envelope.directory && envelope.directory !== "global" ? { directory: envelope.directory } : undefined,
-        }
-      }
       const acknowledge = (
         connection: Connection,
         bytes: number,
@@ -155,13 +141,14 @@ export async function installSseTransport<T>(
           output.forEach((chunk) => connection.controller.enqueue(chunk))
           return acknowledge(connection, input.bytes.length, output.length)
         }
-        const encoded = input.deliveries.map((delivery) => {
-          const payload = connection.path === "/api/event" ? currentEvent(delivery.payload) : delivery.payload
-          return { delivery, payload, bytes: encoder.encode(frame(payload, delivery.options)) }
-        })
+        const encoded = input.deliveries.map((delivery) => ({
+          delivery,
+          payload: delivery.payload,
+          bytes: encoder.encode(frame(delivery.payload, delivery.options)),
+        }))
         encoded.forEach((item) => marker(item.delivery.options?.marker))
         if (input.burst) {
-          const bytes = encoder.encode(encoded.map((item) => frame(item.payload, item.delivery.options)).join(""))
+          const bytes = encoder.encode(encoded.map((item) => new TextDecoder().decode(item.bytes)).join(""))
           connection.controller.enqueue(bytes)
           return encoded.map((item) => acknowledge(connection, item.bytes.byteLength, 1, item.delivery.options?.id))
         }
@@ -174,11 +161,7 @@ export async function installSseTransport<T>(
       const fetch = (input: RequestInfo | URL, init?: RequestInit) => {
         const request = new Request(input, init)
         const url = new URL(request.url)
-        if (
-          url.origin !== server ||
-          (url.pathname !== "/global/event" && url.pathname !== "/event" && url.pathname !== "/api/event")
-        )
-          return originalFetch(request)
+        if (url.origin !== server || url.pathname !== "/api/event") return originalFetch(request)
 
         const id = ++nextConnectionID
         const record = {
@@ -193,18 +176,9 @@ export async function installSseTransport<T>(
             record.controller = controller
             connections.push(record)
             if (retry !== undefined) controller.enqueue(encoder.encode(`retry: ${retry}\n\n`))
-            if (url.pathname === "/api/event")
-              controller.enqueue(
-                encoder.encode(frame({ id: `evt_mock_connected_${id}`, type: "server.connected", data: {} })),
-              )
-            if (url.pathname === "/global/event")
-              controller.enqueue(
-                encoder.encode(
-                  frame({
-                    payload: { id: `evt_mock_connected_${id}`, type: "server.connected", properties: {} },
-                  }),
-                ),
-              )
+            controller.enqueue(
+              encoder.encode(frame({ id: `evt_mock_connected_${id}`, type: "server.connected", data: {} })),
+            )
             request.signal.addEventListener(
               "abort",
               () => {
@@ -279,15 +253,11 @@ export async function installSseTransport<T>(
       return command({ type: "send", deliveries: [{ payload, options: eventOptions }], burst: false, cuts: [...cuts] })
     },
     heartbeat(eventOptions) {
+      const bytes = new TextEncoder().encode(": heartbeat\n\n")
       return command({
-        type: "send",
-        deliveries: [
-          {
-            payload: { directory: "global", payload: { type: "server.heartbeat", properties: {} } } as T,
-            options: eventOptions,
-          },
-        ],
-        burst: false,
+        type: "raw",
+        bytes: Array.from(bytes),
+        marker: eventOptions?.marker,
       })
     },
     writeRaw(value, cuts, marker) {

@@ -1,6 +1,6 @@
-export * as File from "./file"
+export * as File from "./file.js"
 
-import { Revert } from "@opencode-ai/schema/revert"
+import { FileDiff } from "@opencode/schema/file-diff"
 
-export const Diff = Revert.FileDiff
+export const Diff = FileDiff.Info
 export type Diff = typeof Diff.Type

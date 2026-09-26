@@ -1,0 +1,33 @@
+import { Effect, Layer } from "effect"
+import { Config } from "@opencode/core/config"
+import { Location } from "@opencode/core/location"
+import { Mcp } from "@opencode/core/mcp/index"
+import { AbsolutePath } from "@opencode/core/schema"
+import { location } from "./location"
+
+export const emptyMcpLayer = Layer.succeed(
+  Mcp.Service,
+  Mcp.Service.of({
+    transform: () => Effect.die("unused mcp.transform"),
+    reload: () => Effect.die("unused mcp.reload"),
+    servers: () => Effect.succeed([]),
+    add: () => Effect.die("unused mcp.add"),
+    connect: () => Effect.die("unused mcp.connect"),
+    disconnect: () => Effect.die("unused mcp.disconnect"),
+    remove: () => Effect.die("unused mcp.remove"),
+    tools: () => Effect.succeed([]),
+    callTool: () => Effect.die("unused mcp.callTool"),
+    instructions: () => Effect.succeed([]),
+    prompts: () => Effect.succeed([]),
+    prompt: () => Effect.undefined,
+    resourceCatalog: () => Effect.succeed(Mcp.ResourceCatalog.make({ resources: [], templates: [] })),
+    readResource: () => Effect.undefined,
+  }),
+)
+
+export const emptyConfigLayer = Config.testLayer()
+
+export const testLocationLayer = Layer.succeed(
+  Location.Service,
+  Location.Service.of(location({ directory: AbsolutePath.make(process.cwd()) })),
+)

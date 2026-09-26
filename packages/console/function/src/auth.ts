@@ -7,17 +7,16 @@ import { THEME_OPENAUTH } from "@openauthjs/openauth/ui/theme"
 import { GithubProvider } from "@openauthjs/openauth/provider/github"
 import { GoogleOidcProvider } from "@openauthjs/openauth/provider/google"
 import { CloudflareStorage } from "@openauthjs/openauth/storage/cloudflare"
-import { Account } from "@opencode-ai/console-core/account.js"
-import { Workspace } from "@opencode-ai/console-core/workspace.js"
-import { Actor } from "@opencode-ai/console-core/actor.js"
-import { Resource } from "@opencode-ai/console-resource"
-import { User } from "@opencode-ai/console-core/user.js"
-import { and, Database, eq, isNull, or } from "@opencode-ai/console-core/drizzle/index.js"
-import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
-import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
-import { AuthTable } from "@opencode-ai/console-core/schema/auth.sql.js"
-import { Identifier } from "@opencode-ai/console-core/identifier.js"
-import { isAllowedAuthorizationRedirect } from "./auth-redirect.js"
+import { Account } from "@opencode/console-core/account.js"
+import { Workspace } from "@opencode/console-core/workspace.js"
+import { Actor } from "@opencode/console-core/actor.js"
+import { Resource } from "@opencode/console-resource"
+import { User } from "@opencode/console-core/user.js"
+import { and, Database, eq, isNull, or } from "@opencode/console-core/drizzle/index.js"
+import { WorkspaceTable } from "@opencode/console-core/schema/workspace.sql.js"
+import { UserTable } from "@opencode/console-core/schema/user.sql.js"
+import { AuthTable } from "@opencode/console-core/schema/auth.sql.js"
+import { Identifier } from "@opencode/console-core/identifier.js"
 
 type Env = {
   AuthStorage: KVNamespace
@@ -42,17 +41,6 @@ const MY_THEME: Theme = {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const requestURL = new URL(request.url)
-    if (requestURL.pathname === "/authorize") {
-      const redirectURI = requestURL.searchParams.get("redirect_uri")
-      if (
-        redirectURI !== null &&
-        !isAllowedAuthorizationRedirect(requestURL.searchParams.get("client_id") ?? "", redirectURI)
-      ) {
-        return new Response("Unauthorized client", { status: 400 })
-      }
-    }
-
     const result = await issuer({
       theme: MY_THEME,
       providers: {
@@ -114,7 +102,6 @@ export default {
         namespace: env.AuthStorage,
       }),
       subjects,
-      allow: ({ clientID, redirectURI }) => Promise.resolve(isAllowedAuthorizationRedirect(clientID, redirectURI)),
       async success(ctx, response) {
         console.log(response)
 
