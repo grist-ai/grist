@@ -7,7 +7,7 @@ export const PRODUCT_GATEWAY_URL = "https://grist.lol"
 export const PRODUCT_VERSION = "0.1.10"
 /** Public GitHub repo that hosts DMG/zip + latest-mac.yml for electron-updater. */
 export const UPDATES = {
-  owner: "pranav6226",
+  owner: "grist-ai",
   repo: "grist-downloads",
 } as const
 

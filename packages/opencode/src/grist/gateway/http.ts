@@ -64,7 +64,7 @@ const SITE_FILES: Record<string, string> = {
 const MAC_DMG = /^\/download\/(grist-desktop-mac-(arm64|x64)\.dmg)$/
 const PUBLIC_MAC_DMGS: Record<string, string> = {
   "grist-desktop-mac-arm64.dmg":
-    "https://github.com/pranav6226/grist-downloads/releases/latest/download/grist-desktop-mac-arm64.dmg",
+    "https://github.com/grist-ai/grist-downloads/releases/latest/download/grist-desktop-mac-arm64.dmg",
 }
 
 /**
