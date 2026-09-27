@@ -608,6 +608,39 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_APP_ID
   })
 
+  test("sign-up names are stored on the account", async () => {
+    process.env.FIREBASE_API_KEY = "test-key"
+    process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+    process.env.FIREBASE_PROJECT_ID = "grist-test"
+    process.env.FIREBASE_APP_ID = "1:1:web:abc"
+    const gateway = createGateway({
+      adminToken: "secret",
+      fetch: async () =>
+        new Response(JSON.stringify({ users: [{ localId: "uid_names", email: "ada@example.com" }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    })
+    const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
+      body: { id_token: "tok", first_name: "Ada", last_name: "Lovelace" },
+    })
+    expect(session.status).toBe(200)
+    expect((session.json as { ok: boolean }).ok).toBe(true)
+    const account = gateway.store.getAccount("uid_names")
+    expect(account?.first_name).toBe("Ada")
+    expect(account?.last_name).toBe("Lovelace")
+    // A later sign-in without names keeps the stored ones.
+    const again = await call(gateway.fetch, "POST", "/v1/auth/session", {
+      body: { id_token: "tok" },
+    })
+    expect(again.status).toBe(200)
+    expect(gateway.store.getAccount("uid_names")?.first_name).toBe("Ada")
+    delete process.env.FIREBASE_API_KEY
+    delete process.env.FIREBASE_AUTH_DOMAIN
+    delete process.env.FIREBASE_PROJECT_ID
+    delete process.env.FIREBASE_APP_ID
+  })
+
   test("single-use binding: 409 on taken code, 400 on rebind, idempotent retry", async () => {
     process.env.FIREBASE_API_KEY = "test-key"
     process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"

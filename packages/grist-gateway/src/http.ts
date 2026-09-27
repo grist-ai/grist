@@ -451,6 +451,8 @@ export function createGateway(opts: GatewayOptions = {}) {
   async function firebaseSession(req: Request): Promise<Response> {
     const body = await readJson(req)
     const token = typeof body?.id_token === "string" ? body.id_token : ""
+    const firstName = typeof body?.first_name === "string" ? body.first_name : undefined
+    const lastName = typeof body?.last_name === "string" ? body.last_name : undefined
     const user = await verifyFirebaseIdToken(token, fetchImpl)
     if (!user) return json(401, { error: "unauthorized" })
     if (isAdminEmail(user.email)) {
@@ -468,7 +470,13 @@ export function createGateway(opts: GatewayOptions = {}) {
     let account = store.getAccount(user.uid)
     if (!account) {
       const fresh = store.createInvite({ note: "account", expiresAt: now() + ACCOUNT_TTL_MS })
-      const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: fresh.code })
+      const result = store.bindAccount({
+        uid: user.uid,
+        email: user.email,
+        firstName,
+        lastName,
+        inviteCode: fresh.code,
+      })
       if (!result.ok) return json(500, { error: "account setup failed" })
       account = result.account
     }
@@ -490,13 +498,21 @@ export function createGateway(opts: GatewayOptions = {}) {
     const body = await readJson(req)
     const token = typeof body?.id_token === "string" ? body.id_token : ""
     const raw = typeof body?.code === "string" ? body.code : ""
+    const firstName = typeof body?.first_name === "string" ? body.first_name : undefined
+    const lastName = typeof body?.last_name === "string" ? body.last_name : undefined
     const user = await verifyFirebaseIdToken(token, fetchImpl)
     if (!user) return json(401, { ok: false })
     // Open accounts: a pasted code binds that account; otherwise mint one.
     const invite =
       store.getInvite(raw) ?? store.createInvite({ note: "account", expiresAt: now() + ACCOUNT_TTL_MS })
     if (!invite || !inviteUsable(invite, now())) return json(200, { ok: false })
-    const result = store.bindAccount({ uid: user.uid, email: user.email, inviteCode: invite.code })
+    const result = store.bindAccount({
+      uid: user.uid,
+      email: user.email,
+      firstName,
+      lastName,
+      inviteCode: invite.code,
+    })
     if (!result.ok) {
       // One code -> one account, one account -> one code. A code already
       // bound to another account is a 409; an account trying to bind a

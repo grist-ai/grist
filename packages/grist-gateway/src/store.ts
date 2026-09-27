@@ -24,6 +24,8 @@ export type AccountRow = {
   firebase_uid: string
   invite_code: string
   email: string | null
+  first_name: string | null
+  last_name: string | null
   created_at: number
 }
 
@@ -161,6 +163,8 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       firebase_uid TEXT PRIMARY KEY,
       invite_code TEXT NOT NULL UNIQUE,
       email TEXT,
+      first_name TEXT,
+      last_name TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS api_keys (
@@ -197,6 +201,14 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   const usageColumns = db.prepare("PRAGMA table_info(usage_events)").all() as { name: string }[]
   if (!usageColumns.some((column) => column.name === "key_id")) {
     db.exec("ALTER TABLE usage_events ADD COLUMN key_id TEXT")
+  }
+  // Same for the account name columns added with the sign-up UX.
+  const accountColumns = db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[]
+  if (!accountColumns.some((column) => column.name === "first_name")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN first_name TEXT")
+  }
+  if (!accountColumns.some((column) => column.name === "last_name")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN last_name TEXT")
   }
 
   const insertInvite = db.prepare(
@@ -246,8 +258,11 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   // processes; ON CONFLICT DO NOTHING turns a lost race into changes === 0
   // (clean 409) instead of an unhandled 500.
   const insertAccountIgnore = db.prepare(
-    `INSERT INTO accounts (firebase_uid, invite_code, email, created_at) VALUES (?, ?, ?, ?)
+    `INSERT INTO accounts (firebase_uid, invite_code, email, first_name, last_name, created_at) VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT DO NOTHING`,
+  )
+  const updateAccountNames = db.prepare(
+    `UPDATE accounts SET first_name = ?, last_name = ? WHERE firebase_uid = ?`,
   )
   const selectAccount = db.prepare(`SELECT * FROM accounts WHERE firebase_uid = ?`)
   const selectAccountByInvite = db.prepare(`SELECT * FROM accounts WHERE invite_code = ?`)
@@ -473,6 +488,8 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     bindAccount(input: {
       uid: string
       email?: string
+      firstName?: string
+      lastName?: string
       inviteCode: string
     }):
       | { ok: true; account: AccountRow }
@@ -484,9 +501,17 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       try {
         const existing = selectAccount.get(input.uid) as AccountRow | undefined
         if (existing) {
+          // Fill in names supplied later (e.g. sign-up completed after a
+          // Google sign-in that carried no display name).
+          const firstName = input.firstName?.trim() || existing.first_name
+          const lastName = input.lastName?.trim() || existing.last_name
+          if (firstName !== existing.first_name || lastName !== existing.last_name) {
+            updateAccountNames.run(firstName ?? null, lastName ?? null, input.uid)
+          }
+          const account = selectAccount.get(input.uid) as AccountRow
           const result =
             existing.invite_code === input.inviteCode
-              ? { ok: true as const, account: existing }
+              ? { ok: true as const, account }
               : { ok: false as const, reason: "already_bound" as const }
           db.exec("COMMIT")
           return result
@@ -496,7 +521,14 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           db.exec("COMMIT")
           return { ok: false, reason: "code_taken" }
         }
-        const applied = insertAccountIgnore.run(input.uid, input.inviteCode, input.email ?? null, Date.now())
+        const applied = insertAccountIgnore.run(
+          input.uid,
+          input.inviteCode,
+          input.email ?? null,
+          input.firstName?.trim() || null,
+          input.lastName?.trim() || null,
+          Date.now(),
+        )
         if (applied.changes === 0) {
           // Lost a race that slipped past the reads: classify the winner.
           const winner = selectAccountByInvite.get(input.inviteCode) as AccountRow | undefined

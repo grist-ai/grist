@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updateProfile,
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js"
 
 const KEY = "grist_invite"
@@ -20,6 +21,8 @@ const state = {
 let sessionTicket = 0
 let renderChain = Promise.resolve()
 let authGen = 0
+// First/last name from the sign-up form, consumed once by afterFirebase().
+let pendingSignupNames = null
 
 const views = {
   "/": "view-home",
@@ -78,11 +81,39 @@ function showAuthStep() {
   document.getElementById("invite-form").hidden = true
   document.getElementById("firebase-missing").hidden = true
   setLoginCopy({
-    kicker: "[ sign in ]",
-    title: "Sign in",
-    lede: "Sign in with Google to create your account. After that, signing in is enough.",
+    kicker: "[ account ]",
+    title: "Welcome to Grist",
+    lede: "Create an account or sign in to get your API key and start running agents.",
   })
+  selectAuthTab("signin")
 }
+
+function selectAuthTab(which) {
+  const signin = which !== "signup"
+  for (const id of ["tab-signin", "tab-signup"]) {
+    const tab = document.getElementById(id)
+    if (!tab) continue
+    const active = (id === "tab-signup") !== signin
+    tab.classList.toggle("is-active", active)
+    tab.setAttribute("aria-selected", active ? "true" : "false")
+  }
+  const panelSignin = document.getElementById("panel-signin")
+  const panelSignup = document.getElementById("panel-signup")
+  if (panelSignin) panelSignin.hidden = !signin
+  if (panelSignup) panelSignup.hidden = signin
+  const error = document.getElementById("login-error")
+  if (error) error.hidden = true
+}
+
+/** Split a display name ("Ada Lovelace") into { firstName, lastName }. */
+function splitName(displayName) {
+  const parts = String(displayName || "").trim().split(/\s+/)
+  if (!parts.length || !parts[0]) return { firstName: "", lastName: "" }
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") }
+}
+
+document.getElementById("tab-signin")?.addEventListener("click", () => selectAuthTab("signin"))
+document.getElementById("tab-signup")?.addEventListener("click", () => selectAuthTab("signup"))
 
 function showInviteOnly() {
   document.getElementById("login-methods").hidden = true
@@ -160,12 +191,20 @@ async function afterFirebase() {
     showAuthStep()
     return false
   }
+  // Names captured by the sign-up form, sent once with the session request so
+  // the account is created with them. Cleared after use.
+  const names = pendingSignupNames
+  pendingSignupNames = null
+  const nameBody =
+    names && (names.firstName || names.lastName)
+      ? { first_name: names.firstName, last_name: names.lastName }
+      : {}
   let data
   try {
     const response = await fetch("/v1/auth/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id_token: await user.getIdToken() }),
+      body: JSON.stringify({ id_token: await user.getIdToken(), ...nameBody }),
     })
     data = await response.json()
   } catch {
@@ -441,12 +480,12 @@ async function loadAdmin() {
     .join("")
 }
 
-document.getElementById("google-btn")?.addEventListener("click", async () => {
+async function signInWithGoogle() {
   const error = document.getElementById("login-error")
   error.hidden = true
   if (!state.auth) {
     fail(error, "Firebase is not configured.")
-    return
+    return false
   }
   try {
     await signInWithPopup(state.auth, new GoogleAuthProvider())
@@ -454,20 +493,35 @@ document.getElementById("google-btn")?.addEventListener("click", async () => {
     const code = typeof err?.code === "string" ? err.code : ""
     if (code === "auth/unauthorized-domain") {
       fail(error, "This site isn’t on the Firebase authorized domains list.")
-      return
+      return false
     }
     if (code === "auth/popup-blocked" || code === "auth/popup-closed-by-user") {
       fail(error, "Google popup was blocked or closed. Allow popups and try again.")
-      return
+      return false
     }
     if (code === "auth/operation-not-allowed") {
       fail(error, "Google sign-in isn’t enabled yet. Use email.")
-      return
+      return false
     }
     fail(error, "Google sign-in failed. Use email, or try again.")
-    return
+    return false
   }
-  if (await afterFirebase()) goAuthed()
+  // Google accounts carry a display name: record it on the new account.
+  const displayName = state.auth.currentUser?.displayName || ""
+  if (displayName) pendingSignupNames = splitName(displayName)
+  return true
+}
+
+document.getElementById("google-btn")?.addEventListener("click", async () => {
+  if (await signInWithGoogle()) {
+    if (await afterFirebase()) goAuthed()
+  }
+})
+
+document.getElementById("google-signup-btn")?.addEventListener("click", async () => {
+  if (await signInWithGoogle()) {
+    if (await afterFirebase()) goAuthed()
+  }
 })
 
 document.getElementById("email-form")?.addEventListener("submit", async (event) => {
@@ -482,9 +536,65 @@ document.getElementById("email-form")?.addEventListener("submit", async (event) 
   const password = document.getElementById("password").value
   try {
     await signInWithEmailAndPassword(state.auth, email, password)
-  } catch {
-    await createUserWithEmailAndPassword(state.auth, email, password)
+  } catch (err) {
+    const code = typeof err?.code === "string" ? err.code : ""
+    if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+      fail(error, "No account matches that email and password. Check them, or create an account instead.")
+      return
+    }
+    if (code === "auth/too-many-requests") {
+      fail(error, "Too many attempts. Try again in a few minutes.")
+      return
+    }
+    fail(error, "Sign-in failed. Check your email and password, or try again.")
+    return
   }
+  if (await afterFirebase()) goAuthed()
+})
+
+document.getElementById("signup-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault()
+  const error = document.getElementById("login-error")
+  error.hidden = true
+  if (!state.auth) {
+    fail(error, "Firebase is not configured.")
+    return
+  }
+  const firstName = document.getElementById("first-name").value.trim()
+  const lastName = document.getElementById("last-name").value.trim()
+  const email = document.getElementById("signup-email").value.trim()
+  const password = document.getElementById("signup-password").value
+  if (!firstName || !lastName) {
+    fail(error, "Enter your first and last name.")
+    return
+  }
+  let credential
+  try {
+    credential = await createUserWithEmailAndPassword(state.auth, email, password)
+  } catch (err) {
+    const code = typeof err?.code === "string" ? err.code : ""
+    if (code === "auth/email-already-in-use") {
+      fail(error, "That email already has an account. Sign in instead.")
+      selectAuthTab("signin")
+      return
+    }
+    if (code === "auth/weak-password") {
+      fail(error, "Use a password of at least 8 characters.")
+      return
+    }
+    if (code === "auth/invalid-email") {
+      fail(error, "That email address doesn’t look right.")
+      return
+    }
+    fail(error, "Couldn’t create the account. Try again.")
+    return
+  }
+  try {
+    await updateProfile(credential.user, { displayName: `${firstName} ${lastName}`.trim() })
+  } catch {
+    // Non-fatal: the account exists; the name still reaches the gateway below.
+  }
+  pendingSignupNames = { firstName, lastName }
   if (await afterFirebase()) goAuthed()
 })
 

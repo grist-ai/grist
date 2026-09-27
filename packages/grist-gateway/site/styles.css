@@ -1264,6 +1264,44 @@ code {
   color: var(--dim);
 }
 
+.auth-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 1.4rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 0.55rem 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.auth-tab.is-active {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+}
+
+.auth .name-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.auth .name-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
 .auth .text-btn {
   display: block;
   margin: 0.9rem auto 0;
