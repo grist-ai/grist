@@ -8,7 +8,7 @@ import { RemoteCli } from "../remote/cli"
 const registrationScript = `status=$("$cli" service status) || exit 0
 if [ "$status" = stopped ]; then exit 0; fi
 printf 'OPENCODE_SSH_STATUS=%s\\n' "$status"
-for file in "\${XDG_STATE_HOME:-$HOME/.local/state}"/opencode/service*.json; do
+for file in "\${XDG_STATE_HOME:-$HOME/.local/state}"/grist/service*.json; do
   if [ ! -f "$file" ]; then continue; fi
   printf 'OPENCODE_SSH_REGISTRATION_BEGIN\\n'
   cat "$file"
@@ -17,7 +17,7 @@ done
 `
 
 export const discoverScript = `set -eu
-${RemoteCli.discoverScript({ fromPath: true, cache: { directory: ".opencode/desktop-ssh", prefix: "0.0.0-beta-" } })}
+${RemoteCli.discoverScript({ fromPath: true, cache: { directory: ".grist/desktop-ssh", prefix: "0.0.0-beta-" } })}
 if [ -z "$cli" ]; then exit 0; fi
 ${registrationScript}`
 
@@ -53,7 +53,7 @@ export function parseRegistration(output: string) {
 }
 
 export function binaryPath(version: string) {
-  return `$HOME/.opencode/desktop-ssh/${RemoteCli.requireVersion(version)}/opencode`
+  return `$HOME/.grist/desktop-ssh/${RemoteCli.requireVersion(version)}/grist`
 }
 
 function connectionAddress(address: string, password: string) {
@@ -98,12 +98,12 @@ export const bootstrap = Effect.fn("Ssh.bootstrap")(function* (input: {
   // while retaining support for explicitly staged, matching development builds.
   const version =
     input.development && !staged ? yield* RemoteCli.latestBeta().pipe(Effect.mapError(SshFailure.from)) : input.version
-  const setup = { version, directory: `.opencode/desktop-ssh/${version}` }
+  const setup = { version, directory: `.grist/desktop-ssh/${version}` }
   if (!staged) {
     const output = yield* run(RemoteCli.probeScript).pipe(Effect.mapError(() => new SshFailure("platform")))
     const target = output
       .split(/\r?\n/)
-      .findLast((line) => line.startsWith("OPENCODE_REMOTE_TARGET="))
+      .findLast((line) => line.startsWith("GRIST_REMOTE_TARGET="))
       ?.split("=")[1]
     const url = yield* Effect.try({ try: () => RemoteCli.archiveUrl(target ?? "", version), catch: SshFailure.from })
     yield* input.stage("downloading")

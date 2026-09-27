@@ -17,20 +17,20 @@ posix(
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const dir = yield* fs.makeTempDirectoryScoped({ prefix: "ssh-beta-test-" })
     const version = "0.0.0-beta-19059"
-    const bin = path.join(dir, ".opencode/desktop-ssh", version)
+    const bin = path.join(dir, ".grist/desktop-ssh", version)
     yield* fs.makeDirectory(bin, { recursive: true })
     yield* fs.writeFileString(
-      path.join(bin, "opencode"),
+      path.join(bin, "grist"),
       `#!/bin/sh
 set -eu
 case "$1 $2" in
   "service start"|"service restart")
     printf '%s\\n' "$2" >> "$HOME/actions"
-    mkdir -p "$XDG_STATE_HOME/opencode"
-    printf '%s' '{"url":"http://127.0.0.1:12345","password":"fixture","version":"${version}","pid":1234}' > "$XDG_STATE_HOME/opencode/service.json"
+    mkdir -p "$XDG_STATE_HOME/grist"
+    printf '%s' '{"url":"http://127.0.0.1:12345","password":"fixture","version":"${version}","pid":1234}' > "$XDG_STATE_HOME/grist/service.json"
     ;;
   "service status")
-    if [ -f "$XDG_STATE_HOME/opencode/service.json" ]; then printf 'http://127.0.0.1:12345\\n'; else printf 'stopped\\n'; fi
+    if [ -f "$XDG_STATE_HOME/grist/service.json" ]; then printf 'http://127.0.0.1:12345\\n'; else printf 'stopped\\n'; fi
     ;;
   *) exit 66 ;;
 esac
@@ -66,16 +66,16 @@ posix(
       version: "0.0.0-beta-19059",
       pid: 1234,
     }
-    yield* fs.makeDirectory(path.join(dir, ".opencode/bin"), { recursive: true })
-    yield* fs.makeDirectory(path.join(dir, "state/opencode"), { recursive: true })
+    yield* fs.makeDirectory(path.join(dir, ".grist/bin"), { recursive: true })
+    yield* fs.makeDirectory(path.join(dir, "state/grist"), { recursive: true })
     yield* fs.writeFileString(
-      path.join(dir, ".opencode/bin/opencode"),
+      path.join(dir, ".grist/bin/grist"),
       '#!/bin/sh\n[ "$1 $2" = "service status" ] || exit 66\nprintf "http://0.0.0.0:49374\\n"\n',
       { mode: 0o755 },
     )
-    yield* fs.writeFileString(path.join(dir, "state/opencode/service.json"), JSON.stringify(expected, null, 2))
+    yield* fs.writeFileString(path.join(dir, "state/grist/service.json"), JSON.stringify(expected, null, 2))
     yield* fs.writeFileString(
-      path.join(dir, "state/opencode/service-local.json"),
+      path.join(dir, "state/grist/service-local.json"),
       JSON.stringify({ ...expected, url: "http://127.0.0.1:7777", password: "other" }),
     )
     const child = yield* spawner.spawn(

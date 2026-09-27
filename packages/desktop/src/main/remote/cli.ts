@@ -24,12 +24,12 @@ export function requireVersion(version: string) {
 }
 
 export function discoverScript(options: { fromPath?: boolean; cache?: { directory: string; prefix: string } } = {}) {
-  return `cli=${options.fromPath ? "$(command -v opencode || true)" : '""'}
-if [ -z "$cli" ] && [ -x "$HOME/.opencode/bin/opencode" ]; then cli="$HOME/.opencode/bin/opencode"; fi
+  return `cli=${options.fromPath ? "$(command -v grist || true)" : '""'}
+if [ -z "$cli" ] && [ -x "$HOME/.grist/bin/grist" ]; then cli="$HOME/.grist/bin/grist"; fi
 ${
   options.cache
     ? `if [ -z "$cli" ]; then
-  for binary in "$HOME"/${quote(options.cache.directory)}/${quote(options.cache.prefix)}*/opencode; do
+  for binary in "$HOME"/${quote(options.cache.directory)}/${quote(options.cache.prefix)}*/grist; do
     if [ -x "$binary" ]; then cli="$binary"; fi
   done
 fi
@@ -62,13 +62,13 @@ if [ "$arch" = x64 ]; then target="$target-baseline"; fi
 if [ "$os" = linux ]; then
   if [ -f /etc/alpine-release ] || (ldd --version 2>&1 | grep -qi musl); then target="$target-musl"; fi
 fi
-printf 'OPENCODE_REMOTE_TARGET=%s\\n' "$target"
+printf 'GRIST_REMOTE_TARGET=%s\\n' "$target"
 `
 
 export function archiveUrl(target: string, version: string) {
-  if (!/^(linux|darwin)-(x64-baseline|arm64)(-musl)?$/.test(target))
+  if (!/^(linux|darwin)-(x64|arm64)(-musl)?$/.test(target))
     throw new Failure({ code: "platform", detail: target })
-  return `https://registry.npmjs.org/@opencode/cli-${target}/-/cli-${target}-${requireVersion(version)}.tgz`
+  return `https://registry.npmjs.org/grist-${target}/-/grist-${target}-${requireVersion(version)}.tgz`
 }
 
 type Source = { type: "download"; url: string } | { type: "archive" } | { type: "installer"; binary?: string }
@@ -77,21 +77,32 @@ export function installScript(input: { version: string; directory?: string; sour
   const version = requireVersion(input.version)
   // The managed CLI installer also configures the user's shell PATH. Private
   // installations use archives so their destination and shell setup stay isolated.
-  if (input.source.type === "installer")
-    return `set -eu
-curl -fsSL https://raw.githubusercontent.com/anomalyco/opencode/v2/install | bash -s -- ${input.source.binary ? `--binary ${input.source.binary}` : `--version ${quote(version)}`}
-${verifyScript('"$HOME/.opencode/bin/opencode"', version)}
+  // Grist ships no curl installer; managed installs copy the provided binary or
+  // fall back to the npm distribution.
+  if (input.source.type === "installer") {
+    if (input.source.binary)
+      return `set -eu
+destination="$HOME/.grist/bin/grist"
+mkdir -p "$(dirname "$destination")"
+cp ${input.source.binary} "$destination"
+chmod 755 "$destination"
+${verifyScript('"$destination"', version)}
 `
+    return `set -eu
+npm install -g ${quote(`grist-ai@${version}`)}
+${verifyScript('"$(command -v grist)"', version)}
+`
+  }
   return `set -eu
 umask 077
-destination="$HOME"/${quote(`${input.directory ?? ".opencode/bin"}/opencode`)}
+destination="$HOME"/${quote(`${input.directory ?? ".grist/bin"}/grist`)}
 mkdir -p "$(dirname "$destination")"
 stage=$(mktemp -d "$(dirname "$destination")/.install-XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 ${stageBinary(input.source)}
-chmod 755 "$stage/package/bin/opencode"
-${verifyScript('"$stage/package/bin/opencode"', version)}
-mv "$stage/package/bin/opencode" "$destination"
+chmod 755 "$stage/package/bin/grist"
+${verifyScript('"$stage/package/bin/grist"', version)}
+mv "$stage/package/bin/grist" "$destination"
 `
 }
 
@@ -110,17 +121,15 @@ function verifyScript(command: string, version: string) {
   return `test "$(${command} --version | awk '{print $NF}' | sed 's/^v//')" = ${quote(version)}`
 }
 
-const Beta = Schema.Struct({ version: Schema.String.check(Schema.isPattern(/^0\.0\.0-beta-\d+(?:\.\d+)?$/)) })
+const Beta = Schema.Struct({ version: Schema.String.check(Schema.isPattern(/^\d+\.\d+\.\d+(-[a-zA-Z0-9.+-]+)?$/)) })
 
 export const latestBeta = Effect.fn("RemoteCli.latestBeta")(function* () {
   const http = yield* HttpClient.HttpClient
-  const metadata = yield* http.get("https://registry.npmjs.org/@opencode%2fcli/beta").pipe(
+  const metadata = yield* http.get("https://registry.npmjs.org/grist-ai/beta").pipe(
     Effect.flatMap(HttpClientResponse.filterStatusOk),
     Effect.flatMap(HttpClientResponse.schemaBodyJson(Beta)),
     Effect.timeout("30 seconds"),
-    Effect.mapError(
-      () => new Failure({ code: "install", detail: "https://registry.npmjs.org/@opencode%2fcli/beta" }),
-    ),
+    Effect.mapError(() => new Failure({ code: "install", detail: "https://registry.npmjs.org/grist-ai/beta" })),
   )
   return metadata.version
 })

@@ -201,12 +201,12 @@ for (const channel of ["dev", "beta"] as const) {
     if (previous === undefined) delete process.env.OPENCODE_CHANNEL
     else process.env.OPENCODE_CHANNEL = previous
 
-    expect(config.files).toContain("!resources/opencode-cli*")
+    expect(config.files).toContain("!resources/grist-cli*")
     expect(config.extraResources).toEqual([
       {
         from: "resources/",
         to: "",
-        filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"],
+        filter: ["grist-cli", "grist-cli.exe", "grist-cli.version"],
       },
     ])
   })

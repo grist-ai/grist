@@ -33,7 +33,7 @@ export function macSignOptions(options: CustomMacSignOptions): CustomMacSignOpti
     ...options,
     optionsForFile: (file) => {
       const defaults = options.optionsForFile?.(file)
-      if (file !== path.join(options.app, "Contents/Resources/opencode-cli")) return defaults ?? {}
+      if (file !== path.join(options.app, "Contents/Resources/grist-cli")) return defaults ?? {}
       // The Bun CLI loads bun-pty's native library; Electron and its helpers do not need this exception.
       return { ...defaults, entitlements: path.join(packageDir, "resources/entitlements.cli.plist") }
     },
@@ -71,7 +71,7 @@ const getBase = (appId: string): Configuration => ({
   files: [
     "out/**/*",
     "resources/**/*",
-    "!resources/opencode-cli*",
+    "!resources/grist-cli*",
     // Log export imports Zip.js as ESM. Keep index.js and lib, including its inline worker.
     "!**/node_modules/@zip.js/zip.js/dist{,/**/*}",
     "!**/node_modules/@zip.js/zip.js/{index.cjs,index.min.js,index-fflate.js,deno.json,eslint.config.mjs}",
@@ -91,17 +91,17 @@ const getBase = (appId: string): Configuration => ({
     {
       from: "resources/",
       to: "",
-      filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"],
+      filter: ["grist-cli", "grist-cli.exe", "grist-cli.version"],
     },
   ],
   afterPack: async (context) => {
     const cli = path.join(
       context.packager.getResourcesDir(context.appOutDir),
-      context.electronPlatformName === "win32" ? "opencode-cli.exe" : "opencode-cli",
+      context.electronPlatformName === "win32" ? "grist-cli.exe" : "grist-cli",
     )
     const file = await stat(cli)
     if (!file.isFile() || file.size === 0) throw new Error(`Bundled CLI must be a non-empty file: ${cli}`)
-    const version = path.join(path.dirname(cli), "opencode-cli.version")
+    const version = path.join(path.dirname(cli), "grist-cli.version")
     if ((await stat(version)).size === 0) throw new Error(`Bundled CLI version must be a non-empty file: ${version}`)
   },
   mac: {

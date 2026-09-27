@@ -25,7 +25,7 @@ export function sidecarProbe() {
 
 function bundledVersion() {
   try {
-    return readFileSync(path.join(process.resourcesPath, "opencode-cli.version"), "utf8").trim()
+    return readFileSync(path.join(process.resourcesPath, "grist-cli.version"), "utf8").trim()
   } catch {
     return ""
   }
