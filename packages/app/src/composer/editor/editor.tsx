@@ -17,6 +17,8 @@ import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import { resolveBlobUrl } from "@/runtime/persistence/drafts"
+import { joinPromptText } from "@/utils/voice-input"
+import { useVoiceInput, VoiceInputButton } from "@/components/voice-input-button"
 import { ProviderModelIcon } from "@/providers/models/provider-group"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Button } from "@opencode/ui/button"
@@ -108,6 +110,41 @@ export function ComposerEditor(props: ComposerEditorProps) {
     "pointer-events": mode() === "normal" ? ("auto" as const) : ("none" as const),
     transition: "opacity 200ms ease",
   }))
+
+  const insertSpokenText = (text: string) => {
+    const target = editor
+    if (!target || props.disabled || props.readOnly) return
+    target.focus()
+    const selection = window.getSelection()
+    if (!selection?.rangeCount || !target.contains(selection.anchorNode)) {
+      const range = document.createRange()
+      range.selectNodeContents(target)
+      range.collapse(false)
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+    }
+    const value = props.controller.value()
+    const cursor = composerCursor(target)
+    const before = value.slice(0, cursor)
+    const content = joinPromptText(before, text).slice(before.length)
+    if (!content.trim()) return
+    if (typeof document.execCommand === "function" && document.execCommand("insertText", false, content)) return
+    // Fallback for environments without execCommand: splice into the DOM so
+    // the parse in onInput keeps mentions intact.
+    const fallback = window.getSelection()
+    if (!fallback?.rangeCount || !target.contains(fallback.anchorNode)) return
+    const range = fallback.getRangeAt(0)
+    range.deleteContents()
+    const node = document.createTextNode(content)
+    range.insertNode(node)
+    range.setStartAfter(node)
+    range.collapse(true)
+    fallback.removeAllRanges()
+    fallback.addRange(range)
+    target.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: content }))
+  }
+
+  const voice = useVoiceInput({ onTranscript: insertSpokenText })
 
   createEffect(() => {
     const parts = props.controller.parts()
@@ -328,6 +365,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
             </div>
           </div>
           <div data-slot="composer-actions" class="flex shrink-0 items-center">
+            <Show when={state.mode === "normal"}>
+              <VoiceInputButton disabled={props.disabled} voice={voice} />
+            </Show>
             <Show when={state.mode === "normal"}>
               <ComposerEditorAlternateDelivery
                 controller={props.controller}
