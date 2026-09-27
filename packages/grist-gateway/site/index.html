@@ -442,7 +442,8 @@ grist</pre>
           <p class="eyebrow">[ get started ]</p>
           <h2>Open to everyone.</h2>
           <p class="lede">
-            Sign in with Google and your account is created on the spot.
+            Create an account with your name and email, or sign in with Google —
+            your account is ready on the spot.
             Bring your own provider key — OpenRouter, Vercel AI Gateway, or
             any OpenAI-compatible endpoint — and Grist runs inference on it.
           </p>
@@ -505,17 +506,18 @@ grist</pre>
         <h2 id="sign-in">Sign in</h2>
         <p>
           <code>grist auth login</code> lists providers with Grist first.
-          Sign in on this site and your account is created on the spot, or
-          paste a dashboard API key (<code>grist_sk_…</code>). After login,
-          add your own provider key — OpenRouter, Vercel AI Gateway, or any
-          OpenAI-compatible endpoint — and Grist runs inference on it.
+          Create an account on this site with your name and email (or Google),
+          or sign in — or paste a dashboard API key (<code>grist_sk_…</code>).
+          After login, add your own provider key — OpenRouter, Vercel AI
+          Gateway, or any OpenAI-compatible endpoint — and Grist runs
+          inference on it.
         </p>
         <pre>grist auth login --provider grist
 # or, with a key from the dashboard:
 grist auth login --provider grist --api-key grist_sk_…</pre>
         <p>
-          Browser path: the CLI opens this site. Sign in with Google — the
-          first sign-in creates your account. The terminal polls until the
+          Browser path: the CLI opens this site. Create an account or sign in —
+          the first visit creates your account. The terminal polls until the
           site approves it, then asks for your provider key.
         </p>
         <p>
@@ -708,29 +710,75 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
 
     <main id="view-login" hidden>
       <section class="auth">
-        <p class="eyebrow" id="login-kicker">[ sign in ]</p>
-        <h1 id="login-title">Sign in</h1>
+        <p class="eyebrow" id="login-kicker">[ account ]</p>
+        <h1 id="login-title">Welcome to Grist</h1>
         <p class="lede" id="login-lede">
-          Sign in with Google to create your account. After that, signing in is enough.
+          Create an account or sign in to get your API key and start running agents.
         </p>
-        <div id="login-methods">
-          <button class="btn btn-google" type="button" id="google-btn">
-            <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-            </svg>
-            Sign in with Google
+        <div class="auth-tabs" role="tablist" aria-label="Sign in or create account">
+          <button class="auth-tab is-active" type="button" id="tab-signin" role="tab" aria-selected="true">
+            Sign in
           </button>
-          <p class="or">or email</p>
-          <form id="email-form">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" autocomplete="email" required />
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" required />
-            <button class="btn" type="submit" id="email-submit">Continue with email</button>
-          </form>
+          <button class="auth-tab" type="button" id="tab-signup" role="tab" aria-selected="false">
+            Create account
+          </button>
+        </div>
+        <div id="login-methods">
+          <div id="panel-signin" role="tabpanel" aria-labelledby="tab-signin">
+            <button class="btn btn-google" type="button" id="google-btn">
+              <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+              </svg>
+              Sign in with Google
+            </button>
+            <p class="or">or email</p>
+            <form id="email-form">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" autocomplete="email" required />
+              <label for="password">Password</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" required />
+              <button class="btn" type="submit" id="email-submit">Sign in</button>
+            </form>
+          </div>
+          <div id="panel-signup" role="tabpanel" aria-labelledby="tab-signup" hidden>
+            <button class="btn btn-google" type="button" id="google-signup-btn">
+              <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+              </svg>
+              Sign up with Google
+            </button>
+            <p class="or">or email</p>
+            <form id="signup-form">
+              <div class="name-row">
+                <div>
+                  <label for="first-name">First name</label>
+                  <input id="first-name" name="first-name" type="text" autocomplete="given-name" required />
+                </div>
+                <div>
+                  <label for="last-name">Last name</label>
+                  <input id="last-name" name="last-name" type="text" autocomplete="family-name" required />
+                </div>
+              </div>
+              <label for="signup-email">Email</label>
+              <input id="signup-email" name="email" type="email" autocomplete="email" required />
+              <label for="signup-password">Password</label>
+              <input
+                id="signup-password"
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              />
+              <button class="btn" type="submit" id="signup-submit">Create account</button>
+            </form>
+          </div>
         </div>
         <form id="invite-form" hidden>
           <label for="code">Account code</label>
@@ -749,7 +797,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           Google sign-in is not configured on this gateway yet. Enter the account code your operator gave you.
         </p>
         <p class="muted legal-agree">
-          By signing in you agree to the
+          By continuing you agree to the
           <a href="/terms">Terms of Use</a> and
           <a href="/privacy">Privacy Policy</a>.
         </p>
