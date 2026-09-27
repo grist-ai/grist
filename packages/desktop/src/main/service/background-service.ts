@@ -2,6 +2,7 @@ import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
 import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages, DesktopCli } from "./desktop-cli"
+import { cliRegistrationFile } from "./cli-registration-file"
 import { SidecarCredentials } from "./sidecar-credentials"
 import { sidecarProbe } from "./sidecar-probe"
 
@@ -29,7 +30,6 @@ export const layer = Layer.effect(
 
 const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial" | "reconnect") {
   yield* Effect.logInfo("starting v2 background service")
-  const path = yield* Path.Path
   const desktopCli = yield* DesktopCli.Service
   const runFork = Effect.runForkWith(yield* Effect.context())
   const isolated = !app.isPackaged && process.env.OPENCODE_DESKTOP_ISOLATED_SERVER === "1"
@@ -37,12 +37,12 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const version = mode === "initial" ? cli.version : undefined
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
+  // Look exactly where the spawned CLI registers itself; the client's default
+  // registration file still points at the pre-rebrand "opencode" directory.
+  const registrationFile = cliRegistrationFile()
   const ensure = () =>
     client.Service.ensure({
-      file:
-        isolated && process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local"
-          ? path.join(app.getPath("userData"), "opencode", "service-local.json")
-          : undefined,
+      file: registrationFile,
       version,
       command: [...cli.command, "serve", "--service", ...(isolated ? ["--hostname", "0.0.0.0", "--port", "0"] : [])],
       onStart: (reason, previousVersion) =>

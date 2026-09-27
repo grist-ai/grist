@@ -10,11 +10,11 @@ describe("hasExistingAppState", () => {
     expect(hasExistingAppState([file("Local State"), directory("Crashpad")])).toBe(false)
   })
 
-  test("recognizes state written by an earlier OpenCode launch", () => {
+  test("recognizes state written by an earlier Grist launch", () => {
     expect(hasExistingAppState([file("opencode.settings")])).toBe(true)
     expect(hasExistingAppState([file("opencode.global.dat")])).toBe(true)
     expect(hasExistingAppState([file("drafts.sqlite")])).toBe(true)
     expect(hasExistingAppState([file("window-state-abc.json")])).toBe(true)
-    expect(hasExistingAppState([directory("opencode")])).toBe(true)
+    expect(hasExistingAppState([directory("grist")])).toBe(true)
   })
 })

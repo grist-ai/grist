@@ -239,7 +239,7 @@ function manifest(path: Path.Path) {
 function serverLogRoots(path: Path.Path) {
   const xdgData = process.env.XDG_DATA_HOME || path.join(homedir(), ".local", "share")
   return [
-    ...new Set([path.join(xdgData, "opencode", "log"), path.join(app.getPath("userData"), "opencode", "log")]),
+    ...new Set([path.join(xdgData, "grist", "log"), path.join(app.getPath("userData"), "grist", "log")]),
   ]
 }
 
