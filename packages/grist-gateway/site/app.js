@@ -591,6 +591,10 @@ document.getElementById("signup-form")?.addEventListener("submit", async (event)
   const lastName = document.getElementById("last-name").value.trim()
   const email = document.getElementById("signup-email").value.trim()
   const password = document.getElementById("signup-password").value
+  if (password !== document.getElementById("signup-password-confirm").value) {
+    fail(error, "Passwords don’t match.")
+    return
+  }
   if (!firstName || !lastName) {
     fail(error, "Enter your first and last name.")
     return
