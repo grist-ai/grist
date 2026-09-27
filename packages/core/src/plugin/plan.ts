@@ -28,7 +28,7 @@ export const Plugin = define({
   id: "opencode.plan",
   effect: Effect.fn(function* (ctx) {
     const global = yield* Global.Service
-    const directory = path.join(global.home, ".opencode", "plan")
+    const directory = path.join(global.home, ".grist", "plan")
     const enterReminder = enter(directory)
     yield* ctx.agent.transform((editor) => {
       editor.update(plan, (item) => {

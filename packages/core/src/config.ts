@@ -330,7 +330,7 @@ export const layer = (options?: Options) =>
         function* (patch: Patch) {
           const directory = initial.global ?? AbsolutePath.make(globalService.config)
           const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
-          const filepath = (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "opencode.jsonc")
+          const filepath = (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "grist.jsonc")
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
           const updated = yield* Effect.try({
             try: () =>

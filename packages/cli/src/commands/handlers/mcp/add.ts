@@ -38,12 +38,18 @@ export default Runtime.handler(
 )
 
 export async function resolveConfigPath(directory: string) {
+  // Check for existing config files (check .grist/ and .opencode/ subdirectories too)
   const candidates = [
+    path.join(directory, "grist.json"),
+    path.join(directory, "grist.jsonc"),
     path.join(directory, "opencode.json"),
     path.join(directory, "opencode.jsonc"),
-    path.join(directory, ".opencode", "opencode.json"),
-    path.join(directory, ".opencode", "opencode.jsonc"),
   ]
+  for (const dir of [".grist", ".opencode"]) {
+    for (const name of ["grist", "opencode"]) {
+      candidates.push(path.join(directory, dir, `${name}.json`), path.join(directory, dir, `${name}.jsonc`))
+    }
+  }
   for (const candidate of candidates) {
     if (
       await stat(candidate).then(
@@ -53,6 +59,7 @@ export async function resolveConfigPath(directory: string) {
     )
       return candidate
   }
+  // Default to grist.json if none exist
   return candidates[0]
 }
 
