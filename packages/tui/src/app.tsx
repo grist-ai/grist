@@ -1092,7 +1092,7 @@ function App() {
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          openUrl("https://opencode.ai/docs").catch(() => {})
+          openUrl("https://grist.lol/docs").catch(() => {})
           dialog.clear()
         },
         category: "System",

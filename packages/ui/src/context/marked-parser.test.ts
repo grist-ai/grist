@@ -5,8 +5,8 @@ import { parseSmallMarkdown } from "./marked-base"
 const parser = createMarkdownParser((code, language) => `<pre data-language="${language}">${code}</pre>`)
 
 test("renders links with application attributes", async () => {
-  expect(await parser.parse("[OpenCode](https://opencode.ai)")).toBe(
-    '<p><a href="https://opencode.ai" class="external-link" target="_blank" rel="noopener noreferrer">OpenCode</a></p>\n',
+  expect(await parser.parse("[Grist](https://grist.lol)")).toBe(
+    '<p><a href="https://grist.lol" class="external-link" target="_blank" rel="noopener noreferrer">Grist</a></p>\n',
   )
 })
 
