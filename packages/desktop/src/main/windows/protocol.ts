@@ -1,4 +1,5 @@
 import { app, net, protocol } from "electron"
+import { existsSync, readdirSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import {
@@ -10,6 +11,7 @@ import {
   jsCallStacksDocumentPolicy,
 } from "./headers"
 import { rendererHost, rendererProtocol } from "./scheme"
+import { moonshinePthreadFallback } from "./pthread-assets"
 import { resolveSpeechAsset, speechResourceRoot, SPEECH_PROTOCOL } from "./speech-assets"
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -100,12 +102,15 @@ async function serve(request: Request, rendererRoot: string) {
     return new Response("Not found", { status: 404 })
   }
 
-  const file = path.resolve(rendererRoot, `.${decodeURIComponent(url.pathname)}`)
-  const rel = path.relative(rendererRoot, file)
+  const requested = path.resolve(rendererRoot, `.${decodeURIComponent(url.pathname)}`)
+  const rel = path.relative(rendererRoot, requested)
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    report("warning", "rejected path", { url: request.url, file })
+    report("warning", "rejected path", { url: request.url, file: requested })
     return new Response("Not found", { status: 404 })
   }
+  // Emscripten pthread workers request the glue by its unhashed name; fall back to the hashed
+  // build output when it is the only copy on disk.
+  const file = resolveRendererAsset(requested)
 
   try {
     const range = request.headers.get("range")
@@ -123,6 +128,15 @@ async function serve(request: Request, rendererRoot: string) {
     report("error", "fetch error", { url: request.url, file, error })
     return new Response("Not found", { status: 404 })
   }
+}
+
+function resolveRendererAsset(requested: string) {
+  if (existsSync(requested)) return requested
+  const dir = path.dirname(requested)
+  if (!existsSync(dir)) return requested
+  const fallback = moonshinePthreadFallback(path.basename(requested), readdirSync(dir))
+  if (!fallback) return requested
+  return path.join(dir, fallback)
 }
 
 function addDocumentPolicy(response: Response, file: string) {
