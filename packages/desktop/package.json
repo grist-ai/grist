@@ -36,6 +36,7 @@
     "@brendonovich/vite-plugin-opencode": "0.1.3",
     "@effect/platform-node": "catalog:",
     "@lydell/node-pty": "catalog:",
+    "@moonshine-ai/moonshine-wasm": "0.1.5",
     "@opencode/app": "workspace:*",
     "@opencode/client": "workspace:*",
     "@opencode/schema": "workspace:*",
