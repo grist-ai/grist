@@ -1,5 +1,9 @@
 import { defineConfig } from "electron-vite"
 import { pickerPlugin } from "./scripts/picker"
+import * as fs from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
+import { moonshinePthreadCopy } from "./src/main/windows/pthread-assets"
 
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
@@ -123,7 +127,28 @@ const require = __cjs_mod__.createRequire(import.meta.url);
         command === "serve" && process.env.OPENCODE_TEST_ONBOARDING === "1",
       ),
     },
-    plugins: [pickerPlugin(), appPlugin, sentry],
+    plugins: [
+      pickerPlugin(),
+      appPlugin,
+      sentry,
+      // Emscripten pthread workers request the Moonshine glue by its unhashed name, so copy the
+      // hashed build output next to it. The main-process protocol also falls back to the hashed
+      // file when only it is on disk.
+      {
+        name: "grist:moonshine-pthread-assets",
+        async writeBundle(output) {
+          const dir = join(output.dir ?? "out/renderer", "assets")
+          if (!existsSync(dir)) return
+          const copies = moonshinePthreadCopy(await fs.readdir(dir))
+          for (const copy of copies) {
+            await fs.copyFile(join(dir, copy.from), join(dir, copy.to))
+          }
+        },
+      },
+    ],
+    optimizeDeps: {
+      exclude: ["@moonshine-ai/moonshine-wasm"],
+    },
     publicDir: "../../../app/public",
     root: "src/renderer",
     build: {

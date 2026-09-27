@@ -72,6 +72,9 @@ const getBase = (appId: string): Configuration => ({
     "out/**/*",
     "resources/**/*",
     "!resources/grist-cli*",
+    // The Moonshine speech model ships outside the app archive so the speech protocol can read it
+    // from the packaged Resources directory.
+    "!resources/moonshine/**",
     // Log export imports Zip.js as ESM. Keep index.js and lib, including its inline worker.
     "!**/node_modules/@zip.js/zip.js/dist{,/**/*}",
     "!**/node_modules/@zip.js/zip.js/{index.cjs,index.min.js,index-fflate.js,deno.json,eslint.config.mjs}",
@@ -92,6 +95,10 @@ const getBase = (appId: string): Configuration => ({
       from: "resources/",
       to: "",
       filter: ["grist-cli", "grist-cli.exe", "grist-cli.version"],
+    },
+    {
+      from: "resources/moonshine",
+      to: "moonshine",
     },
   ],
   afterPack: async (context) => {

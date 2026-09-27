@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { addRendererHeaders, documentPolicyHeader, jsCallStacksDocumentPolicy, upsertHeader } from "./headers"
+import {
+  addRendererHeaders,
+  coepHeader,
+  coopHeader,
+  documentPolicyHeader,
+  embedderPolicy,
+  isolationPolicy,
+  jsCallStacksDocumentPolicy,
+  upsertHeader,
+} from "./headers"
 
 describe("renderer response headers", () => {
   test("keeps the server's exact allow-headers list so Chromium can reuse the cached preflight", () => {
@@ -31,6 +40,17 @@ describe("renderer response headers", () => {
     const asset = {}
     addRendererHeaders(asset, { document: false })
     expect(Object.keys(asset)).not.toContain(documentPolicyHeader)
+  })
+
+  test("isolates renderer documents cross-origin for the speech workers", () => {
+    const document: Record<string, string[]> = {}
+    addRendererHeaders(document, { document: true })
+    expect(document[coopHeader]).toEqual([isolationPolicy])
+    expect(document[coepHeader]).toEqual([embedderPolicy])
+    const asset: Record<string, string[]> = {}
+    addRendererHeaders(asset, { document: false })
+    expect(Object.keys(asset)).not.toContain(coopHeader)
+    expect(Object.keys(asset)).not.toContain(coepHeader)
   })
 
   test("upsert replaces a header regardless of key casing", () => {

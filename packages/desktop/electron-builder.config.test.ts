@@ -192,6 +192,21 @@ test("the trimmed Zip.js package can still export compressed logs", async () => 
   }
 })
 
+test("bundles the Moonshine speech model outside the app archive", async () => {
+  const previous = process.env.OPENCODE_CHANNEL
+  process.env.OPENCODE_CHANNEL = "prod"
+  const module = await import("./electron-builder.config.ts?moonshine-resource")
+  const config = module.default as Configuration
+  if (previous === undefined) delete process.env.OPENCODE_CHANNEL
+  else process.env.OPENCODE_CHANNEL = previous
+
+  expect(config.files).toContain("!resources/moonshine/**")
+  expect(config.extraResources).toContainEqual({
+    from: "resources/moonshine",
+    to: "moonshine",
+  })
+})
+
 for (const channel of ["dev", "beta"] as const) {
   test(`bundles the CLI outside the ${channel} app archive`, async () => {
     const previous = process.env.OPENCODE_CHANNEL
@@ -207,6 +222,10 @@ for (const channel of ["dev", "beta"] as const) {
         from: "resources/",
         to: "",
         filter: ["grist-cli", "grist-cli.exe", "grist-cli.version"],
+      },
+      {
+        from: "resources/moonshine",
+        to: "moonshine",
       },
     ])
   })

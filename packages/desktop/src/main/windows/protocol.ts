@@ -1,8 +1,20 @@
-import { net, protocol } from "electron"
+import { app, net, protocol } from "electron"
+import { existsSync, readdirSync } from "node:fs"
 import path from "node:path"
-import { pathToFileURL } from "node:url"
-import { documentPolicyHeader, jsCallStacksDocumentPolicy } from "./headers"
+import { fileURLToPath, pathToFileURL } from "node:url"
+import {
+  coepHeader,
+  coopHeader,
+  documentPolicyHeader,
+  embedderPolicy,
+  isolationPolicy,
+  jsCallStacksDocumentPolicy,
+} from "./headers"
 import { rendererHost, rendererProtocol } from "./scheme"
+import { moonshinePthreadFallback } from "./pthread-assets"
+import { resolveSpeechAsset, speechResourceRoot, SPEECH_PROTOCOL } from "./speech-assets"
+
+const root = path.dirname(fileURLToPath(import.meta.url))
 
 export type ProtocolReport = (level: "warning" | "error", message: string, data: Record<string, unknown>) => void
 
@@ -50,6 +62,39 @@ export function registerRendererProtocol(rendererRoot: string) {
   })
 }
 
+// Serves the bundled Moonshine speech model over grist-speech://models/<file> so dictation runs
+// fully on-device. Registered alongside the renderer protocol wherever windows are created.
+export function registerSpeechProtocol() {
+  if (protocol.isProtocolHandled(SPEECH_PROTOCOL)) return
+
+  protocol.handle(SPEECH_PROTOCOL, async (request) => {
+    const assets = speechResourceRoot({
+      packaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      packageRoot: path.join(root, "../.."),
+    })
+    const file = resolveSpeechAsset(request.url, assets)
+    if (!file) {
+      report("warning", "rejected speech path", { url: request.url })
+      return speechNotFound()
+    }
+
+    try {
+      const response = await net.fetch(pathToFileURL(file).toString())
+      const headers = new Headers(response.headers)
+      headers.set("Access-Control-Allow-Origin", "*")
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+    } catch (error) {
+      report("error", "speech fetch error", { url: request.url, file, error })
+      return speechNotFound()
+    }
+  })
+}
+
+function speechNotFound() {
+  return new Response("Not found", { status: 404, headers: { "Access-Control-Allow-Origin": "*" } })
+}
+
 async function serve(request: Request, rendererRoot: string) {
   const url = new URL(request.url)
   if (url.host !== rendererHost) {
@@ -57,12 +102,15 @@ async function serve(request: Request, rendererRoot: string) {
     return new Response("Not found", { status: 404 })
   }
 
-  const file = path.resolve(rendererRoot, `.${decodeURIComponent(url.pathname)}`)
-  const rel = path.relative(rendererRoot, file)
+  const requested = path.resolve(rendererRoot, `.${decodeURIComponent(url.pathname)}`)
+  const rel = path.relative(rendererRoot, requested)
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    report("warning", "rejected path", { url: request.url, file })
+    report("warning", "rejected path", { url: request.url, file: requested })
     return new Response("Not found", { status: 404 })
   }
+  // Emscripten pthread workers request the glue by its unhashed name; fall back to the hashed
+  // build output when it is the only copy on disk.
+  const file = resolveRendererAsset(requested)
 
   try {
     const range = request.headers.get("range")
@@ -82,9 +130,20 @@ async function serve(request: Request, rendererRoot: string) {
   }
 }
 
+function resolveRendererAsset(requested: string) {
+  if (existsSync(requested)) return requested
+  const dir = path.dirname(requested)
+  if (!existsSync(dir)) return requested
+  const fallback = moonshinePthreadFallback(path.basename(requested), readdirSync(dir))
+  if (!fallback) return requested
+  return path.join(dir, fallback)
+}
+
 function addDocumentPolicy(response: Response, file: string) {
   if (!file.toLowerCase().endsWith(".html")) return response
   const headers = new Headers(response.headers)
   headers.set(documentPolicyHeader, jsCallStacksDocumentPolicy)
+  headers.set(coopHeader, isolationPolicy)
+  headers.set(coepHeader, embedderPolicy)
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }

@@ -1,5 +1,11 @@
 export const documentPolicyHeader = "Document-Policy"
 export const jsCallStacksDocumentPolicy = "include-js-call-stacks-in-crash-reports"
+// Moonshine's Emscripten pthread workers need SharedArrayBuffer, which requires cross-origin
+// isolation on the renderer document.
+export const coopHeader = "Cross-Origin-Opener-Policy"
+export const coepHeader = "Cross-Origin-Embedder-Policy"
+export const isolationPolicy = "same-origin"
+export const embedderPolicy = "credentialless"
 
 // The renderer lives at oc://renderer, so every server it talks to is cross-origin. Servers that
 // send no CORS headers get permissive ones here so the renderer can still reach them.
@@ -16,7 +22,11 @@ export function addRendererHeaders(headers: Record<string, string | string[]>, o
     // Chromium caps preflight cache lifetime at two hours; without the header it caches for 5s.
     upsertHeader(headers, "Access-Control-Max-Age", ["7200"])
   }
-  if (options.document) upsertHeader(headers, documentPolicyHeader, [jsCallStacksDocumentPolicy])
+  if (options.document) {
+    upsertHeader(headers, documentPolicyHeader, [jsCallStacksDocumentPolicy])
+    upsertHeader(headers, coopHeader, [isolationPolicy])
+    upsertHeader(headers, coepHeader, [embedderPolicy])
+  }
 }
 
 export function hasHeader(headers: Record<string, string | string[]>, key: string) {

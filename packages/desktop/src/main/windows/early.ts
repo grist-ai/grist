@@ -7,7 +7,7 @@ import { windowArguments } from "./bootstrap"
 import { WINDOW_IDS_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
 import { storedBackgroundColor, titlebarOverlay } from "./defaults"
-import { registerRendererProtocol } from "./protocol"
+import { registerRendererProtocol, registerSpeechProtocol } from "./protocol"
 import { loadWindow } from "./scheme"
 import { allowRendererPermissions, wireNavigationPolicy, wireRendererHeaders } from "./security"
 import { PRODUCT_NAME } from "../../../brand"
@@ -82,6 +82,7 @@ export function createEarlyWindow() {
   // The renderer boots while the main bundle and layers load, instead of after them. Everything the
   // page needs before its first request is wired here; the IPC port arrives once the layers are up.
   registerRendererProtocol(path.join(root, "../renderer"))
+  registerSpeechProtocol()
   allowRendererPermissions(win)
   wireNavigationPolicy(win, (url) => record.openExternal(url))
   wireRendererHeaders(win)

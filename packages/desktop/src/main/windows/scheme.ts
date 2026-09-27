@@ -1,5 +1,6 @@
 import { protocol } from "electron"
 import type { BrowserWindow } from "electron"
+import { SPEECH_PROTOCOL } from "./speech-assets"
 
 export const rendererProtocol = "oc"
 export const rendererHost = "renderer"
@@ -36,6 +37,17 @@ export function registerRendererScheme() {
         stream: true,
         // Let Chromium keep V8 bytecode for the renderer bundle between launches.
         codeCache: true,
+      },
+    },
+    {
+      // Serves the bundled Moonshine speech model so dictation stays on-device.
+      scheme: SPEECH_PROTOCOL,
+      privileges: {
+        secure: true,
+        standard: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true,
       },
     },
   ])

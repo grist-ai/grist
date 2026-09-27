@@ -5,7 +5,7 @@ import { Effect, Path } from "effect"
 import { PROTOCOL_SCHEME } from "../../../brand"
 import { DesktopPaths } from "../paths"
 import { getUserShell, loadShellEnv } from "../service/shell-env"
-import { registerRendererProtocol, setDockIcon, setProtocolReporter } from "../windows"
+import { registerRendererProtocol, registerSpeechProtocol, setDockIcon, setProtocolReporter } from "../windows"
 import { scoped } from "../native/logging"
 
 // electron-context-menu attaches to every existing and future window, so it can load once the first
@@ -44,6 +44,7 @@ export const prepareDesktop = Effect.gen(function* () {
     runFork(scoped("protocol", level === "error" ? Effect.logError(message, data) : Effect.logWarning(message, data))),
   )
   registerRendererProtocol(paths.rendererRoot)
+  registerSpeechProtocol()
   setDockIcon(path, paths)
 })
 
