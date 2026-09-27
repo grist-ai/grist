@@ -24,6 +24,8 @@ async function prepareDesktop() {
     $`bun run install-electron`,
     $`bun ./scripts/copy-icons.ts ${process.env.OPENCODE_CHANNEL ?? "dev"}`,
   ])
+  // The unpackaged app serves the speech model from resources/moonshine over grist-speech://.
+  await $`bun ./scripts/fetch-moonshine.ts`
   if (process.platform === "darwin") process.env.ELECTRON_EXEC_PATH = await prepareDevElectron()
 }
 

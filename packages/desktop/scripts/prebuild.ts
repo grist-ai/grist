@@ -10,6 +10,7 @@ if (channel === "prod" && !Bun.env.OPENCODE_CLI_DIST) {
 
 await $`bun ./scripts/copy-icons.ts ${channel}`
 await $`bun ./scripts/copy-metainfo.ts ${channel}`
+await $`bun ./scripts/fetch-moonshine.ts`
 
 if (channel === "dev") await downloadCliToResources()
 if ((channel === "beta" || channel === "prod") && Bun.env.OPENCODE_CLI_DIST) {
