@@ -49,7 +49,7 @@ export default function NewSessionPage(props: { draftId: string }) {
     mcp,
   })
   const model = createComposerModel(composer.adapter)
-  useComposerCommands({ model: composer.model })
+  useComposerCommands()
   const project = createPromptProjectController({
     controls: composer.project,
     onDone: model.restoreFocus,

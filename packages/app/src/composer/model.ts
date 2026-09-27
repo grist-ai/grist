@@ -229,7 +229,6 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
       keybind: command.keybindParts(item.id),
     })),
   ])
-  const variants = createMemo(() => ["default", ...adapter.controls().model.selection.variant.list()])
   const submission = createComposerSubmit({
     adapter,
     mode,
@@ -356,12 +355,6 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
               keybind: () => command.keybindParts("agent.cycle"),
             }
           : undefined
-      },
-      variant: {
-        options: () => variants().map((value) => ({ id: value, label: value })),
-        current: () => adapter.controls().model.selection.variant.current() ?? "default",
-        onSelect: (value) => adapter.controls().model.selection.variant.set(value === "default" ? undefined : value),
-        keybind: () => command.keybindParts("model.variant.cycle"),
       },
       submit: {
         available,

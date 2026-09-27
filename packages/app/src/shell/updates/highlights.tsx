@@ -9,7 +9,10 @@ import { persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { DialogReleaseNotes, type Highlight } from "@/shell/updates/release-notes"
 
-const CHANGELOG_URL = "https://opencode.ai/changelog.json"
+// Grist desktop releases live in the grist-downloads repo. The GitHub releases
+// feed carries no "highlights" groups, so this currently resolves to a silent
+// no-op; it will light up if a Grist changelog.json is published later.
+const CHANGELOG_URL = "https://api.github.com/repos/grist-ai/grist-downloads/releases"
 
 export const HighlightsStore = Persistence.struct({
   version: Schema.UndefinedOr(Schema.String),

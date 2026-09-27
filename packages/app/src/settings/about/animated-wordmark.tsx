@@ -1,8 +1,8 @@
 import { createEffect, For, on, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 
-const target = ["o", "p", "e", "n", "c", "o", "d", "e"] as const
-const choices = ["o", "p", "e", "n", "c", "d"] as const
+const target = ["g", "r", "i", "s", "t"] as const
+const choices = ["g", "r", "i", "s", "t"] as const
 
 export function AnimatedWordmark(props: { active: boolean }) {
   const [state, setState] = createStore({ letters: [...target] })
@@ -43,31 +43,27 @@ export function AnimatedWordmark(props: { active: boolean }) {
   onCleanup(() => timers.forEach(clearTimeout))
 
   return (
-    <svg class="settings-about-wordmark" viewBox="0 0 234 42" aria-hidden="true">
+    <svg class="settings-about-wordmark" viewBox="0 0 150 42" aria-hidden="true">
       <defs>
-        <symbol id="settings-about-letter-o" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 30H6V18H18V30Z" />
-          <path d="M18 12H6V30H18V12ZM24 36H0V6H24V36Z" />
+        <symbol id="settings-about-letter-g" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M18 18H6V12H18V18Z" />
+          <path d="M0 6H24V12H0Z M0 12H6V30H0Z M0 30H24V36H0Z M18 12H24V18H18Z M18 24H24V30H18Z M0 18H24V24H0Z" />
         </symbol>
-        <symbol id="settings-about-letter-p" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 30H6V18H18V30Z" />
-          <path d="M6 30H18V12H6V30ZM24 36H6V42H0V6H24V36Z" />
+        <symbol id="settings-about-letter-r" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M18 18H6V12H18V18Z" />
+          <path d="M0 6H6V36H0Z M0 6H24V12H0Z M18 12H24V24H18Z M6 18H18V24H6Z M12 24H18V36H12Z" />
         </symbol>
-        <symbol id="settings-about-letter-e" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M24 24V30H6V24H24Z" />
-          <path d="M24 24H6V30H24V36H0V6H24V24ZM6 18H18V12H6V18Z" />
+        <symbol id="settings-about-letter-i" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M15 30H9V12H15V30Z" />
+          <path d="M9 6H15V36H9Z M6 6H18V12H6Z M6 30H18V36H6Z" />
         </symbol>
-        <symbol id="settings-about-letter-n" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 36H6V18H18V36Z" />
-          <path d="M18 12H6V36H0V6H18V12ZM24 36H18V12H24V36Z" />
+        <symbol id="settings-about-letter-s" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M18 24H6V18H18V24Z" />
+          <path d="M0 6H24V12H0Z M0 12H6V18H0Z M0 18H24V24H0Z M18 24H24V30H18Z M0 30H24V36H0Z" />
         </symbol>
-        <symbol id="settings-about-letter-c" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M24 30H6V18H24V30Z" />
-          <path d="M24 12H6V30H24V36H0V6H24V12Z" />
-        </symbol>
-        <symbol id="settings-about-letter-d" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 30H6V18H18V30Z" />
-          <path d="M18 12H6V30H18V12ZM24 36H0V6H18V0H24V36Z" />
+        <symbol id="settings-about-letter-t" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M15 36H9V12H15V36Z" />
+          <path d="M0 6H24V12H0Z M9 12H15V36H9Z" />
         </symbol>
       </defs>
       <For each={state.letters}>

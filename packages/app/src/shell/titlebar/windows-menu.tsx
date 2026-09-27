@@ -97,7 +97,7 @@ export function WindowsAppMenu(props: {
       <Menu.Portal>
         <Menu.Content class="desktop-app-menu">
           <Menu.Group>
-            <Menu.GroupLabel class="desktop-app-menu-heading">OpenCode</Menu.GroupLabel>
+            <Menu.GroupLabel class="desktop-app-menu-heading">Grist</Menu.GroupLabel>
             <For each={DESKTOP_MENU.filter((menu) => desktopMenuVisible(menu, "windows"))}>
               {(menu) => (
                 <DesktopMenuSubmenu label={language.t(menu.labelKey)}>

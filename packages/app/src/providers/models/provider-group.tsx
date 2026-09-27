@@ -7,7 +7,7 @@ import { ProviderIcon } from "@opencode/ui/provider-icon"
 import type { JSX } from "solid-js"
 import { createMemo, For, Match, Show, Switch } from "solid-js"
 import { consoleProviderGroup, consoleProviderName } from "@/providers/catalog/console"
-import { OpenCodeLogo } from "@/providers/opencode-logo"
+import { GristLogo } from "@/providers/grist-logo"
 import { useLanguage } from "@/runtime/i18n/language"
 import customManagedProvider from "@/providers/custom-managed-provider.svg"
 import "@/settings/settings.css"
@@ -33,7 +33,7 @@ export function ProviderModelIcon(props: { provider: ModelProvider; class?: stri
   return (
     <Switch>
       <Match when={props.provider.id === "opencode"}>
-        <OpenCodeLogo class={`size-4 ${props.class ?? ""}`} />
+        <GristLogo class={`size-4 ${props.class ?? ""}`} />
       </Match>
       <Match when={icon()} keyed>
         {(id) => <ProviderIcon id={id} width={16} height={16} class={props.class} />}
@@ -144,7 +144,7 @@ export function ProviderModelSections<T extends ModelItem>(props: {
             >
               <Header
                 id={CONSOLE_GROUP_KEY}
-                icon={<OpenCodeLogo class="size-4 shrink-0" />}
+                icon={<GristLogo class="size-4 shrink-0" />}
                 title={language.t("provider.connect.opencode.name")}
                 badge={managed().group.workspace}
               />

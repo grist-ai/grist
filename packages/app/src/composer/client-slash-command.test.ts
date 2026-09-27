@@ -4,7 +4,7 @@ import { parseClientSlashCommand } from "./client-slash-command"
 const options = [
   { id: "session.btw", trigger: "btw", arguments: true, type: "builtin" as const },
   { id: "custom.btw", trigger: "custom", type: "custom" as const },
-  { id: "model.choose", trigger: "model", type: "builtin" as const },
+  { id: "agent.cycle", trigger: "agent", type: "builtin" as const },
 ]
 
 describe("parseClientSlashCommand", () => {
@@ -26,7 +26,7 @@ describe("parseClientSlashCommand", () => {
   test("rejects prefixes, custom commands, and ordinary slash commands", () => {
     expect(parseClientSlashCommand(options, "/btwx nope")).toBeUndefined()
     expect(parseClientSlashCommand(options, "/custom nope")).toBeUndefined()
-    expect(parseClientSlashCommand(options, "/model opus")).toBeUndefined()
+    expect(parseClientSlashCommand(options, "/agent opus")).toBeUndefined()
     expect(parseClientSlashCommand(options, "ask /btw later")).toBeUndefined()
   })
 })
