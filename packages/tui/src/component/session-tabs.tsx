@@ -23,6 +23,7 @@ import { Portal, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { useConfig } from "../config"
 import { useSessionTabs } from "../context/session-tabs"
 import { useData } from "../context/data"
+import { useClipboard } from "../context/clipboard"
 import { useTheme } from "../context/theme"
 import {
   adaptiveSessionTabLayout,
@@ -44,6 +45,7 @@ import { SESSION_SIDEBAR_WIDTH, SESSION_TABS_COMPACT_BREAKPOINT } from "../ui/la
 import { projectName } from "../util/project"
 import { marqueeCycleWidth, marqueeOverflows, marqueeTextParts } from "../util/marquee"
 import { useDialog } from "../ui/dialog"
+import { useToast } from "../ui/toast"
 import { DialogSessionRename } from "./dialog-session-rename"
 import { Keymap } from "../context/keymap"
 import { registerOpencodeSpinner } from "./register-spinner"
@@ -75,7 +77,7 @@ const FADE_WIDTH = 4
 const ADD_TAB_WIDTH = 3
 const MARQUEE_DELAY = 600
 const MARQUEE_INTERVAL = 80
-const CONTEXT_MENU_WIDTH = 16
+const CONTEXT_MENU_WIDTH = 20
 const MIDDLE_MOUSE_BUTTON = 1
 const RIGHT_MOUSE_BUTTON = 2
 const MOUSE_CLOSE_HOLD_MS = 5_000
@@ -120,7 +122,7 @@ const glowTextColor = (base: RGBA, glow: RGBA, index: number, width: number, lev
   tint(base, glow, 0.12 * unreadGlowIntensity(index, width) * level)
 
 function tabFeedbackColor(status: SessionTabsStatus, theme: ReturnType<typeof useTheme>) {
-  if (status.attention) return theme.hue.interactive[200]
+  if (status.attention) return theme.hue.accent[200]
   if (status.unread === "error") return theme.text.feedback.error.base
   return undefined
 }
@@ -370,6 +372,8 @@ function TabContextMenu(props: { state: TabContextMenuState; tabs: SessionTabsCo
   const background = () => theme.background.raised.base
   const actionHovered = () => theme.background.raised.high
   const dialog = useDialog()
+  const clipboard = useClipboard()
+  const toast = useToast()
   onCleanup(Keymap.use().mode.push("menu"))
   Keymap.createLayer(() => ({
     mode: "menu",
@@ -386,6 +390,14 @@ function TabContextMenu(props: { state: TabContextMenuState; tabs: SessionTabsCo
               title: "Rename",
               run: () =>
                 props.tabs.rename ? props.tabs.rename(sessionID) : DialogSessionRename.show(dialog, sessionID, title),
+            },
+            {
+              title: "Copy session ID",
+              run: () =>
+                void clipboard
+                  .write(sessionID)
+                  .then(() => toast.show({ message: "Session ID copied to clipboard", variant: "info" }))
+                  .catch(toast.error),
             },
             { title: "Close", run: () => props.tabs.close(sessionID) },
           ]
@@ -528,8 +540,8 @@ function VerticalSessionTabs(props: {
   const compact = createMemo(() => width() < SESSION_TABS_COMPACT_BREAKPOINT)
   const tooltipWidth = () => Math.min(54, dimensions().width - width())
   const stride = () => (compact() ? 2 : 3)
-  const unreadColor = () => theme.hue.interactive[200]
-  const activeNumber = () => theme.hue.accent[200]
+  const unreadColor = () => theme.hue.accent[200]
+  const activeNumber = () => theme.hue.interactive[200]
   const idleNumber = () => tint(theme.text.formfield.base, background(), 0.55)
   const separatorUpperPulseColor = createMemo(() => tint(background(), theme.text.base, 0.04))
   const separatorLowerPulseColor = createMemo(() => tint(background(), theme.text.base, 0.05))
@@ -1291,8 +1303,8 @@ function HorizontalSessionTabs(props: {
   onCleanup(clearCloseHold)
   // A captured drag ends with a synthetic up on its drop target; do not turn that into a click.
   let suppressClick = false
-  const unreadColor = () => theme.hue.interactive[200]
-  const activeNumber = () => theme.hue.accent[200]
+  const unreadColor = () => theme.hue.accent[200]
+  const activeNumber = () => theme.hue.interactive[200]
   const idleNumber = () => tint(theme.text.formfield.base, theme.background.base, 0.55)
   const newTab = () => tabs.newTab?.() ?? false
   const activeID = createMemo(() => (newTab() ? NEW_SESSION_TAB.sessionID : tabs.current()))

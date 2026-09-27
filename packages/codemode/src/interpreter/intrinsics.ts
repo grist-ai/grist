@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { define, hidden, Native, Arr, ErrorObj, Obj } from "./objects.js"
+import { define, hidden, Native, Arr, ErrorObj, Obj, type Value } from "./objects.js"
 
 export const errorTypes = [
   "Error",
@@ -27,13 +27,17 @@ const builtins = [
   "RegExp",
   "Map",
   "Set",
+  "WeakMap",
+  "WeakSet",
   "URL",
   "URLSearchParams",
+  "Headers",
   "Uint8Array",
   "TextEncoder",
   "TextDecoder",
   "Promise",
   "Iterator",
+  "IteratorHelper",
   "AsyncIterator",
   "Generator",
   "AsyncGenerator",
@@ -49,6 +53,14 @@ export const createErrorValue = (prototype: Obj, message: string | undefined): E
   const value = new ErrorObj(prototype)
   if (message !== undefined) define(value, "message", message, hidden)
   return value
+}
+
+/** The prototype a primitive reads its methods from without being boxed; none for null, undefined, and symbols. */
+export const primitivePrototype = (builtins: Builtins, value: Value): Obj | undefined => {
+  if (typeof value === "string") return builtins.String
+  if (typeof value === "number") return builtins.Number
+  if (typeof value === "boolean") return builtins.Boolean
+  return undefined
 }
 
 export const createBuiltins = (): Builtins => {
@@ -78,13 +90,17 @@ export const createBuiltins = (): Builtins => {
     RegExp: plain(),
     Map: plain(),
     Set: plain(),
+    WeakMap: plain(),
+    WeakSet: plain(),
     URL: plain(),
     URLSearchParams: plain(),
+    Headers: plain(),
     Uint8Array: plain(),
     TextEncoder: plain(),
     TextDecoder: plain(),
     Promise: plain(),
     Iterator: iterator,
+    IteratorHelper: new Obj(iterator),
     AsyncIterator: asyncIterator,
     Generator: new Obj(iterator),
     AsyncGenerator: new Obj(asyncIterator),

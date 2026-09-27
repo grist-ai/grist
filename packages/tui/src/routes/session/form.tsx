@@ -9,8 +9,8 @@ import {
   type ScrollBoxRenderable,
   type TextareaRenderable,
 } from "@opentui/core"
-import open from "open"
-import { useTheme, useThemes } from "../../context/theme"
+import { openUrl } from "@opencode/util/open"
+import { useTheme } from "../../context/theme"
 import type { FormAnswer, FormField, FormValue } from "@opencode/client"
 import { useData, type FormWithLocation } from "../../context/data"
 import { useClipboard } from "../../context/clipboard"
@@ -58,9 +58,7 @@ const drafts = new Map<string, FormDraft>()
 
 export function FormPrompt(props: { form: FormWithLocation }) {
   const data = useData()
-  const themes = useThemes()
   const theme = useTheme()
-  const themeMode = themes.mode
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const keymap = Keymap.use()
@@ -480,7 +478,7 @@ export function FormPrompt(props: { form: FormWithLocation }) {
     const current = externalField()
     if (!current) return
     setStore("error", "")
-    void open(current.url)
+    void openUrl(current.url)
       .then(() => setStore("externalReady", { ...store.externalReady, [current.key]: true }))
       .catch(() => setStore("error", "Could not open the browser. Copy the URL and continue manually."))
   }
@@ -770,7 +768,7 @@ export function FormPrompt(props: { form: FormWithLocation }) {
     <box
       backgroundColor={theme.background.raised.base}
       border={["left"]}
-      borderColor={theme.hue.interactive[themeMode() === "light" ? 800 : 200]}
+      borderColor={theme.background.action.primary.focused}
       customBorderChars={SplitBorder.customBorderChars}
     >
       <box gap={1} paddingLeft={1} paddingRight={3} paddingTop={1} paddingBottom={1}>
