@@ -601,7 +601,7 @@ export const dict = {
   "error.page.action.updateTo": "Навсозӣ ба {{version}}",
   "error.page.circular": "[Даврача]",
   "error.page.report.prefix": "Лутфан дар бораи ин хато ба дастаи Grist хабар диҳед",
-  "error.page.report.discord": "дар Discord",
+  "error.page.report.github": "дар GitHub",
   "error.page.version": "Версия: {{version}}",
   "error.dev.rootNotFound":
     "Элементи решавӣ ёфт нашуд. Оё шумо онро ба index.html илова карданро фаромӯш кардаед? Ё шояд атрибути id хато навишта шудааст?",

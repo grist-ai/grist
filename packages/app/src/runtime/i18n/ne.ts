@@ -600,7 +600,7 @@ export const dict: Record<string, string> = {
   "error.page.action.updateTo": "{{version}} मा अद्यावधिक गर्नुहोस्",
   "error.page.circular": "[परिपत्र]",
   "error.page.report.prefix": "कृपया यो त्रुटि Grist टोलीलाई रिपोर्ट गर्नुहोस्",
-  "error.page.report.discord": "Discord मा",
+  "error.page.report.github": "GitHub मा",
   "error.page.version": "संस्करण: {{version}}",
   "error.dev.rootNotFound":
     "मूल तत्व फेला परेन। के तपाईंले यसलाई आफ्नो index.html मा थप्न बिर्सनुभयो? वा हुनसक्छ आईडी विशेषता गलत हिज्जे भयो?",

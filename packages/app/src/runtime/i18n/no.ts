@@ -884,7 +884,7 @@ export const dict = {
   "error.page.action.checkUpdates": "Se etter oppdateringer",
   "error.page.action.updateTo": "Oppdater til {{version}}",
   "error.page.report.prefix": "Vennligst rapporter denne feilen til Grist-teamet",
-  "error.page.report.discord": "på Discord",
+  "error.page.report.github": "på GitHub",
   "error.page.version": "Versjon: {{version}}",
 
   "error.dev.rootNotFound":

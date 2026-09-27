@@ -600,7 +600,7 @@ export const dict = {
   "error.page.action.updateTo": "Aktualizovat na {{version}}",
   "error.page.circular": "[Kruhový]",
   "error.page.report.prefix": "Nahlaste tuto chybu týmu Grist",
-  "error.page.report.discord": "dne Discord",
+  "error.page.report.github": "dne GitHub",
   "error.page.version": "Verze: {{version}}",
   "error.dev.rootNotFound":
     "Kořenový prvek nenalezen. Zapomněli jste to přidat do index.html? Nebo je možná chyba v atributu id?",

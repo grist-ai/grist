@@ -611,7 +611,7 @@ export const dict = {
   "error.page.action.updateTo": "Atnaujinkite į {{version}}",
   "error.page.circular": "[Aplinkraštis]",
   "error.page.report.prefix": "Praneškite apie šią klaidą Grist komandai",
-  "error.page.report.discord": "ant Discord",
+  "error.page.report.github": "ant GitHub",
   "error.page.version": "Versija: {{version}}",
   "error.dev.rootNotFound":
     "Šakninis elementas nerastas. Ar pamiršote jį įtraukti į index.html? O gal id atributas buvo neteisingai parašytas?",

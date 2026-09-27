@@ -599,7 +599,7 @@ export const dict: Record<string, string> = {
   "error.page.action.updateTo": "{{version}}-এ আপডেট করুন",
   "error.page.circular": "[সার্কুলার]",
   "error.page.report.prefix": "অনুগ্রহ করে এই ত্রুটিটি Grist টিমের কাছে রিপোর্ট করুন",
-  "error.page.report.discord": "Discord-এ",
+  "error.page.report.github": "GitHub-এ",
   "error.page.version": "সংস্করণ: {{version}}",
   "error.dev.rootNotFound":
     "মূল উপাদান পাওয়া যায়নি. আপনি কি আপনার index.html এ যোগ করতে ভুলে গেছেন? অথবা হয়তো আইডি অ্যাট্রিবিউট ভুল বানান হয়েছে?",

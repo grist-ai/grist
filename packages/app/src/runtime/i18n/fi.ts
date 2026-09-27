@@ -831,7 +831,7 @@ export const dict = {
   "error.page.action.updateTo": "Päivitä versioon {{version}}",
   "error.page.circular": "[Kehäviittaus]",
   "error.page.report.prefix": "Ilmoita tästä virheestä Grist-tiimille",
-  "error.page.report.discord": "Discordissa",
+  "error.page.report.github": "GitHubissa",
   "error.page.version": "Versio: {{version}}",
   "error.dev.rootNotFound":
     "Juurielementtiä ei löydy. Unohditko lisätä sen index.html-tiedostoosi? Tai ehkä id-attribuutti on kirjoitettu väärin?",

@@ -621,7 +621,7 @@ export const dict = {
   "error.page.action.updateTo": "Cập nhật lên {{version}}",
   "error.page.circular": "[Vòng lặp]",
   "error.page.report.prefix": "Vui lòng báo cáo lỗi này cho nhóm Grist",
-  "error.page.report.discord": "trên Discord",
+  "error.page.report.github": "trên GitHub",
   "error.page.version": "Phiên bản: {{version}}",
   "error.dev.rootNotFound":
     "Không tìm thấy phần tử gốc. Bạn đã quên thêm nó vào index.html của mình? Hoặc có thể thuộc tính id bị sai chính tả?",

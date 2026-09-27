@@ -616,7 +616,7 @@ export const dict = {
   "error.page.action.updateTo": "\u2068{{version}}\u2069 میں اپ ڈیٹ کریں۔",
   "error.page.circular": "[سرکلر]",
   "error.page.report.prefix": "براہ کرم Grist ٹیم کو اس غلطی کی اطلاع دیں۔",
-  "error.page.report.discord": "Discord پر",
+  "error.page.report.github": "GitHub پر",
   "error.page.version": "ورژن: \u2068{{version}}\u2069",
   "error.dev.rootNotFound":
     "روٹ عنصر نہیں ملا۔ کیا آپ اسے اپنے index.html میں شامل کرنا بھول گئے؟ یا ہو سکتا ہے کہ آئی ڈی وصف کی ہجے غلط ہو گئی ہو؟",

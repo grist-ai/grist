@@ -603,7 +603,7 @@ export const dict = {
   "error.page.action.updateTo": "Ενημέρωση σε {{version}}",
   "error.page.circular": "[Circular]",
   "error.page.report.prefix": "Αναφέρετε αυτό το σφάλμα στην ομάδα Grist",
-  "error.page.report.discord": "στο Discord",
+  "error.page.report.github": "στο GitHub",
   "error.page.version": "Έκδοση: {{version}}",
   "error.dev.rootNotFound":
     "Το στοιχείο ρίζας δεν βρέθηκε. Ξεχάσατε να το προσθέσετε στο index.html; Ή μήπως το χαρακτηριστικό id γράφτηκε λάθος;",

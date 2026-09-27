@@ -612,7 +612,7 @@ export const dict = {
   "error.page.action.updateTo": "\u2068{{version}}\u2069 އަށް އަޕްޑޭޓް ކުރާށެވެ",
   "error.page.circular": "[ސާކިއުލާ]",
   "error.page.report.prefix": "މި އެރަރ Grist ޓީމަށް ރިޕޯޓް ކުރައްވާށެވެ",
-  "error.page.report.discord": "Discord ގައި",
+  "error.page.report.github": "GitHub ގައި",
   "error.page.version": "ވަރޝަން: \u2068{{version}}\u2069",
   "error.dev.rootNotFound":
     "ރޫޓް އެލިމެންޓް ނުފެނެއެވެ. ތިބާގެ index.html އަށް އެޑް ކުރަން ހަނދާން ނެތުނީ ހެއްޔެވެ؟ ނުވަތަ id އެޓްރިބިއުޓް ގޯސްކޮށް އިމްތިހާނު ވެދާނެ ހެއްޔެވެ؟",

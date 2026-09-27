@@ -599,7 +599,7 @@ export const dict = {
   "error.page.action.updateTo": "Atjaunināt uz {{version}}",
   "error.page.circular": "[Ciklisks]",
   "error.page.report.prefix": "Lūdzu, ziņojiet par šo kļūdu Grist komandai",
-  "error.page.report.discord": "Discord",
+  "error.page.report.github": "GitHub",
   "error.page.version": "Versija: {{version}}",
   "error.dev.rootNotFound":
     "Saknes elements nav atrasts. Vai aizmirsāt to pievienot index.html? Vai arī id atribūts ir kļūdaini uzrakstīts?",

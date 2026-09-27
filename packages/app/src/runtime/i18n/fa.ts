@@ -608,7 +608,7 @@ export const dict = {
   "error.page.action.updateTo": "به روز رسانی به {{version}}",
   "error.page.circular": "[دایره]",
   "error.page.report.prefix": "لطفاً این خطا را به تیم Grist گزارش دهید",
-  "error.page.report.discord": "در Discord",
+  "error.page.report.github": "در GitHub",
   "error.page.version": "نسخه: {{version}}",
   "error.dev.rootNotFound":
     "عنصر ریشه یافت نشد. آیا فراموش کرده اید که آن را به index.html خود اضافه کنید؟ یا شاید ویژگی id اشتباه املایی داشته باشد؟",

@@ -600,7 +600,7 @@ export const dict = {
   "error.page.action.updateTo": "Përditëso në {{version}}",
   "error.page.circular": "[Rrethore]",
   "error.page.report.prefix": "Ju lutemi raportoni këtë gabim te ekipi i Grist",
-  "error.page.report.discord": "mbi Mosmarrëveshjen",
+  "error.page.report.github": "mbi Mosmarrëveshjen",
   "error.page.version": "Versioni: {{version}}",
   "error.dev.rootNotFound":
     "Elementi rrënjë nuk u gjet. A keni harruar ta shtoni atë në index.html tuaj? Apo ndoshta atributi id është shkruar gabim?",

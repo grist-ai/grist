@@ -598,7 +598,7 @@ export const dict: Record<string, string> = {
   "error.page.action.updateTo": "{{version}} වෙත යාවත්කාලීන කරන්න",
   "error.page.circular": "[චක්‍රලේඛය]",
   "error.page.report.prefix": "කරුණාකර මෙම දෝෂය Grist කණ්ඩායමට වාර්තා කරන්න",
-  "error.page.report.discord": "Discord මත",
+  "error.page.report.github": "GitHub මත",
   "error.page.version": "අනුවාදය: {{version}}",
   "error.dev.rootNotFound":
     "මූල මූලද්රව්යය හමු නොවීය. ඔබට එය ඔබගේ index.html වෙත එක් කිරීමට අමතකද? එසේත් නැතිනම් හැඳුනුම්පත වැරදි ලෙස සටහන් වී තිබේද?",

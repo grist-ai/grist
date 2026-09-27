@@ -601,7 +601,7 @@ export const dict = {
   "error.page.action.updateTo": "Ажурирајте до {{version}}",
   "error.page.circular": "[Кружни]",
   "error.page.report.prefix": "Ве молиме пријавете ја оваа грешка на тимот Grist",
-  "error.page.report.discord": "на Discord",
+  "error.page.report.github": "на GitHub",
   "error.page.version": "Верзија: {{version}}",
   "error.dev.rootNotFound":
     "Не е пронајден корен елемент. Дали заборавивте да го додадете во вашата index.html? Или можеби атрибутот id е погрешно напишан?",

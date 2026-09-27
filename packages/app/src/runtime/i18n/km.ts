@@ -609,7 +609,7 @@ export const dict = {
   "error.page.action.updateTo": "ធ្វើបច្ចុប្បន្នភាពទៅ {{version}}",
   "error.page.circular": "[សារាចរ]",
   "error.page.report.prefix": "សូមរាយការណ៍ពីកំហុសនេះទៅកាន់ក្រុម Grist",
-  "error.page.report.discord": "នៅលើ Discord",
+  "error.page.report.github": "នៅលើ GitHub",
   "error.page.version": "កំណែ៖ {{version}}",
   "error.dev.rootNotFound":
     "រកមិនឃើញធាតុឫសទេ។ តើអ្នកភ្លេចបន្ថែមវាទៅ index.html របស់អ្នកទេ? ឬប្រហែលជាគុណលក្ខណៈលេខសម្គាល់ត្រូវបានសរសេរខុស?",

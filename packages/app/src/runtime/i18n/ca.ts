@@ -602,7 +602,7 @@ export const dict = {
   "error.page.action.updateTo": "Actualitza a {{version}}",
   "error.page.circular": "[Circular]",
   "error.page.report.prefix": "Informeu aquest error a l'equip Grist.",
-  "error.page.report.discord": "a Discord",
+  "error.page.report.github": "a GitHub",
   "error.page.version": "Versió: {{version}}",
   "error.dev.rootNotFound":
     "No s'ha trobat l'element arrel. T'has oblidat d'afegir-lo al teu index.html? O potser l'atribut id s'ha escrit malament?",

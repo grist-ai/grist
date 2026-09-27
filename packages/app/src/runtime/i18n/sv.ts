@@ -932,7 +932,7 @@ export const dict = {
   "error.page.action.updateTo": "Uppdatera till {{version}}",
   "error.page.circular": "[Circular]",
   "error.page.report.prefix": "Rapportera det här felet till Grist-teamet",
-  "error.page.report.discord": "på Discord",
+  "error.page.report.github": "på GitHub",
   "error.page.version": "Version: {{version}}",
   "error.dev.rootNotFound":
     "Rotelementet hittades inte. Har du glömt att lägga till det i din index.html? Eller kanske id-attributet är felstavat?",

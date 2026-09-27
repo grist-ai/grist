@@ -632,7 +632,7 @@ export const dict = {
   "error.page.action.updateTo": "Posodobite na {{version}}",
   "error.page.circular": "[Okrožnica]",
   "error.page.report.prefix": "Prosimo, prijavite to napako ekipi Grist",
-  "error.page.report.discord": "na Discordu",
+  "error.page.report.github": "na GitHubu",
   "error.page.version": "Različica: {{version}}",
   "error.dev.rootNotFound":
     "Korenski element ni bil najden. Ste ga pozabili dodati v svoj index.html? Ali pa je morda atribut id narobe črkovan?",

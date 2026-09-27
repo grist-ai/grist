@@ -648,7 +648,7 @@ export const dict = {
   "error.page.action.checkUpdates": "檢查更新",
   "error.page.action.updateTo": "更新到 {{version}}",
   "error.page.report.prefix": "請將此錯誤回報給 Grist 團隊",
-  "error.page.report.discord": "在 Discord 上",
+  "error.page.report.github": "在 GitHub 上",
   "error.page.version": "版本: {{version}}",
 
   "error.dev.rootNotFound": "找不到根元素。你是不是忘了把它新增到 index.html？或者 id 屬性拼錯了？",
