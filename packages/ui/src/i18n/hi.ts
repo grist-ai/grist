@@ -69,8 +69,6 @@ export const dict: Record<string, string> = {
   "ui.sessionTurn.error.freeUsageExceeded": "मुफ़्त उपयोग की सीमा पार हो गई",
   "ui.sessionTurn.error.addCredits": "क्रेडिट जोड़ें",
   "dialog.usageExceeded.freeTier.title": "मुफ़्त सीमा पूरी हो गई",
-  "dialog.usageExceeded.freeTier.description":
-    "$10/month में सर्वोत्तम ओपन-सोर्स मॉडलों तक विश्वसनीय पहुँच के लिए OpenCode Go की सदस्यता लें।",
   "dialog.usageExceeded.freeTier.actionLabel": "सदस्यता लें",
   "dialog.usageExceeded.accountRateLimit.title": "Go सीमा पूरी हो गई",
   "dialog.usageExceeded.accountRateLimit.description":

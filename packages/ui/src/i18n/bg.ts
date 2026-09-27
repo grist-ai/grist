@@ -68,8 +68,6 @@ export const dict = {
   "ui.sessionTurn.error.freeUsageExceeded": "Безплатното използване е превишено",
   "ui.sessionTurn.error.addCredits": "Добавете кредити",
   "dialog.usageExceeded.freeTier.title": "Безплатният лимит е достигнат",
-  "dialog.usageExceeded.freeTier.description":
-    "Абонирайте се за OpenCode Go за надежден достъп до най-добрите модели с отворен код за $10/месец.",
   "dialog.usageExceeded.freeTier.actionLabel": "Абонирайте се",
   "dialog.usageExceeded.accountRateLimit.title": "Лимитът за движение е достигнат",
   "dialog.usageExceeded.accountRateLimit.description":

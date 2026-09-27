@@ -87,7 +87,7 @@ export const dict = {
   "command.project.index": "Switch to project {{index}}",
   "command.project.copyID": "Copy Project ID",
   "command.provider.connect": "Connect provider",
-  "command.provider.connect.description": "Sign in to OpenCode Go, OpenCode Console, or another model provider",
+  "command.provider.connect.description": "Connect the Grist gateway or another model provider",
   "command.server.switch": "Switch server",
   "command.settings.open": "Open settings",
   "command.session.previous": "Previous session",
@@ -193,39 +193,10 @@ export const dict = {
   "dialog.provider.viewAll": "Show more providers",
 
   "provider.connect.title": "Connect {{provider}}",
-  "provider.connect.opencode.name": "OpenCode Console",
-  "provider.connect.opencode.freeName": "OpenCode Free",
-  "provider.connect.console.title": "Connecting to OpenCode Console",
-  "provider.connect.console.instructions":
-    "Continue in your browser. Confirm the code shown there matches the one below.",
-  "provider.connect.console.deviceCode": "Device code",
-  "provider.connect.console.deviceCode.label": "Device code: {{code}}",
-  "provider.connect.console.waiting": "Waiting for confirmation…",
-  "provider.connect.console.browserHint": "Browser didn't open?",
-  "provider.connect.console.copyLink": "Copy sign-in link",
-  "provider.connect.console.linkCopied": "Sign-in link copied",
-  "provider.connect.console.copyFailed": "Couldn't copy the sign-in link. Open Console again to continue.",
-  "provider.connect.console.openAgain": "Open Console again",
-  "provider.connect.console.browserFailed":
-    "We couldn't open your browser. Try again or copy the sign-in link to continue.",
-  "provider.connect.console.expired": "This sign-in request has expired. Start again to get a new device code.",
-  "provider.connect.console.denied": "Access was denied in Console. Try again when you're ready to connect.",
-  "provider.connect.console.statusFailed": "Couldn't check authorization. Check your server connection and try again.",
-  "provider.connect.console.startFailed": "Couldn't start sign-in. Check your server connection and try again.",
   "provider.connect.models.title": "Connected to {{provider}}",
   "provider.connect.models.description": "Choose a model to start with. You can switch models anytime.",
   "provider.connect.models.available": "Available models",
   "provider.connect.models.list": "Models available from {{provider}}",
-  "provider.connect.console.refreshFailed":
-    "Your account is connected, but we couldn't load your models. Try again to refresh them.",
-  "provider.connect.console.connected": "OpenCode connected",
-  "provider.connect.console.noModels":
-    "Your account is connected, but this Console workspace has no available models. Check its setup in Console, then refresh.",
-  "provider.connect.console.modelsLoading": "Your models are still loading. Refresh to check again.",
-  "provider.connect.console.refresh": "Refresh models",
-  "provider.connect.console.openingBrowser": "Opening browser…",
-  "provider.connect.console.serviceAccount": "Service account?",
-  "provider.connect.console.useApiKey": "Use API key",
   "provider.connect.remote.title": "Connecting on “{{server}}”",
   "provider.connect.remote.description":
     "Your Grist credentials will be stored on this server. Models will be available through this server.",
@@ -250,13 +221,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}} API key",
   "provider.connect.apiKey.placeholder": "API key",
   "provider.connect.apiKey.required": "API key is required",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen gives you access to a curated set of reliable optimized models for coding agents.",
-  "provider.connect.opencodeZen.line2":
-    "With a single API key you'll get access to models such as Claude, GPT, Gemini, GLM and more.",
-  "provider.connect.opencodeZen.visit.prefix": "Visit ",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": " to collect your API key.",
   "provider.connect.oauth.code.visit.prefix": "Visit ",
   "provider.connect.oauth.code.visit.link": "this link",
   "provider.connect.oauth.code.visit.suffix":
@@ -278,9 +242,6 @@ export const dict = {
     "Your browser opens so you can sign in to {{provider}}. Paste the authorization code it gives you below.",
   "provider.connect.oauth.openBrowser": "Open browser",
   "provider.connect.oauth.expired": "Authorization expired",
-  "provider.connect.console.apiKey.description":
-    "Paste an API key for a service account. You create service accounts in the OpenCode Console under Keys.",
-  "provider.connect.console.apiKey.link": "Open the Console",
   "provider.connect.toast.connected.title": "{{provider}} connected",
   "provider.connect.toast.connected.description": "{{provider}} models are now available to use.",
 

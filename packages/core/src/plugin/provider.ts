@@ -54,6 +54,7 @@ export const ProviderPlugins: PluginInternal.InternalPlugin[] = [
   PoePlugin,
   PromptCacheKeyPlugin,
   SapAICorePlugin,
+  SnowflakeCortexPlugin,
   VercelPlugin,
   VenicePlugin,
   VLLMPlugin,

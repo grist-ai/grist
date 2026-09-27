@@ -230,13 +230,6 @@ export const dict = {
   "provider.connect.apiKey.label": "\u2068{{provider}}\u2069 API کلید",
   "provider.connect.apiKey.placeholder": "API کلید",
   "provider.connect.apiKey.required": "API کلید درکار ہے۔",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen آپ کو کوڈنگ ایجنٹوں کے لیے قابل اعتماد اصلاح شدہ ماڈلز کے کیوریٹڈ سیٹ تک رسائی فراہم کرتا ہے۔",
-  "provider.connect.opencodeZen.line2":
-    "ایک واحد API کلید کے ساتھ آپ Claude، GPT، Gemini، GLM اور مزید ماڈلز تک رسائی حاصل کریں گے۔",
-  "provider.connect.opencodeZen.visit.prefix": "ملاحظہ کریں ",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": " اور اپنی API کلید حاصل کریں۔",
   "provider.connect.oauth.code.visit.prefix": "ملاحظہ کریں ",
   "provider.connect.oauth.code.visit.link": "یہ لنک",
   "provider.connect.oauth.code.visit.suffix":

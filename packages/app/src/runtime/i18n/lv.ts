@@ -216,13 +216,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}} API atslēga",
   "provider.connect.apiKey.placeholder": "API atslēga",
   "provider.connect.apiKey.required": "Nepieciešama API atslēga",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen nodrošina piekļuvi atlasītiem uzticamiem optimizētiem modeļiem kodēšanas aģentiem.",
-  "provider.connect.opencodeZen.line2":
-    "Ar vienu API atslēgu iegūsiet piekļuvi tādiem modeļiem kā Claude, GPT, Gemini, GLM un citiem.",
-  "provider.connect.opencodeZen.visit.prefix": "Apmeklējiet",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": ", lai saņemtu savu API atslēgu.",
   "provider.connect.oauth.code.visit.prefix": "Apmeklējiet",
   "provider.connect.oauth.code.visit.link": "šo saiti",
   "provider.connect.oauth.code.visit.suffix":

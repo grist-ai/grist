@@ -217,13 +217,6 @@ export const dict: Record<string, string> = {
   "provider.connect.apiKey.label": "{{provider}} API কী",
   "provider.connect.apiKey.placeholder": "API কী",
   "provider.connect.apiKey.required": "API কী প্রয়োজন",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen আপনাকে কোডিং এজেন্টের জন্য নির্ভরযোগ্য অপ্টিমাইজ করা মডেলের একটি কিউরেটেড সেটে অ্যাক্সেস দেয়।",
-  "provider.connect.opencodeZen.line2":
-    "একটি API কী দিয়ে আপনি Claude, GPT, Gemini, GLM এবং আরও অনেক কিছুর মতো মডেলগুলিতে অ্যাক্সেস পাবেন৷",
-  "provider.connect.opencodeZen.visit.prefix": "ভিজিট করুন",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": "আপনার API কী সংগ্রহ করতে।",
   "provider.connect.oauth.code.visit.prefix": "ভিজিট করুন",
   "provider.connect.oauth.code.visit.link": "এই লিঙ্ক",
   "provider.connect.oauth.code.visit.suffix":

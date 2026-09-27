@@ -226,13 +226,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}} API lykill",
   "provider.connect.apiKey.placeholder": "API lykill",
   "provider.connect.apiKey.required": "API lykill er nauðsynlegur",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen veitir þér aðgang að safni af áreiðanlegum og fínstilltum gerðum fyrir kóðunarmiðla.",
-  "provider.connect.opencodeZen.line2":
-    "Með einum API lykli færðu aðgang að gerðum eins og Claude, GPT, Gemini, GLM og fleira.",
-  "provider.connect.opencodeZen.visit.prefix": "Heimsókn",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": "til að safna API lykilnum þínum.",
   "provider.connect.oauth.code.visit.prefix": "Heimsókn",
   "provider.connect.oauth.code.visit.link": "þennan hlekk",
   "provider.connect.oauth.code.visit.suffix":

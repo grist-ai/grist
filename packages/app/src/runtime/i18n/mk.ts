@@ -217,13 +217,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}} API клуч",
   "provider.connect.apiKey.placeholder": "клуч API",
   "provider.connect.apiKey.required": "Потребен е клуч API",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen ви дава пристап до куриран сет на сигурни оптимизирани модели за агенти за кодирање.",
-  "provider.connect.opencodeZen.line2":
-    "Со еден клуч API ќе добиете пристап до модели како што се Claude, GPT, Gemini, GLM и повеќе.",
-  "provider.connect.opencodeZen.visit.prefix": "Посетете",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": "да го соберете вашиот клуч API.",
   "provider.connect.oauth.code.visit.prefix": "Посетете",
   "provider.connect.oauth.code.visit.link": "оваа врска",
   "provider.connect.oauth.code.visit.suffix":

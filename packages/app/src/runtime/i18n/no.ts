@@ -556,13 +556,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}}-API-nøkkel",
   "provider.connect.apiKey.placeholder": "API-nøkkel",
   "provider.connect.apiKey.required": "API-nøkkel er påkrevd",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen gir deg tilgang til et utvalg av pålitelige optimaliserte modeller for kodeagenter.",
-  "provider.connect.opencodeZen.line2":
-    "Med én enkelt API-nøkkel får du tilgang til modeller som Claude, GPT, Gemini, GLM og flere.",
-  "provider.connect.opencodeZen.visit.prefix": "Besøk ",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": " for å hente API-nøkkelen din.",
   "provider.connect.oauth.code.visit.prefix": "Besøk ",
   "provider.connect.oauth.code.visit.link": "denne lenken",
   "provider.connect.oauth.code.visit.suffix":

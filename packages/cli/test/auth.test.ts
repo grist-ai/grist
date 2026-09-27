@@ -4,7 +4,7 @@ import { OPENCODE_VERSION } from "../src/version"
 import type { FormFields } from "@opencode/client"
 
 const consoleForm = [
-  { type: "string", key: "server", hidden: true, format: "uri", default: "https://opencode.ai/console" },
+  { type: "string", key: "server", hidden: true, format: "uri", default: "https://console.example.com" },
 ] satisfies FormFields
 
 describe("auth command", () => {
@@ -75,15 +75,15 @@ describe("auth command", () => {
     expect(requests.indexOf("/api/model/default")).toBeLessThan(requests.indexOf("/api/integration"))
   })
 
-  test("lists OpenCode Go before Zen and preserves the remaining integration order", async () => {
+  test("lists the Grist gateway first and preserves the remaining integration order", async () => {
     using server = authServer((request, url) => {
       if (url.pathname === "/api/integration") {
         return Response.json(
           located(
             [
-              { id: "opencode", name: "OpenCode Zen" },
               { id: "anthropic", name: "Anthropic" },
-              { id: "opencode-go", name: "OpenCode Go" },
+              { id: "grist", name: "Grist" },
+              { id: "openrouter", name: "OpenRouter" },
             ].map((integration) => ({
               ...integration,
               methods: [],
@@ -102,7 +102,7 @@ describe("auth command", () => {
         .trim()
         .split("\n")
         .map((line) => line.split(/\s{2,}/)[0]),
-    ).toEqual(["OpenCode Go", "OpenCode Zen", "Anthropic"])
+    ).toEqual(["Grist", "Anthropic", "OpenRouter"])
   })
 
   test("runs command authentication without interactive input", async () => {
@@ -148,7 +148,7 @@ describe("auth command", () => {
       method: "device",
       form: consoleForm,
       args: [],
-      answer: { server: "https://opencode.ai/console" },
+      answer: { server: "https://console.example.com" },
     },
     {
       id: "opencode",

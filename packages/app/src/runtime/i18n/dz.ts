@@ -226,13 +226,6 @@ export const dict: Record<string, string> = {
   "provider.connect.apiKey.label": "{{provider}} APIལྡེ་མིག།",
   "provider.connect.apiKey.placeholder": "APIལྡེ་མིག།",
   "provider.connect.apiKey.required": "APIལྡེ་མིག་དགོས་མཁོ་ཡོད།",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode ཟེན་གྱིས་ཁྱོད་ལུ་ གསང་ཡིག་ལས་ཚབ་ཚུ་གི་དོན་ལུ་ བློ་གཏད་ཅན་གྱི་ཡར་འཕེལ་ཅན་གྱི་དཔེ་ཚད་ཚུ་གི་ བཀོད་སྒྲིག་འབད་ཡོད་པའི་ཆ་ཚན་ཅིག་ལུ་འཛུལ་སྤྱོད་བྱིནམ་ཨིན།",
-  "provider.connect.opencodeZen.line2":
-    "API ལྡེ་མིག་རྐྱང་པ་གཅིག་གིས་ ཁྱོད་ཀྱིས་ Claude དང་ GPT དེ་ལས་ Gemini དང་ GLM དེ་ལས་མངམ་བཟུམ་གྱི་དཔེ་ཚད་ཚུ་ལུ་འཛུལ་སྤྱོད་འབད་ཚུགས།",
-  "provider.connect.opencodeZen.visit.prefix": "འགྱོ་ནི",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": "ཁྱོད་རའི་ API ལྡེ་མིག་བསྡུ་ལེན་འབད་ནིའི་དོན་ལུ།",
   "provider.connect.oauth.code.visit.prefix": "འགྱོ་ནི",
   "provider.connect.oauth.code.visit.link": "འབྲེལ་མཐུད་འདི།",
   "provider.connect.oauth.code.visit.suffix":

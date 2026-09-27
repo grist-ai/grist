@@ -220,13 +220,6 @@ export const dict = {
   "provider.connect.apiKey.label": "Kunci API {{provider}}",
   "provider.connect.apiKey.placeholder": "Kunci API",
   "provider.connect.apiKey.required": "Kunci API diperlukan",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen memberi anda akses kepada set model terpilih yang boleh dipercayai dan dioptimumkan untuk ejen pengekodan.",
-  "provider.connect.opencodeZen.line2":
-    "Dengan satu kunci API, anda akan mendapat akses kepada model seperti Claude, GPT, Gemini, GLM dan banyak lagi.",
-  "provider.connect.opencodeZen.visit.prefix": "Layari",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": "untuk mendapatkan kunci API anda.",
   "provider.connect.oauth.code.visit.prefix": "Layari",
   "provider.connect.oauth.code.visit.link": "pautan ini",
   "provider.connect.oauth.code.visit.suffix":

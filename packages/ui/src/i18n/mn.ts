@@ -68,8 +68,6 @@ export const dict = {
   "ui.sessionTurn.error.freeUsageExceeded": "Үнэгүй хэрэглээ хэтэрсэн",
   "ui.sessionTurn.error.addCredits": "Кредит нэмэх",
   "dialog.usageExceeded.freeTier.title": "Үнэгүй хязгаарт хүрсэн",
-  "dialog.usageExceeded.freeTier.description":
-    "OpenCode Go-д сард 10 доллараар бүртгүүлж, нээлттэй эхийн шилдэг загваруудад найдвартай хандаарай.",
   "dialog.usageExceeded.freeTier.actionLabel": "Бүртгүүлэх",
   "dialog.usageExceeded.accountRateLimit.title": "Явах хязгаарт хүрсэн",
   "dialog.usageExceeded.accountRateLimit.description":

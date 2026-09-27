@@ -226,13 +226,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}} API kulcs",
   "provider.connect.apiKey.placeholder": "API kulcs",
   "provider.connect.apiKey.required": "API kulcs szükséges",
-  "provider.connect.opencodeZen.line1":
-    "A OpenCode Zen hozzáférést biztosít a kódoló ügynökök számára megbízható, optimalizált modellek válogatott készletéhez.",
-  "provider.connect.opencodeZen.line2":
-    "Egyetlen API kulccsal hozzáférhet olyan modellekhez, mint a Claude, GPT, Gemini, GLM és még sok más.",
-  "provider.connect.opencodeZen.visit.prefix": "Látogatás",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": "hogy átvegye a API kulcsát.",
   "provider.connect.oauth.code.visit.prefix": "Látogatás",
   "provider.connect.oauth.code.visit.link": "ezt a linket",
   "provider.connect.oauth.code.visit.suffix":

@@ -227,13 +227,6 @@ export const dict = {
   "provider.connect.apiKey.label": "\u2068{{provider}}\u2069 API ކީ އެވެ",
   "provider.connect.apiKey.placeholder": "API ކީ އެވެ",
   "provider.connect.apiKey.required": "API ކީ ބޭނުންވެއެވެ",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen އިން ކޯޑިންގ އޭޖެންޓުންނަށް އިތުބާރު ހުރި އޮޕްޓިމައިޒްޑް މޮޑެލްތަކުގެ ކިއުރެޓެޑް ސެޓަކަށް އެކްސެސް ލިބިގެންދެއެވެ.",
-  "provider.connect.opencodeZen.line2":
-    "އެއް API ކީ އާއެކު Claude، GPT، Gemini، GLM އަދި އެހެނިހެން މޮޑެލްތަކަށް އެކްސެސް ލިބިގެންދާނެއެވެ.",
-  "provider.connect.opencodeZen.visit.prefix": "ޒިޔާރަތްކުރުން ",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen އެވެ",
-  "provider.connect.opencodeZen.visit.suffix": " ތިބާގެ API ކީ އެއްކުރުމަށްޓަކައެވެ.",
   "provider.connect.oauth.code.visit.prefix": "ޒިޔާރަތްކުރުން ",
   "provider.connect.oauth.code.visit.link": "މި ލިންކެވެ",
   "provider.connect.oauth.code.visit.suffix":

@@ -217,11 +217,6 @@ export const dict = {
   "provider.connect.apiKey.label": "מפתח API של {{provider}}",
   "provider.connect.apiKey.placeholder": "מפתח API",
   "provider.connect.apiKey.required": "יש צורך במפתח API",
-  "provider.connect.opencodeZen.line1": "OpenCode Zen מספק גישה למבחר מודלים אמינים שעברו אופטימיזציה עבור סוכני קוד.",
-  "provider.connect.opencodeZen.line2": "עם מפתח API יחיד תקבל גישה למודלים כגון Claude, GPT, Gemini, GLM ועוד.",
-  "provider.connect.opencodeZen.visit.prefix": "יש לעבור אל ",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": " כדי לקבל מפתח API.",
   "provider.connect.oauth.code.visit.prefix": "יש לעבור אל ",
   "provider.connect.oauth.code.visit.link": "הקישור הזה",
   "provider.connect.oauth.code.visit.suffix":

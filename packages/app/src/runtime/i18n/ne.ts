@@ -217,13 +217,6 @@ export const dict: Record<string, string> = {
   "provider.connect.apiKey.label": "{{provider}} API कुञ्जी",
   "provider.connect.apiKey.placeholder": "API कुञ्जी",
   "provider.connect.apiKey.required": "API कुञ्जी आवश्यक छ",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen ले तपाईंलाई कोडिङ एजेन्टहरूका लागि भरपर्दो अनुकूलित मोडेलहरूको क्युरेट गरिएको सेटमा पहुँच दिन्छ।",
-  "provider.connect.opencodeZen.line2":
-    "एकल API कुञ्जीको साथ तपाईंले Claude, GPT, Gemini, GLM र थप जस्ता मोडेलहरूमा पहुँच प्राप्त गर्नुहुनेछ।",
-  "provider.connect.opencodeZen.visit.prefix": "भ्रमण गर्नुहोस्",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": "तपाईँको API कुञ्जी सङ्कलन गर्न।",
   "provider.connect.oauth.code.visit.prefix": "भ्रमण गर्नुहोस्",
   "provider.connect.oauth.code.visit.link": "यो लिङ्क",
   "provider.connect.oauth.code.visit.suffix":

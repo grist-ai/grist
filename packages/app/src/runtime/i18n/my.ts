@@ -222,13 +222,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}} API သော့",
   "provider.connect.apiKey.placeholder": "API သော့",
   "provider.connect.apiKey.required": "API ကီး လိုအပ်သည်။",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen သည် သင့်အား coding အေးဂျင့်များအတွက် ယုံကြည်စိတ်ချရသော အကောင်းဆုံးပုံစံများဖြင့် စုစည်းထားသော မော်ဒယ်များကို ဝင်ရောက်ခွင့်ပေးသည်။",
-  "provider.connect.opencodeZen.line2":
-    "API သော့တစ်ခုတည်းဖြင့် သင်သည် Claude၊ GPT၊ Gemini၊ GLM နှင့် အခြားအရာများကဲ့သို့သော မော်ဒယ်များသို့ ဝင်ရောက်ခွင့်ရရှိမည်ဖြစ်သည်။",
-  "provider.connect.opencodeZen.visit.prefix": "သွားရောက်ကြည့်ရှုရန်",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": " သို့သွား၍ သင်၏ API key ကို ရယူပါ။",
   "provider.connect.oauth.code.visit.prefix": "လည်ပတ်ပါ။",
   "provider.connect.oauth.code.visit.link": "ဤလင့်ခ်",
   "provider.connect.oauth.code.visit.suffix":

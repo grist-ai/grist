@@ -216,13 +216,6 @@ export const dict = {
   "provider.connect.apiKey.label": "{{provider}} API გასაღები",
   "provider.connect.apiKey.placeholder": "API გასაღები",
   "provider.connect.apiKey.required": "API გასაღები საჭიროა",
-  "provider.connect.opencodeZen.line1":
-    "OpenCode Zen გაძლევთ წვდომას კოდირების აგენტებისთვის საიმედო ოპტიმიზირებული მოდელების კურირებულ კომპლექტზე.",
-  "provider.connect.opencodeZen.line2":
-    "ერთი API გასაღებით თქვენ მიიღებთ წვდომას ისეთ მოდელებზე, როგორიცაა Claude, GPT, Gemini, GLM და სხვა.",
-  "provider.connect.opencodeZen.visit.prefix": "ეწვიეთ ",
-  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": " თქვენი API გასაღების შესაგროვებლად.",
   "provider.connect.oauth.code.visit.prefix": "ეწვიეთ ",
   "provider.connect.oauth.code.visit.link": "ეს ბმული",
   "provider.connect.oauth.code.visit.suffix":
