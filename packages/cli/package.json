@@ -27,6 +27,7 @@
     "@agentclientprotocol/sdk": "1.2.1",
     "@clack/prompts": "1.0.0-alpha.1",
     "@effect/platform-node": "catalog:",
+    "@grist-ai/logic": "workspace:*",
     "@grist-ai/plugin": "workspace:*",
     "@opencode/client": "workspace:*",
     "@opencode/core": "workspace:*",

@@ -284,6 +284,15 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       description: "List all available models",
       params: ServerParams,
     }),
+    Spec.make("doctor", {
+      description: "Check Grist installation health",
+      params: {
+        json: Flag.boolean("json").pipe(
+          Flag.withDescription("Emit machine-readable JSON instead of the checklist"),
+          Flag.withDefault(false),
+        ),
+      },
+    }),
     Spec.make("stats", {
       description: "Show shareable usage statistics",
       params: {
