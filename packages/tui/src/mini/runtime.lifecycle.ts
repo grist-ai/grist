@@ -174,7 +174,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
   if (mono) renderer.on(CliRenderEvents.EXTERNAL_OUTPUT, monoSnapshot)
   const setTitle = (title?: string) => {
     if (input.host.platform !== "linux") return
-    if (!title || isFallbackTitle(title)) return renderer.setTerminalTitle("OpenCode")
+    if (!title || isFallbackTitle(title)) return renderer.setTerminalTitle("Grist")
     renderer.setTerminalTitle(`OC | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
   }
   setTitle(input.sessionTitle)

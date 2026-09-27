@@ -68,7 +68,7 @@ export function DialogPair() {
           </box>
           <Show when={value.loopback}>
             <text fg={theme.text.muted} wrapMode="word">
-              Run `opencode service set hostname 0.0.0.0` to access the service remotely.
+              Run `grist service set hostname 0.0.0.0` to access the service remotely.
             </text>
           </Show>
         </box>

@@ -1,13 +1,13 @@
 import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
-import { OPENCODE_ARTIFACT, OPENCODE_CHANNEL, OPENCODE_LOCAL, OPENCODE_VERSION } from "../version"
+import { OPENCODE_CHANNEL, OPENCODE_LOCAL, OPENCODE_VERSION } from "../version"
 import { Context, Duration, Effect, FileSystem, Layer, Option, Ref, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { parse, type ParseError } from "jsonc-parser"
 import path from "node:path"
 import { stripVTControlCharacters } from "node:util"
 import { RetainedImage } from "./retained-image"
-import { action, parseReleaseVersion, type Policy } from "./updater-action"
+import { action, compareRelease, parseReleaseVersion, type Policy } from "./updater-action"
 import { errorMessage } from "../util/error"
 
 export const methods = ["curl", "npm", "pnpm", "bun", "yarn", "vp", "brew"] as const
@@ -128,7 +128,6 @@ const make = Effect.gen(function* () {
   const global = yield* Global.Service
   const appProcess = yield* AppProcess.Service
   const installedVersion = yield* Ref.make(OPENCODE_VERSION)
-  const channel = OPENCODE_CHANNEL.replace(/[^a-zA-Z0-9._-]/g, "-")
   const installedPackage = yield* Effect.gen(function* () {
     const executable = yield* fs.realPath(process.execPath)
     const directory = path.dirname(path.dirname(executable))
@@ -136,7 +135,7 @@ const make = Effect.gen(function* () {
       .readFileString(path.join(directory, "package.json"))
       .pipe(Effect.flatMap((text) => Effect.try(() => JSON.parse(text))))
     // Source invocations run inside Bun or Node, which may themselves be npm packages.
-    if (!/^@opencode(?:-ai)?\/cli(?:-node)?$/.test(manifest.name)) return
+    if (!/^(?:@opencode(?:-ai)?\/cli(?:-node)?|grist-ai|grist-(?:linux|darwin|windows)-[a-z0-9]+(?:-musl)?)$/.test(manifest.name)) return
     if (Object.values(manifest.bin ?? {}).some((bin) => path.resolve(directory, bin) === executable))
       return manifest.name
   }).pipe(Effect.orElseSucceed(() => undefined))
@@ -232,16 +231,25 @@ const make = Effect.gen(function* () {
     }
   }
 
+  // Grist has no update-info service; the latest release for an npm-style
+  // install is whatever the registry reports for the installed package.
+  // Curl/brew installs have no automated channel, so they report unavailable.
   const release = Effect.fnUntraced(function* (method?: Method) {
-    const distribution = method === "brew" ? "homebrew" : "npm"
+    if (!installedPackage || method === "curl" || method === "brew") {
+      return yield* Effect.fail(
+        new UpgradeError({
+          title: "Grist updates are not automated for this install",
+          detail:
+            "Automatic updates are only supported for npm-style installs. See https://github.com/grist-ai/grist/releases for the latest Grist release.",
+          retry: "Check the release page for the latest Grist version.",
+        }),
+      )
+    }
     const response = yield* Effect.tryPromise({
       try: (signal) =>
-        fetch(
-          `https://opencode.ai/update/api/${encodeURIComponent(channel)}/${encodeURIComponent(OPENCODE_ARTIFACT)}/${distribution}?current=${encodeURIComponent(OPENCODE_VERSION)}`,
-          {
-            signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
-          },
-        ),
+        fetch(`https://registry.npmjs.org/${encodeURIComponent(installedPackage)}/latest`, {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+        }),
       catch: (cause) =>
         new UpgradeError(
           {
@@ -256,38 +264,36 @@ const make = Effect.gen(function* () {
       return yield* Effect.fail(
         new UpgradeError({
           title: "Could not check for Grist updates",
-          detail: `The update service returned HTTP ${response.status}.`,
+          detail: `The npm registry returned HTTP ${response.status}.`,
           retry: "Try again in a few minutes.",
         }),
       )
-    const data: { version: string; metadata?: { package?: string } } = yield* Effect.tryPromise({
+    const data: { version?: unknown } = yield* Effect.tryPromise({
       try: () => response.json(),
       catch: (cause) =>
         new UpgradeError(
           {
-            title: "Could not read the OpenCode update information",
+            title: "Could not read the Grist update information",
             detail: errorDetail(cause),
             retry: "Try again in a few minutes.",
           },
           { cause },
         ),
     })
-    if (!data.metadata?.package)
+    if (typeof data.version !== "string" || !parseReleaseVersion(data.version))
       return yield* Effect.fail(
         new UpgradeError({
-          title: "Could not read the OpenCode update information",
-          detail: "The update service returned incomplete release information.",
+          title: "Could not read the Grist update information",
+          detail: "The npm registry returned an invalid version.",
           retry: "Try again in a few minutes.",
         }),
       )
-    return { package: data.metadata.package, version: data.version }
+    return { package: installedPackage, version: data.version }
   })
 
-  const latest = () =>
-    method().pipe(
-      Effect.flatMap(release),
-      Effect.map((data) => data.version),
-    )
+  // The latest version only needs the installed package name; the install
+  // method only matters when actually performing the upgrade.
+  const latest = () => release().pipe(Effect.map((data) => data.version))
 
   const temporaryDirectory = (prefix: string) =>
     Effect.acquireRelease(fs.makeTempDirectory({ directory: global.cache, prefix }), (directory) =>
@@ -317,7 +323,7 @@ const make = Effect.gen(function* () {
     const failure = (detail: string, cause?: unknown) =>
       new UpgradeError(
         {
-          title: input.title ?? `${installNames[input.method]} could not install OpenCode`,
+          title: input.title ?? `${installNames[input.method]} could not install Grist`,
           detail,
           command: (input.displayCommand ?? input.command).join(" "),
           retry: input.retry ?? "Fix the issue above, then run grist upgrade again.",
@@ -344,29 +350,29 @@ const make = Effect.gen(function* () {
   const upgrade = Effect.fnUntraced(function* (method: Method, input: string) {
     if (!parseReleaseVersion(input)) return yield* Effect.fail(new Error(`Invalid version: ${input}`))
     const version = input.trim().replace(/^v/, "")
+    const current = yield* Ref.get(installedVersion)
+    // Never install a version that is not newer than the installed one; the
+    // registry's /latest can lag behind (or predate) a locally built binary.
+    if (compareRelease(current, version) !== 1)
+      return yield* Effect.fail(new Error(`Grist ${version} is not newer than the installed ${current}.`))
+    if (method === "curl" || method === "brew") {
+      return yield* Effect.fail(
+        new UpgradeError({
+          title: "Grist updates are not automated for this install",
+          detail:
+            "Automatic updates are only supported for npm-style installs. See https://github.com/grist-ai/grist/releases for the latest Grist release.",
+          retry: "Check the release page for the latest Grist version.",
+        }),
+      )
+    }
     const packageName = (yield* release(method)).package
     const target = `${packageName}@${version}`
-    if (installedPackage && packageName !== installedPackage && (method === "pnpm" || method === "yarn")) {
-      return yield* Effect.fail(new Error(`Reinstall ${target} with ${method} to migrate from ${installedPackage}.`))
-    }
+    // packageName is always the installed package now; there is no cross-package migration.
     const commands: Record<Exclude<Method, "bun" | "curl" | "brew">, string[]> = {
-      // Keep the old package: uninstalling it can unlink the replacement command.
-      npm: [
-        "npm",
-        "install",
-        "--global",
-        ...((OPENCODE_ARTIFACT === "cli" && !installedPackage?.endsWith("/cli-node")) ||
-        (installedPackage && packageName !== installedPackage)
-          ? ["--force"]
-          : []),
-        target,
-      ],
+      npm: ["npm", "install", "--global", target],
       pnpm: ["pnpm", "add", "--global", `--allow-build=${packageName}`, target],
       yarn: ["yarn", "global", "add", target],
-      vp:
-        installedPackage && packageName !== installedPackage
-          ? ["vp", "install", "-g", "--force", target]
-          : ["vp", "update", "-g", target],
+      vp: ["vp", "update", "-g", target],
     }
     yield* Effect.scoped(
       Effect.gen(function* () {
@@ -383,28 +389,6 @@ const make = Effect.gen(function* () {
             }),
           )
         }
-        if (method === "curl") {
-          yield* fs.makeDirectory(global.cache, { recursive: true })
-          const directory = yield* temporaryDirectory("update-")
-          const installer = path.join(directory, "install")
-          yield* runUpgrade({
-            method,
-            command: ["curl", "-fsSL", "-o", installer, "https://opencode.ai/v2/install"],
-            displayCommand: ["curl", "-fsSL", "https://opencode.ai/v2/install"],
-            title: "Could not download the Grist installer",
-            retry: "Check your network, then run grist upgrade again.",
-          })
-          return yield* retaining(
-            method,
-            runUpgrade({
-              method,
-              command: ["bash", installer, "--version", version, "--no-modify-path"],
-              displayCommand: ["opencode", "upgrade", version, "--method", "curl"],
-              title: "The Grist installer failed",
-            }),
-          )
-        }
-        if (method === "brew") return yield* runUpgrade({ method, command: ["brew", "upgrade", packageName] })
         return yield* retaining(method, runUpgrade({ method, command: commands[method] }))
       }),
     ).pipe(
@@ -413,7 +397,7 @@ const make = Effect.gen(function* () {
           ? cause
           : new UpgradeError(
               {
-                title: "Could not prepare the OpenCode upgrade",
+                title: "Could not prepare the Grist upgrade",
                 detail: errorDetail(cause),
                 retry: "Fix the issue above, then run grist upgrade again.",
               },
@@ -463,7 +447,7 @@ const make = Effect.gen(function* () {
     const current = yield* Ref.get(installedVersion)
     yield* upgrade(detected, version)
     yield* Ref.set(installedVersion, version)
-    yield* Effect.logInfo("updated OpenCode", { from: current, to: version, method: detected })
+    yield* Effect.logInfo("updated Grist", { from: current, to: version, method: detected })
     return true
   })
 
@@ -475,7 +459,13 @@ const make = Effect.gen(function* () {
     if (OPENCODE_LOCAL)
       return {
         type: "unavailable" as const,
-        message: "This build runs from a source checkout. Use an installed OpenCode release to check for updates.",
+        message: "This build runs from a source checkout. Use an installed Grist release to check for updates.",
+      }
+    if (!installedPackage)
+      return {
+        type: "unavailable" as const,
+        message:
+          "Automatic updates are not supported for this install method. See https://github.com/grist-ai/grist/releases for the latest Grist release.",
       }
     const version = yield* latest()
     if (!parseReleaseVersion(version)) return yield* Effect.fail(new Error(`Invalid version: ${version}`))
@@ -507,4 +497,4 @@ const make = Effect.gen(function* () {
 export const layer = Layer.effect(Service, make)
 
 export * as Updater from "./updater"
-export { action, type Action, type Policy } from "./updater-action"
+export { action, compareRelease, type Action, type Policy } from "./updater-action"

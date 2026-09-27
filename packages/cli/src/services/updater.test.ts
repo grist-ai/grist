@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { action } from "./updater-action"
+import { action, compareRelease } from "./updater-action"
 import { decodePolicy } from "./updater"
 
 describe("updater", () => {
@@ -36,15 +36,18 @@ describe("updater", () => {
     expect(action("1.2.3", "1.2.3", "notify")).toBe("none")
   })
 
-  test("reports when latest is lower (rollback)", () => {
-    expect(action("1.2.4", "1.2.3", "notify")).toBe("notify")
+  test("never reports an older release as an update", () => {
+    expect(action("1.2.4", "1.2.3", "notify")).toBe("none")
+    expect(action("2.0.18", "0.1.9", "notify")).toBe("none")
+    expect(action("1.2.3", "1.2.3", "notify")).toBe("none")
   })
 
   test("accepts strict release version variants", () => {
     expect(action("v1.2.3", " 1.2.4\n", "notify")).toBe("notify")
     expect(action("1.2.3-alpha.1", "1.2.3-alpha.2", "notify")).toBe("notify")
     expect(action("0.0.0-dev-17403", "0.0.0-dev-17403.2", "notify")).toBe("notify")
-    expect(action("0.0.0-next-17403", "0.0.0-beta-17404", "notify")).toBe("notify")
+    expect(action("0.0.0-beta-17404", "0.0.0-next-17403", "notify")).toBe("notify")
+    expect(action("0.0.0-next-17403", "0.0.0-beta-17404", "notify")).toBe("none")
     expect(action("1.2.3+old", "1.2.3+new", "notify")).toBe("none")
     expect(action("v1.2.3+old", "1.2.3", "notify")).toBe("none")
   })
@@ -75,13 +78,25 @@ describe("updater", () => {
     expect(action("9007199254740990.0.0", "9007199254740991.0.0", "notify")).toBe("notify")
   })
 
-  test("preserves equality for oversized numeric prerelease identifiers", () => {
-    expect(action("1.0.0-9007199254740992", "1.0.0-9007199254740993", "notify")).toBe("none")
+  test("orders oversized numeric prerelease identifiers without precision loss", () => {
+    expect(action("1.0.0-9007199254740992", "1.0.0-9007199254740993", "notify")).toBe("notify")
+    expect(action("1.0.0-9007199254740993", "1.0.0-9007199254740992", "notify")).toBe("none")
     expect(action("1.0.0-9007199254740991", "1.0.0-9007199254740992", "notify")).toBe("notify")
   })
 
   test("rejects versions longer than semver's limit before trimming", () => {
     expect(action("1.2.3", `${" ".repeat(251)}1.2.3`, "notify")).toBe("none")
     expect(action("1.2.3", `1.2.4+${"a".repeat(250)}`, "notify")).toBe("notify")
+  })
+
+  test("compareRelease orders versions", () => {
+    expect(compareRelease("1.2.3", "1.2.4")).toBeGreaterThan(0)
+    expect(compareRelease("1.2.4", "1.2.3")).toBeLessThan(0)
+    expect(compareRelease("1.2.3", "1.2.3")).toBe(0)
+    expect(compareRelease("1.2.3-alpha", "1.2.3")).toBeGreaterThan(0)
+    expect(compareRelease("1.2.3", "1.2.3-alpha")).toBeLessThan(0)
+    expect(compareRelease("1.2.3-alpha.1", "1.2.3-alpha.2")).toBeGreaterThan(0)
+    expect(compareRelease("2.0.18", "0.1.9")).toBeLessThan(0)
+    expect(compareRelease("1.2.3", "not-a-version")).toBeUndefined()
   })
 })
