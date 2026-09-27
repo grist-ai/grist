@@ -22,7 +22,7 @@ import {
   wireFullscreen,
   wireZoom,
 } from "./appearance"
-import { registerRendererProtocol, setProtocolReporter } from "./protocol"
+import { registerRendererProtocol, registerSpeechProtocol, setProtocolReporter } from "./protocol"
 import { loadWindow } from "./scheme"
 import { createWindowRegistry } from "./registry"
 import { makeWindowRecovery } from "./recovery"
@@ -50,6 +50,7 @@ export {
   getBackgroundColor,
   getPinchZoomEnabled,
   registerRendererProtocol,
+  registerSpeechProtocol,
   setProtocolReporter,
   setBackgroundColor,
   setDockIcon,
