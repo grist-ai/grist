@@ -45,7 +45,7 @@ export default Runtime.handler(
         `  ssh -L ${url.port}:${url.hostname}:${url.port} <host>`,
         `  If port ${url.port} is busy locally, forward another port and use it in the link.`,
         "",
-        "  To connect from other devices, run `opencode service set hostname 0.0.0.0`.",
+        "  To connect from other devices, run `grist service set hostname 0.0.0.0`.",
         "",
       ].join(EOL) + EOL,
     )
