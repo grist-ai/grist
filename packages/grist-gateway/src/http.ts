@@ -60,7 +60,6 @@ const SITE_FILES: Record<string, string> = {
   "favicon.svg": "image/svg+xml",
   "favicon-32.png": "image/png",
   "apple-touch-icon.png": "image/png",
-  "og-image.png": "image/png",
   "robots.txt": "text/plain; charset=utf-8",
   "sitemap.xml": "application/xml; charset=utf-8",
 }
