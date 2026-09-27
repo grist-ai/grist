@@ -945,7 +945,7 @@ describe("Config", () => {
               {
                 type: "entries",
                 path: tmp.path,
-                names: [".agents", ".claude", ".opencode", "opencode.json", "opencode.jsonc"],
+                names: [".agents", ".claude", ".grist", ".opencode", "grist.json", "grist.jsonc", "opencode.json", "opencode.jsonc"],
               },
             ])
           }).pipe(Effect.provide(testLayer(tmp.path, undefined, undefined, undefined, Watcher.testLayer)))
@@ -993,6 +993,29 @@ describe("Config", () => {
                 .filter((entry) => entry.type === "document")
                 .map((document) => document.info.$schema),
             ).toEqual(["base", "last"])
+          }).pipe(Effect.provide(testLayer(tmp.path)))
+        }),
+      ),
+    ),
+  )
+
+  it.live("prefers grist JSON config over opencode JSON config", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Promise.all([
+              fs.writeFile(path.join(tmp.path, "opencode.json"), JSON.stringify({ $schema: "opencode" })),
+              fs.writeFile(path.join(tmp.path, "grist.json"), JSON.stringify({ $schema: "grist" })),
+            ]),
+          )
+          return yield* Effect.gen(function* () {
+            const config = yield* Config.Service
+            const entries = yield* config.entries()
+            const schemas = entries.filter((entry) => entry.type === "document").map((document) => document.info.$schema)
+            // Later documents win; grist.json loads after opencode.json.
+            expect(schemas).toEqual(["opencode", "grist"])
+            expect(Config.latest(entries, "$schema")).toBe("grist")
           }).pipe(Effect.provide(testLayer(tmp.path)))
         }),
       ),
@@ -1511,7 +1534,7 @@ describe("Config", () => {
             expect(yield* watcher.subscriptions()).toContainEqual({
               path: tmp.path,
               type: "entries",
-              names: [".agents", ".claude", ".opencode", "opencode.json", "opencode.jsonc"],
+              names: [".agents", ".claude", ".grist", ".opencode", "grist.json", "grist.jsonc", "opencode.json", "opencode.jsonc"],
             })
           }).pipe(Effect.provide(testLayer(tmp.path)))
         }),
