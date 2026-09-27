@@ -31,6 +31,27 @@ injected into session context; **escalate-only model switching** mid-run;
 Vercel AI Gateway, or any OpenAI-compatible endpoint) with zero markup. Grist
 never holds your inference budget.
 
+## New in v2
+
+Grist moved from a surgical fork of OpenCode v1 to a first-class OpenCode v2
+plugin (now tracking upstream v2.0.18). What changed:
+
+- **Zero-config plugin** — `@grist-ai/plugin` is baked into the `grist`
+  binary. Every session loads the Jev gate, doctrine injector, and control
+  plane with no user setup. The only upstream edit is one additive registry
+  function, so future upstream releases merge as plain tags — no fork diff
+  to carry.
+- **Full CLI surface** — the v2 move brings the whole OpenCode command set:
+  `grist auth`, `grist models`, `grist debug`, `grist service`,
+  `grist upgrade`, `grist stats`, `grist session`, `grist mcp`, `grist pair`,
+  `grist reload`, and `grist serve` (API + web UI). The utility commands
+  arrive as upstream features, not Grist code.
+- **Managed background service** — `grist serve --service` elects a single
+  server; `grist run` is a thin client over it. No more ad-hoc servers.
+- **Grist identity** — config discovery prefers `grist.json`/`grist.jsonc`
+  and `.grist/`, and global state lives under `~/.grist`, `~/.config/grist`,
+  `~/.cache/grist`, `~/.local/state/grist`, and `~/.local/share/grist`.
+
 ## The ladder
 
 Four cost-tiered rungs. The gate picks per task — never pin one with `-m`
@@ -124,7 +145,7 @@ startup behind the `GRIST_BINARY` build define.
 
 ```bash
 export TURBO_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1
-export PATH="$HOME/workspace/tools/bun-linux-x64:$PATH"  # bun ^1.3.14
+export PATH="$HOME/workspace/tools/bun-linux-x64-1.4.2:$PATH"  # bun ^1.4.2
 
 bun install --os="*" --cpu="*"   # full-platform install (builds need every pty binary)
 bun typecheck                    # per package: bun typecheck from the package dir
@@ -139,7 +160,7 @@ bun run --cwd packages/grist build:all
 ## Upstream
 
 Forked from [anomalyco/opencode](https://github.com/anomalyco/opencode) at
-v2.0.9 (upstream `v2` branch). Rebase strategy: keep the Grist surface to
+v2.0.18 (upstream `v2` branch). Rebase strategy: keep the Grist surface to
 `packages/grist*`, `skills/grist`, and the additive instance-plugin registry —
 everything else stays pristine upstream.
 

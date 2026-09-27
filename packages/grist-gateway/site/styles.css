@@ -937,6 +937,40 @@ nav a:visited,
   margin-bottom: 2.4rem;
 }
 
+.v2-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.75rem 3rem;
+}
+
+.v2-list li {
+  border-top: 1px solid var(--line);
+  padding-top: 1.1rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.v2-list li b {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--fg);
+}
+
+.v2-list li code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+}
+
+@media (max-width: 760px) {
+  .v2-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 .solpi-block {
   max-width: none;
   background: #080808;

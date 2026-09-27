@@ -397,6 +397,46 @@ grist</pre>
         </p>
       </section>
 
+      <section class="band" id="v2">
+        <div class="band-copy">
+          <p class="eyebrow">[ new in v2 ]</p>
+          <h2>Rebuilt on OpenCode v2.</h2>
+          <p class="lede">
+            Grist moved from a surgical fork to a first-class OpenCode plugin
+            (tracking upstream v2.0.18). The gate, the ladder, and the doctrine
+            are unchanged — everything around them got better.
+          </p>
+        </div>
+        <ul class="v2-list">
+          <li>
+            <b>Zero-config plugin.</b> The harness ships baked into the
+            <code>grist</code> binary — every session loads the Jev gate,
+            doctrine, and control plane with no setup. One additive upstream
+            hook is the entire fork surface, so new upstream releases merge
+            as plain tags.
+          </li>
+          <li>
+            <b>The full CLI, inherited.</b> <code>grist auth</code>,
+            <code>grist models</code>, <code>grist debug</code>,
+            <code>grist service</code>, <code>grist upgrade</code>,
+            <code>grist stats</code>, <code>grist session</code>,
+            <code>grist mcp</code> — v2's command surface arrives as upstream
+            features, not Grist code to maintain.
+          </li>
+          <li>
+            <b>Managed background service.</b> <code>grist serve --service</code>
+            elects a single server; <code>grist run</code> is a thin client
+            over it. No more ad-hoc servers lingering after a reinstall.
+          </li>
+          <li>
+            <b>Grist identity.</b> Config discovery prefers
+            <code>grist.json</code> and <code>.grist/</code>, and global state
+            lives under <code>~/.grist</code> — the harness finally has its
+            own name on disk.
+          </li>
+        </ul>
+      </section>
+
       <section class="waitlist" id="get-started">
         <div>
           <p class="eyebrow">[ get started ]</p>
