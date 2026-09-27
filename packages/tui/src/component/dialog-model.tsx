@@ -192,10 +192,8 @@ export function sortModelOptions<
   },
 >(options: T[], grouped = true) {
   return options.toSorted((a, b) => {
-    const provider = grouped
-      ? Number(b.providerID === "opencode-go") - Number(a.providerID === "opencode-go") ||
-        Number(b.providerID === "opencode") - Number(a.providerID === "opencode")
-      : 0
+    // The Grist gateway is the only built-in provider: it always sorts first.
+    const provider = grouped ? Number(b.providerID === "grist") - Number(a.providerID === "grist") : 0
     if (provider !== 0) return provider
 
     const name = grouped ? (a.providerName ?? "").localeCompare(b.providerName ?? "") : 0

@@ -201,9 +201,6 @@ export const dict = {
   "dialog.provider.group.other": "دیگر",
   "dialog.provider.custom.label": "حسب ضرورت OpenAI سے ہم آہنگ فراہم کنندہ",
   "dialog.provider.tag.recommended": "تجویز کردہ",
-  "dialog.provider.opencode.note": "کیوریٹ شدہ ماڈلز بشمول Claude، GPT، Gemini اور مزید",
-  "dialog.provider.opencode.tagline": "قابل اعتماد آپٹمائزڈ ماڈلز",
-  "dialog.provider.opencodeGo.tagline": "سب کے لیے کم لاگت کی رکنیت",
   "dialog.provider.copilot.note": "GitHub Copilot کے ذریعے کوڈنگ امداد کے لیے AI ماڈلز",
   "dialog.provider.openai.note": "تیز رفتار اور مؤثر عمومی AI کاموں کے لیے GPT ماڈلز",
   "dialog.provider.google.note": "تیز، منظم جوابات کے لیے Gemini ماڈل",
@@ -529,7 +526,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "اگلا",
   "dialog.releaseNotes.action.hideFuture": "مستقبل میں یہ نہ دکھائیں۔",
   "dialog.releaseNotes.media.alt": "ریلیز کا پیش منظر",
-  "dialog.usageExceeded.dontShowAgain": "دوبارہ نہ دکھائیں",
 
   "context.breakdown.title": "سیاق و سباق کی تفصیل",
   "context.breakdown.note": 'ان پٹ ٹوکنز کی تخمینی تقسیم۔ "دیگر" میں ٹول کی تعریفیں اور اضافی بوجھ شامل ہیں۔',

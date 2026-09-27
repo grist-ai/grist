@@ -220,9 +220,6 @@ export const dict = {
   "dialog.provider.group.other": "drugo",
   "dialog.provider.custom.label": "Ponudnik po meri, združljiv z OpenAI",
   "dialog.provider.tag.recommended": "Priporočeno",
-  "dialog.provider.opencode.note": "Izbrani modeli, vključno z Claude, GPT, Gemini in drugimi",
-  "dialog.provider.opencode.tagline": "Zanesljivi optimizirani modeli",
-  "dialog.provider.opencodeGo.tagline": "Poceni naročnina za vsakogar",
   "dialog.provider.copilot.note": "Modeli AI za pomoč pri kodiranju prek GitHub Copilot",
   "dialog.provider.openai.note": "Modeli GPT za hitre in zmogljive splošne naloge z umetno inteligenco",
   "dialog.provider.google.note": "Modeli Gemini za hitre, strukturirane odzive",
@@ -1122,7 +1119,6 @@ export const dict = {
   "workspace.reset.archived.one": "1 seja bo arhivirana.",
   "workspace.reset.archived.many": "{{count}} seje bodo arhivirane.",
   "workspace.reset.note": "To bo ponastavilo delovni prostor, da bo ustrezal privzeti veji.",
-  "dialog.usageExceeded.dontShowAgain": "Ne prikaži več",
   "provider.disconnect.toast.noCredentials.description":
     "Za {{provider}} ni bilo mogoče najti odstranljivih poverilnic.",
   "provider.disconnect.toast.failed.description": "Odklop {{provider}} ni uspel.",

@@ -526,9 +526,6 @@ export const dict = {
   "dialog.provider.group.other": "Anders",
   "dialog.provider.custom.label": "Aangepaste OpenAI-compatibele aanbieder",
   "dialog.provider.tag.recommended": "Aanbevolen",
-  "dialog.provider.opencode.note": "Samengestelde modellen, waaronder Claude, GPT, Gemini en meer",
-  "dialog.provider.opencode.tagline": "Betrouwbare geoptimaliseerde modellen",
-  "dialog.provider.opencodeGo.tagline": "Goedkoop abonnement voor iedereen",
   "dialog.provider.copilot.note": "AI-modellen voor codeerondersteuning via GitHub Copilot",
   "dialog.provider.openai.note": "GPT-modellen voor snelle, capabele algemene AI-taken",
   "dialog.provider.google.note": "Gemini-modellen voor snelle, gestructureerde reacties",
@@ -853,7 +850,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "Volgende",
   "dialog.releaseNotes.action.hideFuture": "Laat deze in de toekomst niet zien",
   "dialog.releaseNotes.media.alt": "Releasevoorbeeld",
-  "dialog.usageExceeded.dontShowAgain": "Niet meer weergeven",
 
   "context.breakdown.title": "Contextanalyse",
   "context.breakdown.note":

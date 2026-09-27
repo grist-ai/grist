@@ -2,7 +2,7 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { HttpClientRequest } from "effect/unstable/http"
 import { Evaluation, EvaluationClient } from "../src/experimental.js"
-import { OpenCodeZen, OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
+import { OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
 import { it } from "./lib/effect.js"
 import { dynamicResponse } from "./lib/http.js"
 
@@ -115,9 +115,9 @@ describe("experimental Evaluation", () => {
     ),
   )
 
-  it.effect("configures the OpenCode Zen System One endpoint", () =>
+  it.effect("configures a custom System One endpoint", () =>
     Evaluation.run({
-      model: OpenCodeZen.configure({ apiKey: "zen-key", baseURL: "https://zen.test/v1" }).experimental.evaluation(
+      model: TypeSafeAI.configure({ apiKey: "typesafe-key", baseURL: "https://typesafe.test/v1" }).experimental.evaluation(
         "jev-1.13",
       ),
       state: "hello",
@@ -127,7 +127,7 @@ describe("experimental Evaluation", () => {
         Effect.sync(() => {
           expect(response.answers.greeting.probability).toBe(0.99)
           expect(response.usage?.providerMetadata).toEqual({
-            opencode: { input_tokens: 10, output_tokens: 2 },
+            typesafe: { input_tokens: 10, output_tokens: 2 },
           })
         }),
       ),
@@ -135,8 +135,8 @@ describe("experimental Evaluation", () => {
         EvaluationClient.layer.pipe(
           Layer.provide(
             dynamicResponse((input) => {
-              expect(input.request.url).toBe("https://zen.test/v1/systemone")
-              expect(input.request.headers.authorization).toBe("Bearer zen-key")
+              expect(input.request.url).toBe("https://typesafe.test/v1/systemone")
+              expect(input.request.headers.authorization).toBe("Bearer typesafe-key")
               return Effect.succeed(
                 input.respond(
                   JSON.stringify({

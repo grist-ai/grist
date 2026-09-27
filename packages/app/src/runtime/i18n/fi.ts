@@ -417,9 +417,6 @@ export const dict = {
   "dialog.provider.group.other": "Muut",
   "dialog.provider.custom.label": "Mukautettu OpenAI-yhteensopiva palveluntarjoaja",
   "dialog.provider.tag.recommended": "Suositeltu",
-  "dialog.provider.opencode.note": "Kuratoituja malleja, kuten Claude, GPT, Gemini ja muita",
-  "dialog.provider.opencode.tagline": "Luotettavat optimoidut mallit",
-  "dialog.provider.opencodeGo.tagline": "Edullinen tilaus kaikille",
   "dialog.provider.copilot.note": "AI-malleja koodausapuun GitHub Copilotin kautta",
   "dialog.provider.openai.note": "GPT-mallit nopeisiin, suorituskykyisiin yleisiin tekoälytehtäviin",
   "dialog.provider.google.note": "Gemini-mallit nopeisiin, jäsenneltyihin vastauksiin",
@@ -743,7 +740,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "Seuraava",
   "dialog.releaseNotes.action.hideFuture": "Älä näytä näitä jatkossa",
   "dialog.releaseNotes.media.alt": "Julkaisun esikatselu",
-  "dialog.usageExceeded.dontShowAgain": "Älä näytä uudelleen",
 
   "context.breakdown.title": "Kontekstin erittely",
   "context.breakdown.note":

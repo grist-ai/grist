@@ -17,14 +17,12 @@ import {
 } from "./shared"
 
 const integrationPriority = new Map([
-  ["opencode-go", 0],
-  ["opencode", 1],
-  ["openai", 2],
-  ["github-copilot", 3],
-  ["google", 4],
-  ["anthropic", 5],
-  ["openrouter", 6],
-  ["vercel", 7],
+  ["openai", 0],
+  ["github-copilot", 1],
+  ["google", 2],
+  ["anthropic", 3],
+  ["openrouter", 4],
+  ["vercel", 5],
 ])
 
 export default Runtime.handler(
@@ -91,7 +89,6 @@ const findIntegration = Effect.fn("cli.auth.login.integration")(function* (clien
       options: available.map((integration) => {
         const option = { value: integration.id, label: integration.name, hint: integration.id }
         if (integration.connections.length > 0) return { ...option, hint: "connected" }
-        if (integration.id === "opencode") return { ...option, hint: "recommended" }
         return option
       }),
     }),

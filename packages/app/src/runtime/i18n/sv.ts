@@ -518,9 +518,6 @@ export const dict = {
   "dialog.provider.group.other": "Andra",
   "dialog.provider.custom.label": "Anpassad OpenAI-kompatibel leverantör",
   "dialog.provider.tag.recommended": "Rekommenderad",
-  "dialog.provider.opencode.note": "Kurerade modeller inklusive Claude, GPT, Gemini och mer",
-  "dialog.provider.opencode.tagline": "Pålitliga optimerade modeller",
-  "dialog.provider.opencodeGo.tagline": "Lågprisprenumeration för alla",
   "dialog.provider.copilot.note": "AI-modeller för kodningshjälp via GitHub Copilot",
   "dialog.provider.openai.note": "GPT-modeller för snabba, kapabla allmänna AI-uppgifter",
   "dialog.provider.google.note": "Gemini-modeller för snabba, strukturerade svar",
@@ -844,7 +841,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "Nästa",
   "dialog.releaseNotes.action.hideFuture": "Visa inte dessa i framtiden",
   "dialog.releaseNotes.media.alt": "Förhandsvisning av version",
-  "dialog.usageExceeded.dontShowAgain": "Visa inte igen",
 
   "context.breakdown.title": "Kontextfördelning",
   "context.breakdown.note":

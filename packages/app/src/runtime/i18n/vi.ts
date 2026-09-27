@@ -198,9 +198,6 @@ export const dict = {
   "dialog.provider.group.other": "Khác",
   "dialog.provider.custom.label": "Nhà cung cấp tương thích OpenAI tùy chỉnh",
   "dialog.provider.tag.recommended": "Đề xuất",
-  "dialog.provider.opencode.note": "Các mô hình được tuyển chọn, gồm Claude, GPT, Gemini và nhiều mô hình khác",
-  "dialog.provider.opencode.tagline": "Các mô hình tối ưu hóa đáng tin cậy",
-  "dialog.provider.opencodeGo.tagline": "Đăng ký chi phí thấp cho mọi người",
   "dialog.provider.anthropic.note": "Truy cập trực tiếp các mô hình Claude bằng khóa API",
   "dialog.provider.copilot.note": "Các mô hình AI hỗ trợ lập trình qua GitHub Copilot",
   "dialog.provider.openai.note": "Các mô hình GPT nhanh và mạnh mẽ cho tác vụ AI đa dụng",
@@ -532,7 +529,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "Tiếp theo",
   "dialog.releaseNotes.action.hideFuture": "Không hiển thị lại",
   "dialog.releaseNotes.media.alt": "Xem trước bản phát hành",
-  "dialog.usageExceeded.dontShowAgain": "Không hiển thị lại",
 
   "context.breakdown.title": "Phân tích ngữ cảnh",
   "context.breakdown.note":

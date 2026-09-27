@@ -14,15 +14,6 @@ import { createStore, produce } from "solid-js/store"
 export type ProviderConnectMethod = Extract<IntegrationMethod, { type: "key" | "oauth" }>
 type Authorization = IntegrationOauthConnectOutput["data"]
 
-// OpenCode Go and OpenCode Zen both bill through the OpenCode Console, so the
-// Console sign-in is the connection method for both providers.
-export const CONSOLE_INTEGRATION = "opencode"
-export const CONSOLE_PROVIDERS = new Set(["opencode", "opencode-go"])
-
-export function consoleIntegration(provider: string) {
-  return CONSOLE_PROVIDERS.has(provider) ? CONSOLE_INTEGRATION : provider
-}
-
 export function providerFormDefaults(fields: ProviderConnectMethod["form"]) {
   return (fields ?? []).reduce<FormAnswer>((answer, field) => {
     if (field.type === "external" || !field.hidden || field.default === undefined) return answer
@@ -47,8 +38,6 @@ export function createProviderConnectionController(options: {
   onComplete: () => void
   /** Picks the method to start without asking when the integration exposes several. */
   autoSelect?: (methods: ProviderConnectMethod[]) => number | undefined
-  /** Runs after the catalogs refresh; returning false keeps the dialog on a retryable error. */
-  prepare?: (active: () => boolean) => Promise<boolean>
   pollInterval?: number
 }) {
   const language = useLanguage()
@@ -59,7 +48,6 @@ export function createProviderConnectionController(options: {
     const directory = options.directory()
     return directory ? { directory } : undefined
   }
-  const isConsole = () => options.provider() === CONSOLE_INTEGRATION
   // Not createResource: the dialog is owned by whichever page opened it, so reading a pending
   // resource here would suspend that page's <Suspense> and blank the screen behind the dialog.
   const [integration, setIntegration] = createStore({
@@ -206,10 +194,8 @@ export function createProviderConnectionController(options: {
       .then(() => true)
       .catch(() => false)
     if (!active()) return
-    const prepared = refreshed && options.prepare ? await options.prepare(active) : refreshed
-    if (!active()) return
-    if (!prepared && options.prepare) {
-      dispatch({ type: "auth.error", error: language.t("provider.connect.console.refreshFailed") })
+    if (!refreshed) {
+      dispatch({ type: "auth.error", error: language.t("provider.connect.error.refreshFailed") })
       return
     }
     setStore("state", "ready")
@@ -227,10 +213,7 @@ export function createProviderConnectionController(options: {
     if (polling.disposed || generation !== polling.generation) return
     if (!result.ok) {
       setStore("statusFailed", true)
-      dispatch({
-        type: "auth.error",
-        error: isConsole() ? language.t("provider.connect.console.statusFailed") : errorMessage(result.error),
-      })
+      dispatch({ type: "auth.error", error: errorMessage(result.error) })
       return
     }
     if (result.status.status === "complete") {
@@ -239,24 +222,12 @@ export function createProviderConnectionController(options: {
     }
     if (result.status.status === "failed") {
       polling.attempt = undefined
-      const message = result.status.message
-      dispatch({
-        type: "auth.error",
-        error:
-          isConsole() && message.includes("expired_token")
-            ? language.t("provider.connect.console.expired")
-            : isConsole() && message.includes("access_denied")
-              ? language.t("provider.connect.console.denied")
-              : message,
-      })
+      dispatch({ type: "auth.error", error: result.status.message })
       return
     }
     if (result.status.status === "expired") {
       polling.attempt = undefined
-      dispatch({
-        type: "auth.error",
-        error: language.t(isConsole() ? "provider.connect.console.expired" : "provider.connect.oauth.expired"),
-      })
+      dispatch({ type: "auth.error", error: language.t("provider.connect.oauth.expired") })
       return
     }
     polling.timer = setTimeout(() => void poll(authorization, generation), options.pollInterval ?? 1_000)
@@ -304,16 +275,7 @@ export function createProviderConnectionController(options: {
         ...(Object.keys(merged).length ? { answer: merged } : {}),
         location: location(),
       })
-      .then((response) => {
-        if (isConsole() && platform.platform === "desktop") {
-          const url = new URL(response.data.url)
-          url.searchParams.set("client_id", "opencode-desktop")
-          // Lets the Console return link focus the window that started the sign-in.
-          url.searchParams.set("return_window", platform.windowID)
-          response.data.url = url.href
-        }
-        return { ok: true as const, authorization: response.data }
-      })
+      .then((response) => ({ ok: true as const, authorization: response.data }))
       .catch((error) => ({ ok: false as const, error }))
     if (polling.disposed || generation !== polling.generation) {
       if (result.ok)
@@ -327,15 +289,12 @@ export function createProviderConnectionController(options: {
       return
     }
     if (!result.ok) {
-      dispatch({
-        type: "auth.error",
-        error: isConsole() ? language.t("provider.connect.console.startFailed") : errorMessage(result.error),
-      })
+      dispatch({ type: "auth.error", error: errorMessage(result.error) })
       return
     }
     polling.attempt = result.authorization
     dispatch({ type: "auth.waiting", authorization: result.authorization })
-    // Same as `opencode auth login`: hand the user straight to the browser instead of
+    // Same as `grist auth login`: hand the user straight to the browser instead of
     // asking them to click a link and retype a code.
     void open()
     if (result.authorization.mode === "auto") void poll(result.authorization, generation)

@@ -190,9 +190,6 @@ export const dict = {
   "dialog.provider.group.other": "Lain-lain",
   "dialog.provider.custom.label": "Penyedia serasi OpenAI tersuai",
   "dialog.provider.tag.recommended": "Disyorkan",
-  "dialog.provider.opencode.note": "Model terpilih termasuk Claude, GPT, Gemini dan banyak lagi",
-  "dialog.provider.opencode.tagline": "Model dioptimumkan yang boleh dipercayai",
-  "dialog.provider.opencodeGo.tagline": "Langganan kos rendah untuk semua",
   "dialog.provider.anthropic.note": "Akses terus kepada model Claude melalui kunci API",
   "dialog.provider.copilot.note": "Model AI untuk bantuan pengekodan melalui GitHub Copilot",
   "dialog.provider.openai.note": "Model GPT untuk tugasan AI umum yang pantas dan berkeupayaan",
@@ -1189,7 +1186,6 @@ export const dict = {
   "workspace.reset.archived.one": "1 sesi akan diarkibkan.",
   "workspace.reset.archived.many": "{{count}} sesi akan diarkibkan.",
   "workspace.reset.note": "Ini akan menetap semula ruang kerja agar sepadan dengan cawangan lalai.",
-  "dialog.usageExceeded.dontShowAgain": "Jangan tunjukkan lagi",
   "desktop.menu.installCli": "Pasang CLI...",
   "desktop.cli.installed.title": "CLI Dipasang",
   "desktop.cli.installed.message":

@@ -24,8 +24,8 @@ test("creates a session in a new project and selects its model", async ({ page }
     provider: () => ({
       all: [
         {
-          id: "opencode",
-          name: "OpenCode",
+          id: "grist",
+          name: "Grist",
           models: {
             "free-model": {
               id: "free-model",
@@ -36,20 +36,20 @@ test("creates a session in a new project and selects its model", async ({ page }
           },
         },
         {
-          id: "opencode-go",
-          name: "OpenCode Go",
+          id: "acme",
+          name: "Acme",
           models: {
-            "go-model-1": {
-              id: "go-model-1",
-              name: "Go Model 1",
+            "acme-model-1": {
+              id: "acme-model-1",
+              name: "Acme Model 1",
               cost: { input: 1, output: 1 },
               limit: { context: 200_000 },
             },
           },
         },
       ],
-      connected: ["opencode", "opencode-go"],
-      default: { providerID: "opencode", modelID: "free-model" },
+      connected: ["grist", "acme"],
+      default: { providerID: "grist", modelID: "free-model" },
     }),
     sessions: [],
     pageMessages: () => ({ items: [] }),
@@ -62,10 +62,10 @@ test("creates a session in a new project and selects its model", async ({ page }
       "opencode.global.dat:model",
       JSON.stringify({
         user: [
-          { providerID: "opencode", modelID: "free-model", visibility: "show" },
-          { providerID: "opencode-go", modelID: "go-model-1", visibility: "show" },
+          { providerID: "grist", modelID: "free-model", visibility: "show" },
+          { providerID: "acme", modelID: "acme-model-1", visibility: "show" },
         ],
-        recent: [{ providerID: "opencode-go", modelID: "go-model-1" }],
+        recent: [{ providerID: "acme", modelID: "acme-model-1" }],
         variant: {},
       }),
     )
@@ -97,7 +97,7 @@ test("creates a session in a new project and selects its model", async ({ page }
   await expectAppVisible(page.locator('[data-component="composer"]'))
 
   const modelControl = page.locator('[data-action="composer-model"]')
-  await expect(modelControl).toContainText("Go Model 1")
+  await expect(modelControl).toContainText("Acme Model 1")
   await modelControl.click()
   const modelSearch = page.getByPlaceholder("Search models", { exact: true })
   await expect(modelSearch).toBeFocused()
@@ -110,7 +110,7 @@ test("creates a session in a new project and selects its model", async ({ page }
   await modelSearch.press("ArrowUp")
   await modelSearch.press("Enter")
 
-  await expect(modelControl).toContainText("Go Model 1")
+  await expect(modelControl).toContainText("Acme Model 1")
 })
 
 test("restores each existing session's model and variant when switching tabs", async ({ page }) => {
@@ -118,7 +118,7 @@ test("restores each existing session's model and variant when switching tabs", a
     ...fixture.sessions[0],
     id: `ses_model_${name}`,
     title: `Model ${name}`,
-    model: { id: `model-${name}`, providerID: "opencode", variant: "balanced" },
+    model: { id: `model-${name}`, providerID: "grist", variant: "balanced" },
   }))
   await mockOpenCodeServer(page, {
     ...fixture,
@@ -126,8 +126,8 @@ test("restores each existing session's model and variant when switching tabs", a
     provider: {
       all: [
         {
-          id: "opencode",
-          name: "OpenCode",
+          id: "grist",
+          name: "Grist",
           models: Object.fromEntries(
             sessions.map((session) => [
               session.model.id,
@@ -141,8 +141,8 @@ test("restores each existing session's model and variant when switching tabs", a
           ),
         },
       ],
-      connected: ["opencode"],
-      default: { providerID: "opencode", modelID: sessions[0]!.model.id },
+      connected: ["grist"],
+      default: { providerID: "grist", modelID: sessions[0]!.model.id },
     },
     pageMessages: () => ({ items: [] }),
   })

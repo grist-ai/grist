@@ -18,7 +18,6 @@ import { NvidiaPlugin } from "./provider/nvidia.js"
 import { OllamaPlugin } from "./provider/ollama.js"
 import { OpenAIPlugin } from "./provider/openai.js"
 import { SnowflakeCortexPlugin } from "./provider/snowflake-cortex.js"
-import { OpencodePlugin } from "./provider/opencode.js"
 import { OpenRouterPlugin } from "./provider/openrouter.js"
 import { PerplexityPlugin } from "./provider/perplexity.js"
 import { PoePlugin } from "./provider/poe.js"
@@ -49,8 +48,6 @@ export const ProviderPlugins: PluginInternal.InternalPlugin[] = [
   ModalPlugin,
   NvidiaPlugin,
   OllamaPlugin,
-  OpencodePlugin,
-  SnowflakeCortexPlugin,
   OpenAIPlugin,
   OpenRouterPlugin,
   PerplexityPlugin,

@@ -198,9 +198,6 @@ export const dict = {
   "dialog.provider.group.other": "Más",
   "dialog.provider.custom.label": "Egyedi OpenAI-kompatibilis szolgáltató",
   "dialog.provider.tag.recommended": "Ajánlott",
-  "dialog.provider.opencode.note": "Összeválogatott modellek, köztük Claude, GPT, Gemini és még sok más",
-  "dialog.provider.opencode.tagline": "Megbízható optimalizált modellek",
-  "dialog.provider.opencodeGo.tagline": "Olcsó előfizetés mindenki számára",
   "dialog.provider.copilot.note": "AI modellek a kódoláshoz a GitHub Copilot segítségével",
   "dialog.provider.openai.note": "GPT modellek a gyors, általános AI-feladatokhoz",
   "dialog.provider.google.note": "Gemini modellek a gyors, strukturált válaszokhoz",
@@ -1148,7 +1145,6 @@ export const dict = {
   "workspace.reset.archived.one": "1 munkamenet archiválva lesz.",
   "workspace.reset.archived.many": "A {{count}} munkamenetek archiválva lesznek.",
   "workspace.reset.note": "Ezzel visszaállítja a munkaterületet, hogy megfeleljen az alapértelmezett ágnak.",
-  "dialog.usageExceeded.dontShowAgain": "Ne jelenjen meg újra",
   "provider.disconnect.toast.noCredentials.description":
     "Nem találhatók eltávolítható hitelesítő adatok a következőhöz: {{provider}}.",
   "provider.disconnect.toast.failed.description": "Nem sikerült leválasztani a következőt: {{provider}}.",

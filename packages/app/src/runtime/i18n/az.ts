@@ -191,9 +191,6 @@ export const dict = {
   "dialog.provider.group.other": "Digər",
   "dialog.provider.custom.label": "Xüsusi OpenAI-a uyğun provayder",
   "dialog.provider.tag.recommended": "Tövsiyə olunan",
-  "dialog.provider.opencode.note": "Claude, GPT, Gemini və daha çoxu daxil olmaqla seçilmiş modellər",
-  "dialog.provider.opencode.tagline": "Etibarlı optimallaşdırılmış modellər",
-  "dialog.provider.opencodeGo.tagline": "Hamı üçün aşağı qiymətli abunəlik",
   "dialog.provider.copilot.note": "GitHub Copilot vasitəsilə kodlaşdırma yardımı üçün AI modelləri",
   "dialog.provider.openai.note": "Sürətli və bacarıqlı ümumi AI tapşırıqları üçün GPT modelləri",
   "dialog.provider.google.note": "Sürətli, strukturlaşdırılmış cavablar üçün Gemini modelləri",
@@ -519,7 +516,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "Növbəti",
   "dialog.releaseNotes.action.hideFuture": "Gələcəkdə göstərmə",
   "dialog.releaseNotes.media.alt": "Buraxılış önbaxışı",
-  "dialog.usageExceeded.dontShowAgain": "Bir daha göstərmə",
 
   "context.breakdown.title": "Kontekst bölgüsü",
   "context.breakdown.note": 'Giriş tokenlərinin təxmini bölgüsü. "Digər" alət təriflərini və əlavə yükü əhatə edir.',

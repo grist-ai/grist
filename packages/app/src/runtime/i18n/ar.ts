@@ -195,9 +195,6 @@ export const dict = {
   "dialog.provider.group.other": "آخر",
   "dialog.provider.custom.label": "موفر مخصص متوافق مع OpenAI",
   "dialog.provider.tag.recommended": "موصى به",
-  "dialog.provider.opencode.note": "نماذج مختارة تتضمن Claude و GPT و Gemini والمزيد",
-  "dialog.provider.opencode.tagline": "نماذج موثوقة ومحسنة",
-  "dialog.provider.opencodeGo.tagline": "اشتراك منخفض التكلفة للجميع",
   "dialog.provider.copilot.note": "نماذج ذكاء اصطناعي للمساعدة في البرمجة عبر GitHub Copilot",
   "dialog.provider.openai.note": "نماذج GPT لمهام الذكاء الاصطناعي العامة السريعة والمتقدمة",
   "dialog.provider.google.note": "نماذج Gemini لاستجابات سريعة ومنظمة",
@@ -520,7 +517,6 @@ export const dict = {
   "dialog.project.edit.worktree.startup": "برنامج نصي لبدء تشغيل مساحة العمل",
   "dialog.project.edit.worktree.startup.description": "يتم تشغيله بعد إنشاء مساحة عمل جديدة (شجرة عمل).",
   "dialog.project.edit.worktree.startup.placeholder": "مثال: bun install",
-  "dialog.usageExceeded.dontShowAgain": "عدم الإظهار مرة أخرى",
 
   "context.breakdown.title": "تفصيل السياق",
   "context.breakdown.note": 'تفصيل تقريبي لرموز الإدخال المميزة. يشمل "أخرى" تعريفات الأدوات والأعباء الإضافية.',

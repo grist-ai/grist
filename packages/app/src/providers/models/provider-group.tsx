@@ -5,8 +5,7 @@ import { iconNames, type IconName } from "@opencode/ui/icons/provider"
 import { Menu } from "@opencode/ui/menu"
 import { ProviderIcon } from "@opencode/ui/provider-icon"
 import type { JSX } from "solid-js"
-import { createMemo, For, Match, Show, Switch } from "solid-js"
-import { consoleProviderGroup, consoleProviderName } from "@/providers/catalog/console"
+import { For, Match, Show, Switch } from "solid-js"
 import { GristLogo } from "@/providers/grist-logo"
 import { useLanguage } from "@/runtime/i18n/language"
 import customManagedProvider from "@/providers/custom-managed-provider.svg"
@@ -15,8 +14,6 @@ import "@/settings/settings.css"
 type ModelProvider = { id: string; canonical?: string; name: string }
 type ModelItem = { provider: ModelProvider & { integrationID?: string }; cost?: { input: number } }
 type ModelGroup<T> = { category: string; items: T[] }
-
-export const CONSOLE_GROUP_KEY = "console:opencode"
 
 export function CustomManagedProviderIcon(props: { class?: string }) {
   return <img data-component="custom-managed-provider-icon" src={customManagedProvider} alt="" class={props.class} />
@@ -27,12 +24,12 @@ export function ProviderModelIcon(props: { provider: ModelProvider; class?: stri
     [
       props.provider.canonical,
       props.provider.canonical?.replace(/-token-plan$/, ""),
-      props.provider.id.replace(/^console-/, ""),
+      props.provider.id,
     ].find((id): id is IconName => !!id && id !== "synthetic" && iconNames.includes(id as IconName))
 
   return (
     <Switch>
-      <Match when={props.provider.id === "opencode"}>
+      <Match when={props.provider.id === "grist"}>
         <GristLogo class={`size-4 ${props.class ?? ""}`} />
       </Match>
       <Match when={icon()} keyed>
@@ -45,15 +42,9 @@ export function ProviderModelIcon(props: { provider: ModelProvider; class?: stri
   )
 }
 
-/** Detects the Console workspace from every listed model, so a search that hides some providers keeps the group. */
-export function consoleModelGroup<T extends ModelItem>(items: readonly T[]) {
-  return consoleProviderGroup([...new Map(items.map((item) => [item.provider.id, item.provider])).values()])
-}
-
-/** Provider sections for a model list, with Console workspace providers nested under one OpenCode Console section. */
+/** Provider sections for a model list. */
 export function ProviderModelSections<T extends ModelItem>(props: {
   groups: ModelGroup<T>[]
-  managed: ReturnType<typeof consoleModelGroup<T>>
   expanded: (key: string) => boolean
   disabled: boolean
   onExpandedChange: (key: string, expanded: boolean) => void
@@ -63,29 +54,6 @@ export function ProviderModelSections<T extends ModelItem>(props: {
   onSetVisibility?: (providerID: string, visible: boolean) => void
   ref?: (providerID: string, element: HTMLElement) => void
 }) {
-  type Section = {
-    group?: ModelGroup<T>
-    managed?: { group: NonNullable<ReturnType<typeof consoleModelGroup<T>>>; providers: ModelGroup<T>[] }
-  }
-  const language = useLanguage()
-  const sections = createMemo<Section[]>(() => {
-    const managed = props.managed
-    const ids = new Set(managed?.providers.map((provider) => provider.id))
-    const nested = props.groups.filter((group) => ids.has(group.category))
-    if (!managed || nested.length === 0) return props.groups.map((group) => ({ group }))
-    const first = props.groups.findIndex((group) => ids.has(group.category))
-    return props.groups.flatMap<Section>((group, index) => {
-      if (!ids.has(group.category)) return [{ group }]
-      if (index !== first) return []
-      return [{ managed: { group: managed, providers: nested } }]
-    })
-  })
-  // Only the keyless catalog is free; a Zen key or Console account keeps the provider's own name.
-  const name = (group: ModelGroup<T>) =>
-    group.category === "opencode" && group.items.every((item) => !item.cost?.input)
-      ? language.t("provider.connect.opencode.freeName")
-      : group.items[0].provider.name
-
   function Header(input: { id: string; icon: JSX.Element; title: JSX.Element; badge?: string; action?: JSX.Element }) {
     return (
       <h3 class="settings-models-group-header" classList={{ "justify-between": !!input.action }}>
@@ -111,69 +79,22 @@ export function ProviderModelSections<T extends ModelItem>(props: {
   }
 
   return (
-    <For each={sections()}>
-      {(section) => (
-        <Show
-          when={section.managed}
-          fallback={
-            <Show when={section.group}>
-              {(group) => (
-                <section
-                  ref={(element) => props.ref?.(group().category, element)}
-                  class="settings-section"
-                  data-component="settings-models-provider"
-                  data-expanded={props.expanded(group().category) ? "" : undefined}
-                >
-                  <Header
-                    id={group().category}
-                    icon={<ProviderModelIcon provider={group().items[0].provider} class="shrink-0" />}
-                    title={name(group())}
-                    action={props.action?.(group())}
-                  />
-                  <Show when={props.expanded(group().category)}>{props.rows(group().items)}</Show>
-                </section>
-              )}
-            </Show>
-          }
+    <For each={props.groups}>
+      {(group) => (
+        <section
+          ref={(element) => props.ref?.(group.category, element)}
+          class="settings-section"
+          data-component="settings-models-provider"
+          data-expanded={props.expanded(group.category) ? "" : undefined}
         >
-          {(managed) => (
-            <section
-              class="settings-section"
-              data-component="settings-models-console"
-              data-expanded={props.expanded(CONSOLE_GROUP_KEY) ? "" : undefined}
-            >
-              <Header
-                id={CONSOLE_GROUP_KEY}
-                icon={<GristLogo class="size-4 shrink-0" />}
-                title={language.t("provider.connect.opencode.name")}
-                badge={managed().group.workspace}
-              />
-              <Show when={props.expanded(CONSOLE_GROUP_KEY)}>
-                <div class="provider-model-groups settings-models-console-groups">
-                  <For each={managed().providers}>
-                    {(group) => (
-                      <ProviderModelGroup
-                        ref={(element) => props.ref?.(group.category, element)}
-                        provider={group.items[0].provider}
-                        name={consoleProviderName(managed().group, group.items[0].provider.name)}
-                        expanded={props.expanded(group.category)}
-                        disabled={props.disabled}
-                        onSetVisibility={
-                          props.onSetVisibility
-                            ? (visible) => props.onSetVisibility?.(group.category, visible)
-                            : undefined
-                        }
-                        onExpandedChange={(value) => props.onExpandedChange(group.category, value)}
-                      >
-                        {props.rows(group.items)}
-                      </ProviderModelGroup>
-                    )}
-                  </For>
-                </div>
-              </Show>
-            </section>
-          )}
-        </Show>
+          <Header
+            id={group.category}
+            icon={<ProviderModelIcon provider={group.items[0].provider} class="shrink-0" />}
+            title={group.items[0].provider.name}
+            action={props.action?.(group)}
+          />
+          <Show when={props.expanded(group.category)}>{props.rows(group.items)}</Show>
+        </section>
       )}
     </For>
   )

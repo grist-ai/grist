@@ -542,9 +542,6 @@ export const dict = {
   "dialog.provider.group.other": "Outro",
   "dialog.provider.custom.label": "Provedor personalizado compatível com OpenAI",
   "dialog.provider.tag.recommended": "Recomendado",
-  "dialog.provider.opencode.note": "Modelos selecionados incluindo Claude, GPT, Gemini e mais",
-  "dialog.provider.opencode.tagline": "Modelos otimizados e confiáveis",
-  "dialog.provider.opencodeGo.tagline": "Assinatura de baixo custo para todos",
   "dialog.provider.copilot.note": "Modelos de IA para auxílio à programação pelo GitHub Copilot",
   "dialog.provider.openai.note": "Modelos GPT rápidos e avançados para tarefas gerais de IA",
   "dialog.provider.google.note": "Modelos Gemini para respostas rápidas e estruturadas",
@@ -859,7 +856,6 @@ export const dict = {
   "dialog.project.edit.worktree.startup": "Script de inicialização do espaço de trabalho",
   "dialog.project.edit.worktree.startup.description": "Executa após criar um novo espaço de trabalho (worktree).",
   "dialog.project.edit.worktree.startup.placeholder": "Ex.: bun install",
-  "dialog.usageExceeded.dontShowAgain": "Não mostrar novamente",
 
   "context.breakdown.title": "Detalhamento do contexto",
   "context.breakdown.note":

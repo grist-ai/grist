@@ -10,7 +10,7 @@ export const VercelPlugin = define({
         if (!Provider.isAISDK(item.provider.package)) continue
         if (Provider.packageName(item.provider.package) !== "@ai-sdk/vercel") continue
         evt.update(item.provider.id, (provider) => {
-          provider.headers = { ...provider.headers, "http-referer": "https://opencode.ai/", "x-title": "opencode" }
+          provider.headers = { ...provider.headers, "http-referer": "https://github.com/grist-ai/grist", "x-title": "grist" }
         })
       }
     })

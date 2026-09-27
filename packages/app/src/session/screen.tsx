@@ -19,7 +19,6 @@ import type { SessionModel } from "@/session/model"
 import { SESSION_PANEL_WIDTH_MIN } from "@/session/session-panel-width"
 import { SessionPanelFrame } from "@/session/session-frame"
 import { TerminalPanel } from "@/session/terminal/panel"
-import { useUsageExceededDialogs } from "./usage-exceeded-dialogs"
 import { SessionErrorFallback } from "./route-error"
 import { createSessionScreenLayout } from "./screen-layout"
 import { createSessionReview } from "./review/model"
@@ -179,7 +178,6 @@ function SessionScreenContent(props: { session: SessionModel; browser: ReturnTyp
     timeline,
     visible: conversationVisible,
   })
-  useUsageExceededDialogs()
 
   const sessionErrorFallback = (error: unknown, reset: () => void) => {
     createEffect(on(session.identity.sessionKey, reset, { defer: true }))

@@ -196,9 +196,6 @@ export const dict = {
   "dialog.provider.group.other": "अन्य",
   "dialog.provider.custom.label": "कस्टम OpenAI-संगत प्रोवाइडर",
   "dialog.provider.tag.recommended": "अनुशंसित",
-  "dialog.provider.opencode.note": "Claude, GPT, Gemini और अधिक सहित क्यूरेटेड मॉडल",
-  "dialog.provider.opencode.tagline": "विश्वसनीय अनुकूलित मॉडल",
-  "dialog.provider.opencodeGo.tagline": "सभी के लिए कम लागत वाली सदस्यता",
   "dialog.provider.copilot.note": "GitHub Copilot के माध्यम से कोडिंग सहायता के लिए AI मॉडल",
   "dialog.provider.openai.note": "तेज़, सक्षम सामान्य AI कार्यों के लिए GPT मॉडल",
   "dialog.provider.google.note": "तेज़, संरचित प्रतिक्रियाओं के लिए Gemini मॉडल",
@@ -522,7 +519,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "अगला",
   "dialog.releaseNotes.action.hideFuture": "भविष्य में इन्हें न दिखाएँ",
   "dialog.releaseNotes.media.alt": "रिलीज़ पूर्वावलोकन",
-  "dialog.usageExceeded.dontShowAgain": "फिर से न दिखाएँ",
 
   "context.breakdown.title": "कॉन्टेक्स्ट ब्रेकडाउन",
   "context.breakdown.note": 'इनपुट टोकन का अनुमानित विभाजन। "अन्य" में टूल की परिभाषाएँ और अतिरिक्त खर्च शामिल हैं।',

@@ -192,9 +192,6 @@ export const dict = {
   "dialog.provider.group.other": "အခြား",
   "dialog.provider.custom.label": "စိတ်ကြိုက် OpenAI-သဟဇာတ ပံ့ပိုးပေးသူ",
   "dialog.provider.tag.recommended": "အကြံပြုထားသည်။",
-  "dialog.provider.opencode.note": "Claude၊ GPT၊ Gemini နှင့် အခြားအရာများ အပါအဝင် ရွေးချယ်ထားသော မော်ဒယ်များ",
-  "dialog.provider.opencode.tagline": "ယုံကြည်စိတ်ချရသော အကောင်းဆုံးပြင်ဆင်ထားသော မော်ဒယ်များ",
-  "dialog.provider.opencodeGo.tagline": "လူတိုင်းအတွက် ကုန်ကျစရိတ်သက်သာသော စာရင်းသွင်းမှု",
   "dialog.provider.anthropic.note": "API သော့ဖြင့် Claude မော်ဒယ်များကို တိုက်ရိုက်အသုံးပြုနိုင်သည်",
   "dialog.provider.copilot.note": "GitHub Copilot မှတစ်ဆင့် ကုဒ်ရေးနည်းအကူအညီအတွက် AI မော်ဒယ်များ",
   "dialog.provider.openai.note": "လျင်မြန်ပြီး လုပ်ဆောင်နိုင်သော အထွေထွေ AI လုပ်ဆောင်ချက်များအတွက် GPT မော်ဒယ်များ",
@@ -1205,7 +1202,6 @@ export const dict = {
   "workspace.reset.archived.one": "1 ဆက်ရှင်ကို သိမ်းဆည်းပါမည်။",
   "workspace.reset.archived.many": "{{count}} ဆက်ရှင်များကို သိမ်းဆည်းထားပါမည်။",
   "workspace.reset.note": "၎င်းသည် မူရင်းဌာနခွဲနှင့် ကိုက်ညီစေရန် အလုပ်ခွင်ကို ပြန်လည်သတ်မှတ်ပါမည်။",
-  "dialog.usageExceeded.dontShowAgain": "ထပ်မပြပါနှင့်",
   "desktop.menu.installCli": "CLI ကို ထည့်သွင်းရန်...",
   "desktop.cli.installed.title": "CLI ထည့်သွင်းပြီးပါပြီ",
   "desktop.cli.installed.message":

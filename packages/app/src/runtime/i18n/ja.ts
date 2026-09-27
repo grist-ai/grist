@@ -197,9 +197,6 @@ export const dict = {
   "dialog.provider.group.other": "その他",
   "dialog.provider.custom.label": "OpenAI互換のカスタムプロバイダー",
   "dialog.provider.tag.recommended": "推奨",
-  "dialog.provider.opencode.note": "Claude, GPT, Geminiなどを含む厳選されたモデル",
-  "dialog.provider.opencode.tagline": "信頼性の高い最適化モデル",
-  "dialog.provider.opencodeGo.tagline": "すべての人に低価格のサブスクリプション",
   "dialog.provider.anthropic.note": "APIキーでClaudeモデルに直接アクセス",
   "dialog.provider.copilot.note": "GitHub Copilotを通じてコーディングを支援するAIモデル",
   "dialog.provider.openai.note": "高速で高性能な汎用AIタスク向けのGPTモデル",
@@ -523,7 +520,6 @@ export const dict = {
   "dialog.project.edit.worktree.startup.description":
     "新しいワークスペース (ワークツリー) を作成した後に実行されます。",
   "dialog.project.edit.worktree.startup.placeholder": "例: bun install",
-  "dialog.usageExceeded.dontShowAgain": "今後表示しない",
 
   "context.breakdown.title": "コンテキストの内訳",
   "context.breakdown.note": '入力トークンのおおよその内訳です。"その他"にはツールの定義やオーバーヘッドが含まれます。',

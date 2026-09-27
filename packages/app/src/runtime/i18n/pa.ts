@@ -200,9 +200,6 @@ export const dict = {
   "dialog.provider.group.other": "ہور",
   "dialog.provider.custom.label": "من پسند OpenAI نال رلدا پرووائیڈر",
   "dialog.provider.tag.recommended": "سفارش کیتی",
-  "dialog.provider.opencode.note": "Claude، GPT، Gemini تے ہور سمیت کیوریٹڈ ماڈل",
-  "dialog.provider.opencode.tagline": "قابل اعتماد اصلاح شدہ ماڈل",
-  "dialog.provider.opencodeGo.tagline": "ہر اک لئی گھٹ قیمت دی رکنیت",
   "dialog.provider.copilot.note": "GitHub Copilot دے ذریعے کوڈنگ دی مدد لئی اے آئی ماڈل",
   "dialog.provider.openai.note": "تیز تے صلاحیت والے عام AI کماں لئی GPT ماڈل",
   "dialog.provider.google.note": "تیز تے منظم جواباں لئی Gemini ماڈل",
@@ -527,7 +524,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "اگلا",
   "dialog.releaseNotes.action.hideFuture": "ایہہ اگوں نہ وکھاؤ",
   "dialog.releaseNotes.media.alt": "ریلیز پیش نظارہ",
-  "dialog.usageExceeded.dontShowAgain": "دوبارہ نہ وکھاؤ",
 
   "context.breakdown.title": "کانٹیکسٹ دی ونڈ",
   "context.breakdown.note": 'ان پٹ ٹوکناں دی لگ بھگ ونڈ۔ "ہور" وچ ٹول دیاں تعریفاں تے وادھو خرچ شامل نیں۔',

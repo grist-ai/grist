@@ -188,9 +188,6 @@ export const dict = {
   "dialog.provider.group.other": "Jiné",
   "dialog.provider.custom.label": "Vlastní poskytovatel kompatibilní s OpenAI",
   "dialog.provider.tag.recommended": "Doporučeno",
-  "dialog.provider.opencode.note": "Vybrané modely včetně Claude, GPT, Gemini a dalších",
-  "dialog.provider.opencode.tagline": "Spolehlivé optimalizované modely",
-  "dialog.provider.opencodeGo.tagline": "Nízkonákladové předplatné pro každého",
   "dialog.provider.copilot.note": "Modely umělé inteligence pro pomoc s kódováním prostřednictvím GitHub Copilot",
   "dialog.provider.openai.note": "GPT modely pro rychlé a schopné obecné úlohy umělé inteligence",
   "dialog.provider.google.note": "Gemini modely pro rychlé, strukturované odpovědi",
@@ -1093,7 +1090,6 @@ export const dict = {
   "workspace.reset.archived.one": "1 relace bude archivována.",
   "workspace.reset.archived.many": "{{count}} relací bude archivováno.",
   "workspace.reset.note": "Tím se pracovní prostor resetuje tak, aby odpovídal výchozí větvi.",
-  "dialog.usageExceeded.dontShowAgain": "Znovu nezobrazovat",
   "provider.disconnect.toast.noCredentials.description":
     "Pro {{provider}} nebyly nalezeny žádné vyměnitelné přihlašovací údaje.",
   "provider.disconnect.toast.failed.description": "Odpojení {{provider}} se nezdařilo.",

@@ -1,7 +1,7 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { Evaluation, EvaluationModel, type EvaluationOptions } from "../../src/experimental.js"
-import { OpenCodeZen, OpenRouter, TypeSafeAI } from "../../src/providers.js"
+import { OpenRouter, TypeSafeAI } from "../../src/providers.js"
 import { recordedTests } from "../recorded-test.js"
 
 const questions = {
@@ -32,14 +32,6 @@ const typesafe = recordedTests({
   metadata: { model: "jev-latest" },
 })
 
-const zen = recordedTests({
-  prefix: "opencode-zen-evaluation",
-  provider: "opencode",
-  protocol: "system-one",
-  requires: ["OPENCODE_API_KEY"],
-  metadata: { model: "jev-1.13-free" },
-})
-
 const openrouter = recordedTests({
   prefix: "openrouter-evaluation",
   provider: "openrouter",
@@ -56,15 +48,6 @@ describe("experimental Evaluation recorded", () => {
     ),
   )
 
-  zen.effect("evaluates choice score and boolean questions", () =>
-    assertEvaluation(
-      OpenCodeZen.configure({ apiKey: process.env.OPENCODE_API_KEY ?? "fixture" }).experimental.evaluation(
-        "jev-1.13-free",
-      ),
-      "opencode",
-    ),
-  )
-
   openrouter.effect("evaluates choice score and boolean questions", () =>
     assertEvaluation(
       OpenRouter.configure({ apiKey: process.env.OPENROUTER_API_KEY ?? "fixture" }).experimental.evaluation(
@@ -77,7 +60,7 @@ describe("experimental Evaluation recorded", () => {
 
 const assertEvaluation = <Options extends EvaluationOptions>(
   model: EvaluationModel<Options>,
-  metadataKey: "typesafe" | "opencode" | "openrouter",
+  metadataKey: "typesafe" | "openrouter",
 ) =>
   Effect.gen(function* () {
     const response = yield* Evaluation.run({ model, state, questions })

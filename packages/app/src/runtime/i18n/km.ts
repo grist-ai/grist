@@ -190,9 +190,6 @@ export const dict = {
   "dialog.provider.group.other": "ផ្សេងទៀត។",
   "dialog.provider.custom.label": "អ្នកផ្តល់សេវាដែលត្រូវគ្នានឹង OpenAI ផ្ទាល់ខ្លួន",
   "dialog.provider.tag.recommended": "បានណែនាំ",
-  "dialog.provider.opencode.note": "ម៉ូដែលដែលបានជ្រើសរើសរួមមាន Claude, GPT, Gemini និងច្រើនទៀត",
-  "dialog.provider.opencode.tagline": "ម៉ូដែលដែលបានកែលម្អដែលអាចទុកចិត្តបាន។",
-  "dialog.provider.opencodeGo.tagline": "ការជាវតម្លៃទាបសម្រាប់អ្នករាល់គ្នា",
   "dialog.provider.anthropic.note": "ចូលប្រើម៉ូដែល Claude ដោយផ្ទាល់តាមរយៈសោ API",
   "dialog.provider.copilot.note": "ម៉ូដែល AI សម្រាប់ជំនួយការសរសេរកូដតាមរយៈ GitHub Copilot",
   "dialog.provider.openai.note": "ម៉ូដែល GPT សម្រាប់កិច្ចការ AI ទូទៅដែលមានល្បឿនលឿន និងមានសមត្ថភាព",
@@ -1183,7 +1180,6 @@ export const dict = {
   "workspace.reset.archived.one": "សម័យ 1 នឹងត្រូវបានទុកក្នុងប័ណ្ណសារ។",
   "workspace.reset.archived.many": "សម័យ {{count}} នឹងត្រូវបានទុកក្នុងប័ណ្ណសារ។",
   "workspace.reset.note": "វានឹងកំណត់កន្លែងធ្វើការឡើងវិញដើម្បីផ្គូផ្គងសាខាលំនាំដើម។",
-  "dialog.usageExceeded.dontShowAgain": "កុំបង្ហាញម្តងទៀត",
   "desktop.menu.installCli": "ដំឡើង CLI...",
   "desktop.cli.installed.title": "បានដំឡើង CLI",
   "desktop.cli.installed.message":

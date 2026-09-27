@@ -5,7 +5,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Switch } from "@opencode/ui/switch"
 import { TextInput } from "@opencode/ui/text-input"
 import { useFilteredList } from "@opencode/ui/hooks"
-import { createMemo, For, Show, type Component } from "solid-js"
+import { For, Show, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/providers/models/selection"
 import { popularProviders } from "@/providers/catalog/providers"
@@ -15,7 +15,7 @@ import { DialogConnectProvider } from "@/providers/connect/dialog"
 import { decode64 } from "@/runtime/persistence/base64"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
-import { consoleModelGroup, ProviderModelSections } from "@/providers/models/provider-group"
+import { ProviderModelSections } from "@/providers/models/provider-group"
 import "@/settings/settings.css"
 
 type ModelItem = ReturnType<ReturnType<typeof useLocal>["model"]["list"]>[number]
@@ -58,7 +58,6 @@ export const DialogManageModels: Component = () => {
       return a.items[0].provider.name.localeCompare(b.items[0].provider.name)
     },
   })
-  const managed = createMemo(() => consoleModelGroup(local.model.list()))
   const searching = () => list.filter().length > 0
   const expanded = (key: string) => searching() || !store.collapsed[key]
 
@@ -149,7 +148,6 @@ export const DialogManageModels: Component = () => {
               >
                 <ProviderModelSections
                   groups={list.grouped.latest}
-                  managed={managed()}
                   expanded={expanded}
                   disabled={searching()}
                   onExpandedChange={(key, value) => setStore("collapsed", key, !value)}

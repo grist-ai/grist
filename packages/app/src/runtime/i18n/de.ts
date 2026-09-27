@@ -443,9 +443,6 @@ export const dict = {
   "dialog.provider.group.other": "Andere",
   "dialog.provider.custom.label": "Benutzerdefinierter OpenAI-kompatibler Anbieter",
   "dialog.provider.tag.recommended": "Empfohlen",
-  "dialog.provider.opencode.note": "Kuratierte Modelle inklusive Claude, GPT, Gemini und mehr",
-  "dialog.provider.opencode.tagline": "Zuverlässige, optimierte Modelle",
-  "dialog.provider.opencodeGo.tagline": "Kostengünstiges Abo für alle",
   "dialog.provider.copilot.note": "KI-Modelle zur Programmierunterstützung über GitHub Copilot",
   "dialog.provider.openai.note": "GPT-Modelle für schnelle, leistungsfähige allgemeine KI-Aufgaben",
   "dialog.provider.google.note": "Gemini-Modelle für schnelle, strukturierte Antworten",
@@ -763,7 +760,6 @@ export const dict = {
   "dialog.project.edit.worktree.startup.description":
     "Wird nach dem Erstellen eines neuen Arbeitsbereichs (Worktree) ausgeführt.",
   "dialog.project.edit.worktree.startup.placeholder": "z. B. bun install",
-  "dialog.usageExceeded.dontShowAgain": "Nicht mehr anzeigen",
 
   "context.breakdown.title": "Kontext-Aufschlüsselung",
   "context.breakdown.note":

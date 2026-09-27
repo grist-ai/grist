@@ -251,7 +251,11 @@ const layer = Layer.effect(
         const value = yield* read()
         const requested = value.data.defaultModel
         const model = requested && value.byProvider.get(requested.providerID)?.get(requested.modelID)
-        return model?.enabled ? model : value.available[0]
+        if (model?.enabled) return model
+        // The Grist gateway is the only built-in provider: prefer it over BYOK
+        // models when the user hasn't chosen a default.
+        const gateway = value.available.find((candidate) => candidate.providerID === "grist")
+        return gateway ?? value.available[0]
       }),
       small: Effect.fn("Model.small")(function* (providerID) {
         const value = yield* read()

@@ -171,9 +171,7 @@ export const dict = {
   "dialog.provider.group.other": "Other",
   "dialog.provider.custom.label": "Custom OpenAI-compatible provider",
   "dialog.provider.tag.recommended": "Recommended",
-  "dialog.provider.opencode.note": "Curated models including Claude, GPT, Gemini and more",
-  "dialog.provider.opencode.tagline": "Reliable optimized models",
-  "dialog.provider.opencodeGo.tagline": "Low cost subscription for everyone",
+  "dialog.provider.grist.tagline": "Frontier quality at flat price",
   "dialog.provider.anthropic.note": "Direct access to Claude models via API key",
   "dialog.provider.copilot.note": "AI models for coding assistance via GitHub Copilot",
   "dialog.provider.openai.note": "GPT models for fast, capable general AI tasks",
@@ -241,6 +239,12 @@ export const dict = {
   "provider.connect.status.waiting": "Waiting for authorization…",
   "provider.connect.status.failed": "Authorization failed: {{error}}",
   "provider.connect.error.unsupportedFields": "This authentication form contains unsupported fields",
+  "provider.connect.error.refreshFailed":
+    "Connected, but we couldn't load the provider's models. Try again to refresh them.",
+  "provider.connect.noModels.connected": "{{provider}} connected",
+  "provider.connect.noModels.description":
+    "Your account is connected, but this provider has no available models. Check its setup, then refresh.",
+  "provider.connect.noModels.refresh": "Refresh models",
   "provider.connect.apiKey.description":
     "Enter your {{provider}} API key to connect your account and use {{provider}} models in Grist.",
   "provider.connect.apiKey.label": "{{provider}} API key",
@@ -637,7 +641,6 @@ export const dict = {
   "dialog.releaseNotes.action.next": "Next",
   "dialog.releaseNotes.action.hideFuture": "Don't show these in the future",
   "dialog.releaseNotes.media.alt": "Release preview",
-  "dialog.usageExceeded.dontShowAgain": "Don't show again",
 
   "context.breakdown.title": "Context Breakdown",
   "context.breakdown.note": 'Approximate breakdown of input tokens. "Other" includes tool definitions and overhead.',

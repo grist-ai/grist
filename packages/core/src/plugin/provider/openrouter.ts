@@ -9,7 +9,7 @@ export const OpenRouterPlugin = define({
       for (const item of evt.list()) {
         if (item.provider.package !== "@opencode/ai/providers/openrouter") continue
         evt.update(item.provider.id, (provider) => {
-          provider.headers = { ...provider.headers, "HTTP-Referer": "https://opencode.ai/", "X-Title": "opencode" }
+          provider.headers = { ...provider.headers, "HTTP-Referer": "https://github.com/grist-ai/grist", "X-Title": "grist" }
         })
       }
     })
