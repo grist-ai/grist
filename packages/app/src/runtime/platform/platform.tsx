@@ -121,6 +121,9 @@ type PlatformBase = {
   /** Read image from clipboard (desktop only) */
   readClipboardImage?(): Promise<File | null>
 
+  /** Proactively request microphone permission before voice capture (desktop only) */
+  ensureMicrophoneAccess?(): Promise<boolean>
+
   /** Write text to the native clipboard (desktop only) */
   writeClipboardText?(text: string): Promise<void>
 
