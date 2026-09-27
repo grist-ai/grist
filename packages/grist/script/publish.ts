@@ -61,6 +61,10 @@ async function published(name: string, version: string) {
   return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
 }
 
+async function packageExists(name: string) {
+  return (await $`npm view ${name} versions`.nothrow()).exitCode === 0
+}
+
 async function publish(cwd: string, name: string, version: string) {
   if (process.platform !== "win32") await $`chmod -R 755 .`.cwd(cwd)
   if (await published(name, version)) {
@@ -203,7 +207,24 @@ await Bun.file(`${wrapperDir}/package.json`).write(
 
 for (const name of Object.keys(binaries)) {
   const pkgDir = name // platform package dir is dist/<name>
-  await publish(`./dist/${pkgDir}`, name, version)
+  try {
+    await publish(`./dist/${pkgDir}`, name, version)
+  } catch (err) {
+    // A brand-new package name (e.g. grist-windows-*) can't be first-published
+    // via OIDC trusted publishing — the trusted publisher is configured per
+    // existing package on npmjs.com, so the first publish needs a classic
+    // token. That must not block the rest of the release (darwin/linux and
+    // the grist-ai wrapper). A name that already exists but failed to publish
+    // is a real problem: fail loudly.
+    if (!(await packageExists(name))) {
+      console.warn(
+        `warning: skipping ${name}@${version} — package does not exist on npm yet, ` +
+          `publish it once with an npm login first (${(err as Error).message})`,
+      )
+      continue
+    }
+    throw err
+  }
 }
 await publish(wrapperDir, PRODUCT_NPM, version)
 await publish("./dist/grist-skills", skills.name, skills.version)
