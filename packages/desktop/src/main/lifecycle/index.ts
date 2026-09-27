@@ -13,6 +13,7 @@ import { marks } from "./marks"
 import { initializeFirstLaunchOnboarding } from "./onboarding"
 import { Shutdown } from "./shutdown"
 import { consoleReturnWindow } from "./deep-link"
+import { PROTOCOL_SCHEME } from "../../../brand"
 
 export interface Interface {
   readonly relaunch: () => void
@@ -67,7 +68,7 @@ const runtime = Layer.effect(
       )
     }
     const secondInstance = (_event: Event, argv: string[]) => {
-      const urls = argv.filter((arg) => arg.startsWith("opencode://"))
+      const urls = argv.filter((arg) => arg.startsWith(`${PROTOCOL_SCHEME}://`))
       if (urls.length) {
         runFork(Effect.logInfo("deep link received via second-instance", { urls }))
         focusWindow(emitDeepLinks(urls) ?? null)

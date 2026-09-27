@@ -9,11 +9,11 @@ import { requiresStableMacInstaller, stableMacDownload } from "./migration"
 
 const updateClient = pkg.autoUpdater
 const restartTimeout = 10_000
-const stableArtifact = "https://opencode.ai/update/api/latest/desktop/opencode"
+const stableArtifact = "https://api.github.com/repos/grist-ai/grist-downloads/releases/latest"
 
 export const make = Effect.gen(function* () {
   const external = requiresStableMacInstaller(process.platform, CHANNEL)
-  const userAgent = `opencode/${CHANNEL === "prod" ? "latest" : CHANNEL}/${app.getVersion()}/desktop`
+  const userAgent = `grist/${CHANNEL === "prod" ? "latest" : CHANNEL}/${app.getVersion()}/desktop`
   const runFork = Effect.runForkWith(yield* Effect.context())
   updateClient.logger = {
     info: (...args) => runFork(Effect.logInfo(...args)),
@@ -41,7 +41,7 @@ export const make = Effect.gen(function* () {
       try: async () => {
         if (external) {
           const response = await fetch(stableArtifact, { headers: { "User-Agent": userAgent } })
-          if (!response.ok) throw new Error(`Stable OpenCode update check failed: ${response.status}`)
+          if (!response.ok) throw new Error(`Stable Grist update check failed: ${response.status}`)
           const download = stableMacDownload(await response.json(), process.arch)
           if (!download) throw new Error("Stable OpenCode download is unavailable")
           return { mode: "external", ...download } as const

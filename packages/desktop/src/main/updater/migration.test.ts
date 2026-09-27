@@ -9,24 +9,23 @@ test("uses the external stable installer only for macOS beta", () => {
 })
 
 test("selects the signed stable installer for the current Mac architecture", () => {
-  const artifact = {
-    version: "2.0.2",
-    metadata: {
-      files: {
-        "opencode-desktop-mac-arm64.dmg": { url: "https://files.test/OpenCode-arm64.dmg" },
-        "opencode-desktop-mac-x64.dmg": { url: "https://files.test/OpenCode-x64.dmg" },
-      },
-    },
+  const release = {
+    tag_name: "0.1.11",
+    assets: [
+      { name: "grist-desktop-mac-arm64.dmg", browser_download_url: "https://files.test/Grist-arm64.dmg" },
+      { name: "grist-desktop-mac-arm64.zip", browser_download_url: "https://files.test/Grist-arm64.zip" },
+      { name: "grist-desktop-mac-x64.dmg", browser_download_url: "https://files.test/Grist-x64.dmg" },
+    ],
   }
 
-  expect(stableMacDownload(artifact, "arm64")).toEqual({
-    version: "2.0.2",
-    url: "https://files.test/OpenCode-arm64.dmg",
+  expect(stableMacDownload(release, "arm64")).toEqual({
+    version: "0.1.11",
+    url: "https://files.test/Grist-arm64.dmg",
   })
-  expect(stableMacDownload(artifact, "x64")).toEqual({
-    version: "2.0.2",
-    url: "https://files.test/OpenCode-x64.dmg",
+  expect(stableMacDownload(release, "x64")).toEqual({
+    version: "0.1.11",
+    url: "https://files.test/Grist-x64.dmg",
   })
-  expect(stableMacDownload(artifact, "ia32")).toBeUndefined()
-  expect(stableMacDownload({ version: "2.0.2", metadata: { files: {} } }, "arm64")).toBeUndefined()
+  expect(stableMacDownload(release, "ia32")).toBeUndefined()
+  expect(stableMacDownload({ tag_name: "0.1.11", assets: [] }, "arm64")).toBeUndefined()
 })

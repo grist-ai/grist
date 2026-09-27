@@ -3,6 +3,7 @@ import { Wordmark } from "@opencode/ui/wordmark"
 import type { Platform } from "@opencode/app/desktop"
 import { onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
+import { PRODUCT_COLOR } from "../../../brand"
 import "./splash.css"
 
 export function LoadingSplash(props: {
@@ -52,7 +53,9 @@ export function LoadingSplash(props: {
             "bg-v2-background-bg-base": !props.deep,
           }}
         >
-          <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+          <div style={{ color: PRODUCT_COLOR }}>
+            <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+          </div>
         </div>
       }
     >
