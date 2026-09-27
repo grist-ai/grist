@@ -21,6 +21,7 @@ import { Updater } from "../updater"
 import { DesktopStorage } from "../storage"
 import { createPairing } from "../service/pairing"
 import { getLastFocusedWindow, setBackgroundColor } from "../windows"
+import { ensureMicrophoneAccessNative } from "../native/microphone-native"
 import { sender } from "./context"
 
 export const appHandlers = AppRpcs.toLayer(
@@ -80,6 +81,7 @@ export const appHandlers = AppRpcs.toLayer(
       AppGetKeepScreenActive: () => Effect.sync(screenActivity.get),
       AppSetKeepScreenActive: ({ enabled }) =>
         Effect.try(() => screenActivity.set(enabled)).pipe(Effect.mapError(String)),
+      AppEnsureMicrophoneAccess: () => promise(() => ensureMicrophoneAccessNative()),
     })
   }),
 )

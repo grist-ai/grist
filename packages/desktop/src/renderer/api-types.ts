@@ -97,4 +97,5 @@ export type ElectronAPI = {
   pairCode(): Promise<string>
   getKeepScreenActive(): Promise<boolean>
   setKeepScreenActive(enabled: boolean): Promise<void>
+  ensureMicrophoneAccess(): Promise<boolean>
 }

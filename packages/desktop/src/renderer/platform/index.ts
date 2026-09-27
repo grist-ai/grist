@@ -85,6 +85,7 @@ export function createDesktopPlatform(
     setPinchZoomEnabled,
     getKeepScreenActive: () => api.getKeepScreenActive(),
     setKeepScreenActive: (enabled) => api.setKeepScreenActive(enabled),
+    ensureMicrophoneAccess: () => api.ensureMicrophoneAccess(),
     onDragCancel: (callback) => {
       window.addEventListener(DragCancelEvent, callback)
       return () => window.removeEventListener(DragCancelEvent, callback)

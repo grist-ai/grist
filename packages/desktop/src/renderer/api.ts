@@ -168,4 +168,5 @@ export const api: ElectronAPI = {
   pairCode: () => invoke("AppPairCode"),
   getKeepScreenActive: () => invoke("AppGetKeepScreenActive"),
   setKeepScreenActive: (enabled) => invoke("AppSetKeepScreenActive", { enabled }),
+  ensureMicrophoneAccess: () => invoke("AppEnsureMicrophoneAccess"),
 }

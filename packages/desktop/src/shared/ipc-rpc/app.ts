@@ -64,6 +64,9 @@ export const AppSetKeepScreenActive = Rpc.make("AppSetKeepScreenActive", {
   payload: { enabled: Schema.Boolean },
   error: Schema.String,
 })
+export const AppEnsureMicrophoneAccess = Rpc.make("AppEnsureMicrophoneAccess", {
+  success: Schema.Boolean,
+})
 export const AppRpcs = RpcGroup.make(
   AppAwaitInitialization,
   AppReconnectService,
@@ -84,4 +87,5 @@ export const AppRpcs = RpcGroup.make(
   AppPairCode,
   AppGetKeepScreenActive,
   AppSetKeepScreenActive,
+  AppEnsureMicrophoneAccess,
 )
