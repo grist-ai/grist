@@ -54,6 +54,28 @@ const titles = {
   "/cookies": "Cookie Policy — Grist",
 }
 
+const descriptions = {
+  "/": "Grist is a complete coding-agent harness: confidence-gated model routing, institutional memory, and BYOK economics. Open to everyone.",
+  "/login":
+    "Sign in to Grist or create an account — your API key and dashboard are ready on the spot. Bring your own provider key for inference.",
+  "/dashboard":
+    "Grist dashboard: usage broken down by ladder rung, spend caps, API keys for agents, and per-rung model overrides.",
+  "/dashboard/api":
+    "Mint Grist API keys so agents like Muse can run coding tasks on a VM, billed to your account.",
+  "/dashboard/models":
+    "Override any Grist ladder rung with a model id your provider serves. Clearing a field restores the default.",
+  "/admin": "Grist admin: mint account codes with preset spend caps for testers and special cases.",
+  "/docs":
+    "Grist docs: install the CLI, sign in, start in a repo, and understand the gate, memory, SoL-Pi, and spend.",
+  "/docs/skills":
+    "Give an AI agent the Grist skill so it can install the CLI on its own VM and bill your account.",
+  "/privacy": "Grist privacy policy: what we collect, what leaves your machine, and what we refuse to do.",
+  "/terms": "Terms of use for Grist: the rules for the coding-agent harness, the gateway, and the open beta.",
+  "/acceptable-use":
+    "Acceptable use policy for Grist: what you may and may not do with the harness and the gateway.",
+  "/cookies": "Cookie policy for Grist: what little we store in your browser and why.",
+}
+
 function pathOf() {
   return window.location.pathname.replace(/\/+$/, "") || "/"
 }
@@ -230,7 +252,12 @@ function setAuthNav() {
 
 function show(id) {
   for (const main of document.querySelectorAll("main")) main.hidden = main.id !== id
-  document.title = titles[pathOf()] ?? titles["/"]
+  const path = pathOf()
+  document.title = titles[path] ?? titles["/"]
+  const meta = document.querySelector('meta[name="description"]')
+  if (meta) meta.setAttribute("content", descriptions[path] ?? descriptions["/"])
+  const canonical = document.querySelector('link[rel="canonical"]')
+  if (canonical) canonical.setAttribute("href", `https://grist.lol${path === "/" ? "/" : path}`)
 }
 
 function fail(node, message) {
