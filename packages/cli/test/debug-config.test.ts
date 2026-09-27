@@ -21,7 +21,7 @@ describe("debug config command", () => {
   test("prints config entries from the invoking directory without reordering permissions", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-debug-config-"))
     const project = path.join(import.meta.dir, "..")
-    const registration = path.join(root, "state", "opencode", "service-local.json")
+    const registration = path.join(root, "state", "grist", "service-local.json")
     const entries = [
       {
         type: "document",
