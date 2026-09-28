@@ -16,7 +16,7 @@ const it = testEffect(NodeServices.layer)
 const posix = process.platform === "win32" ? it.live.skip : it.live
 
 posix(
-  "installs a local build through the managed installer, including shell PATH setup",
+  "installs a local build through the managed installer",
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
@@ -42,9 +42,9 @@ posix(
       ),
     ).toBe(0)
     expect(yield* fs.readFileString(path.join(dir, "wslpath-input"))).toBe(windows)
-    expect(yield* fs.readFileString(path.join(dir, ".opencode/bin/opencode"))).toContain("0.0.0-dev-16365")
-    expect((yield* fs.readDirectory(path.join(dir, ".opencode/bin"))).toSorted()).toEqual(["opencode", "opencode2"])
-    expect(yield* fs.readFileString(path.join(dir, ".bashrc"))).toContain(`export PATH=${dir}/.opencode/bin:$PATH`)
+    expect(yield* fs.readFileString(path.join(dir, ".grist/bin/grist"))).toContain("0.0.0-dev-16365")
+    expect((yield* fs.readDirectory(path.join(dir, ".grist/bin"))).toSorted()).toEqual(["grist"])
+    expect(yield* fs.readFileString(path.join(dir, ".bashrc"))).toBe("# existing config\n")
   }),
 )
 
@@ -57,7 +57,7 @@ test("installs and verifies the bundled CLI version", async () => {
         installCli: async (distro, cli) => {
           installs.push([distro, cli.version])
         },
-        resolveCli: async () => "/home/me/.opencode/bin/opencode",
+        resolveCli: async () => "/home/me/.grist/bin/grist",
       }),
     ),
   )
@@ -74,14 +74,14 @@ test("rejects a WSL CLI version that differs from the bundled version", async ()
     createWslServersController(
       testControllerOptions({
         installCli: async () => undefined,
-        resolveCli: async () => "/home/me/.opencode/bin/opencode",
+        resolveCli: async () => "/home/me/.grist/bin/grist",
         readCliVersion: async () => "0.0.0-dev-older",
       }),
     ),
   )
 
   await expect(controller.installOpencode("Debian")).rejects.toThrow(
-    "OpenCode update finished but Debian still reports 0.0.0-dev-older; expected 0.0.0-dev-16365",
+    "Grist update finished but Debian still reports 0.0.0-dev-older; expected 0.0.0-dev-16365",
   )
 })
 
@@ -166,7 +166,7 @@ test("probes addable distros in parallel before checking OpenCode", async () => 
         },
         resolveCli: async (distro) => {
           opencode.push(distro)
-          return "/home/me/.opencode/bin/opencode"
+          return "/home/me/.grist/bin/grist"
         },
       }),
     ),
@@ -201,7 +201,7 @@ test("does not check OpenCode in addable distros that cannot execute commands", 
         }),
         resolveCli: async (distro) => {
           opencode.push(distro)
-          return "/home/me/.opencode/bin/opencode"
+          return "/home/me/.grist/bin/grist"
         },
       }),
     ),
@@ -238,7 +238,7 @@ function testControllerOptions(overrides: Partial<ControllerOptions> = {}): Cont
       persistedServers = servers
     },
     readCliVersion: async () => "0.0.0-dev-16365",
-    resolveCli: async () => "/home/me/.opencode/bin/opencode",
+    resolveCli: async () => "/home/me/.grist/bin/grist",
     ...overrides,
   }
 }

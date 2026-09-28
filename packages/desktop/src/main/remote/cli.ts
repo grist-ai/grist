@@ -75,8 +75,7 @@ type Source = { type: "download"; url: string } | { type: "archive" } | { type: 
 
 export function installScript(input: { version: string; directory?: string; source: Source }) {
   const version = requireVersion(input.version)
-  // The managed CLI installer also configures the user's shell PATH. Private
-  // installations use archives so their destination and shell setup stay isolated.
+  // Private installations use archives so their destination stays isolated.
   // Grist ships no curl installer; managed installs copy the provided binary or
   // fall back to the npm distribution.
   if (input.source.type === "installer") {
