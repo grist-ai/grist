@@ -607,7 +607,10 @@ GRIST_OBS_PACK=off       # pack only</pre>
         <p>
           Inference runs on your own provider key — OpenRouter, Vercel AI
           Gateway, or any OpenAI-compatible endpoint — at your provider's
-          prices, with zero markup from us. <code>grist usage</code> and the
+          prices, with zero markup from us. Attach one key, and prefer an AI
+          gateway key: it reaches every model on every rung, while a direct
+          provider key limits all rungs to that provider's models.
+          <code>grist usage</code> and the
           dashboard show spend broken down by rung, so you can see exactly
           where the money went.
         </p>
@@ -952,6 +955,12 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           OpenAI-compatible endpoint. Every model call Grist makes, including
           the Jev gate's own judgments, bills to that key at your provider's
           rates. Without a key, inference runs on Grist's gateway key.
+        </p>
+        <p class="lede">
+          Attach <strong>one key</strong>, and make it an AI gateway key
+          (OpenRouter or Vercel AI Gateway): a gateway key reaches every model
+          on every rung. A direct provider key (e.g. Anthropic-only) also works,
+          but then every rung is limited to that provider's models.
         </p>
         <form id="provider-form" class="key-form">
           <div>
