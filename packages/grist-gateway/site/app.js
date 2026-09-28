@@ -1043,7 +1043,7 @@ document.querySelectorAll('a[href^="/"]').forEach((link) => {
   link.addEventListener("click", (event) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     const href = link.getAttribute("href")
-    if (!href || href.startsWith("/v1") || href.endsWith(".md")) return
+    if (!href || href.startsWith("/v1") || href.startsWith("/download") || href.endsWith(".md")) return
     event.preventDefault()
     history.pushState(null, "", href)
     void render()
