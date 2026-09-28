@@ -2,6 +2,7 @@ import { RpcClient, RpcClientError } from "effect/unstable/rpc"
 import { AppRpcs } from "./ipc-rpc/app"
 import { EventRpcs } from "./ipc-rpc/events"
 import { FileRpcs } from "./ipc-rpc/files"
+import { GristAuthRpcs } from "./ipc-rpc/grist-auth"
 import { MenuRpcs } from "./ipc-rpc/menu"
 import { StorageRpcs } from "./ipc-rpc/storage"
 import { UpdaterRpcs } from "./ipc-rpc/updater"
@@ -12,6 +13,7 @@ import { SshRpcs } from "./ipc-rpc/ssh"
 export { AppRpcs } from "./ipc-rpc/app"
 export { EventRpcs } from "./ipc-rpc/events"
 export { FileRpcs } from "./ipc-rpc/files"
+export { GristAuthRpcs } from "./ipc-rpc/grist-auth"
 export { MenuRpcs } from "./ipc-rpc/menu"
 export { StorageRpcs } from "./ipc-rpc/storage"
 export { UpdaterRpcs } from "./ipc-rpc/updater"
@@ -22,6 +24,7 @@ export { SshRpcs } from "./ipc-rpc/ssh"
 export const DesktopRpcs = AppRpcs.merge(
   StorageRpcs,
   FileRpcs,
+  GristAuthRpcs,
   WindowRpcs,
   MenuRpcs,
   UpdaterRpcs,

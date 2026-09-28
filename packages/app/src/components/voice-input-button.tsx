@@ -5,7 +5,7 @@ import { Index, onCleanup, onMount, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
-import { attachVoiceActivity, openMoonshineMic, preloadSpeechModel } from "@/utils/moonshine-local"
+import { attachVoiceActivity, openMoonshineMic, preloadSpeechModel, startMicCapture } from "@/utils/moonshine-local"
 import { sameActivity, textFromLines, VOICE_ACTIVITY_BARS } from "@/utils/voice-input"
 import { showToast } from "@/shell/notifications/toast"
 
@@ -25,12 +25,15 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
   let lines: string[] = []
   let partial = ""
   let detachActivity: (() => void) | undefined
+  let detachCapture: (() => void) | undefined
   let cancelled = false
   let capturing = false
 
   const detach = () => {
     detachActivity?.()
     detachActivity = undefined
+    detachCapture?.()
+    detachCapture = undefined
     setVoice("levels", restingLevels())
   }
 
@@ -107,8 +110,10 @@ export function useVoiceInput(input: { onTranscript: (text: string) => void }) {
         })
       }
       if (cancelled) return
-      await mic.start()
+      detachCapture = await startMicCapture(mic)
       if (cancelled) {
+        detachCapture?.()
+        detachCapture = undefined
         await mic.stop()
         return
       }

@@ -8,6 +8,7 @@ import type { SshPlatform } from "@/servers/ssh/types"
 import type { UpdaterPlatform } from "@/shell/updates/types"
 import type { DraftStore } from "@/runtime/persistence/drafts"
 import type { BrowserPanePlatform } from "./browser-pane"
+import type { GristAuthPlatform } from "@/grist-auth"
 
 type PickerPaths = string | string[] | null
 type OpenDirectoryPickerOptions = { title?: string; multiple?: boolean }
@@ -145,6 +146,13 @@ type PlatformBase = {
     /** Single-use code for an `/auth/connect/:code` link. */
     code(): Promise<string>
   }
+
+  /**
+   * Grist account auth (device-code login + API key), desktop only. The main
+   * process writes the shared CLI credential file, so signing in here signs in
+   * the bundled CLI too.
+   */
+  gristAuth?: GristAuthPlatform
 }
 
 export type Platform = PlatformBase &

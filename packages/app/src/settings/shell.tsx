@@ -14,6 +14,7 @@ import { AddServerMenu } from "@/servers/wsl/settings"
 import { DialogServer } from "@/servers/connect/dialog"
 import { LocationProvider } from "@/workspaces/location"
 import { SettingsGeneral } from "./general/general"
+import { SettingsAccount } from "./account/account"
 import { SettingsAppearance } from "./appearance/appearance"
 import { experimentalSettingsAvailable, SettingsExperimental } from "./experimental/experimental"
 import { SettingsKeybinds } from "./keybinds/keybinds"
@@ -40,6 +41,7 @@ import { revealSettingsSearch } from "./search-reveal"
 import "@/settings/settings.css"
 
 const rootClientTabs = [
+  { value: "account", icon: pageIcons.account, label: "settings.tab.account" },
   { value: "general", icon: pageIcons.general, label: "settings.tab.preferences" },
   { value: "appearance", icon: pageIcons.appearance, label: "settings.general.section.appearance" },
   { value: "notifications", icon: pageIcons.notifications, label: "settings.tab.notifications" },
@@ -232,7 +234,10 @@ function RootSettings() {
   const groups = createMemo<SettingsNavGroup[]>(() => [
     {
       items: rootClientTabs
-        .filter((item) => item.value !== "pairing" || !!platform.pair)
+        .filter(
+          (item) =>
+            (item.value !== "pairing" || !!platform.pair) && (item.value !== "account" || !!platform.gristAuth),
+        )
         .map((item) => ({ ...item, label: language.t(item.label) })),
     },
     ...(multiple()
@@ -291,6 +296,9 @@ function RootSettings() {
       onChange={change}
       mobileAction={multiple() ? <AddServerMenu compact onAddServer={addServer} /> : undefined}
     >
+      <Tabs.Content value="account" class="settings-panel">
+        <SettingsAccount />
+      </Tabs.Content>
       <Tabs.Content value="general" class="settings-panel">
         <SettingsGeneral />
       </Tabs.Content>
@@ -310,7 +318,7 @@ function RootSettings() {
         <SettingsExperimental />
       </Tabs.Content>
       <Tabs.Content value="about" class="settings-panel settings-about">
-        <SettingsAbout active={surface.view().tab === "about"} />
+        <SettingsAbout />
       </Tabs.Content>
       <Show when={single()} keyed>
         {(server) => (

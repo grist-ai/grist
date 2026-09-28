@@ -1,4 +1,5 @@
 import type { ElectronAPI } from "./api-types"
+import type { GristAuthPlatform } from "@opencode/app/grist-auth"
 import type { UpdaterState } from "@opencode/app/updater"
 import { invoke, listen, send } from "./ipc-client"
 
@@ -166,6 +167,13 @@ export const api: ElectronAPI = {
   setNativeTranslations: (bundle) => invoke("AppSetNativeTranslations", { value: bundle }),
   pairInfo: () => invoke("AppPairInfo").then(mutable),
   pairCode: () => invoke("AppPairCode"),
+  gristAuth: {
+    status: () => invoke("GristAuthStatus"),
+    startDevice: () => invoke("GristAuthStartDevice"),
+    pollDevice: (deviceCode: string) => invoke("GristAuthPollDevice", { deviceCode }),
+    saveApiKey: (apiKey: string) => invoke("GristAuthSaveApiKey", { apiKey }),
+    logout: () => invoke("GristAuthLogout"),
+  } satisfies GristAuthPlatform,
   getKeepScreenActive: () => invoke("AppGetKeepScreenActive"),
   setKeepScreenActive: (enabled) => invoke("AppSetKeepScreenActive", { enabled }),
   ensureMicrophoneAccess: () => invoke("AppEnsureMicrophoneAccess"),

@@ -16,6 +16,12 @@ type Entry<Tab> = {
 }
 
 export const clientSettings: Entry<SettingsRootTab>[] = [
+  {
+    tab: "account",
+    label: "settings.tab.account",
+    keywords: "login sign in signin api key auth account",
+    available: "desktop",
+  },
   { tab: "general", label: "settings.tab.preferences" },
   { tab: "appearance", label: "settings.general.section.appearance" },
   { tab: "notifications", label: "settings.tab.notifications" },

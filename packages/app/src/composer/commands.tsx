@@ -1,5 +1,6 @@
 import { useCommand, type CommandOption } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
+import { usePlatform } from "@/runtime/platform/platform"
 import { useLocal } from "@/providers/models/selection"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { useWorkspaceLocation } from "@/workspaces/location"
@@ -15,6 +16,7 @@ export const useComposerCommands = () => {
   const command = useCommand()
   const dialog = useDialog()
   const language = useLanguage()
+  const platform = usePlatform()
   const local = useLocal()
   const workspace = useWorkspaceLocation()
   const agentCommand = withCategory(language.t("command.category.agent"))
@@ -27,13 +29,18 @@ export const useComposerCommands = () => {
   }
 
   command.register("composer", () => [
-    providerCommand({
-      id: "provider.connect",
-      title: language.t("command.provider.connect"),
-      description: language.t("command.provider.connect.description"),
-      slash: "connect",
-      onSelect: connectProvider,
-    }),
+    // The provider connect dialog is hidden on desktop (gateway-only, auth lives in settings).
+    ...(platform.platform === "desktop"
+      ? []
+      : [
+          providerCommand({
+            id: "provider.connect",
+            title: language.t("command.provider.connect"),
+            description: language.t("command.provider.connect.description"),
+            slash: "connect",
+            onSelect: connectProvider,
+          }),
+        ]),
     agentCommand({
       id: "agent.cycle",
       title: language.t("command.agent.cycle"),

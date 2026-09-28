@@ -22,6 +22,7 @@ import {
 import { createStore } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
+import { usePlatform } from "@/runtime/platform/platform"
 import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
 import { useGlobal } from "@/runtime/server/runtime"
@@ -66,6 +67,9 @@ export const DialogConnectProvider: Component<{
   onDone?: () => void
   onConnected?: (provider: string) => void
 }> = (props) => {
+  const platform = usePlatform()
+  // The desktop app hides all provider and model surfaces; authentication moves to Grist account login.
+  if (platform.platform === "desktop") return null
   const fallback = useProviderConnectController()
   const controller = props.controller ?? fallback
   const [state, setState] = createStore({

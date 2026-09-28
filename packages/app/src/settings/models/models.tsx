@@ -5,6 +5,7 @@ import { type Component, createEffect, For, Show } from "solid-js"
 import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import { useLanguage } from "@/runtime/i18n/language"
+import { usePlatform } from "@/runtime/platform/platform"
 import { useModels } from "@/providers/models/models"
 import { useServerSDK } from "@/runtime/server/client"
 import { popularProviders } from "@/providers/catalog/providers"
@@ -28,6 +29,9 @@ export const SettingsModels: Component<{
   provider?: string
   onReveal?: () => void
 }> = (props) => {
+  const platform = usePlatform()
+  // The desktop app hides all provider and model surfaces; the Jev gate selects models.
+  if (platform.platform === "desktop") return null
   const language = useLanguage()
   const models = useModels()
   const serverSdk = useServerSDK()

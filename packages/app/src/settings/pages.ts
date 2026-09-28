@@ -3,6 +3,7 @@ import type { useLanguage } from "@/runtime/i18n/language"
 import type { SettingsRootTab } from "./surface"
 
 export const pageIcons = {
+  account: "lock",
   general: "sliders",
   appearance: "appearance",
   notifications: "notifications",
@@ -19,6 +20,7 @@ export const pageIcons = {
 } as const satisfies Record<SettingsRootTab, IconProps["name"]>
 
 export const pageLabels = {
+  account: "settings.tab.account",
   general: "settings.tab.preferences",
   appearance: "settings.general.section.appearance",
   notifications: "settings.tab.notifications",

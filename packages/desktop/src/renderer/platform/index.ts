@@ -98,6 +98,7 @@ export function createDesktopPlatform(
       info: () => api.pairInfo(),
       code: () => api.pairCode(),
     },
+    gristAuth: api.gristAuth,
   }
 }
 

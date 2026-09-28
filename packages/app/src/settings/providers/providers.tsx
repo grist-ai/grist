@@ -9,6 +9,7 @@ import { useIntegrations } from "@/providers/catalog/integrations"
 import { createEffect, createMemo, type Component, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
+import { usePlatform } from "@/runtime/platform/platform"
 import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
 import { DialogConnectProvider, useProviderConnectController } from "@/providers/connect/dialog"
@@ -34,6 +35,9 @@ export const SettingsProviders: Component<{
   directory: string | undefined
   onSelectProvider?: (providerID: string) => void
 }> = (props) => {
+  const platform = usePlatform()
+  // The desktop app hides all provider and model surfaces; authentication moves to Grist account login.
+  if (platform.platform === "desktop") return null
   const dialog = useDialog()
   const language = useLanguage()
   const serverSdk = useServerSDK()

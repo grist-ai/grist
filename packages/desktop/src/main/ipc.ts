@@ -9,6 +9,7 @@ import { DesktopFiles, openExternalURL } from "./files"
 import { appHandlers } from "./ipc-handlers/app"
 import { eventHandlers } from "./ipc-handlers/events"
 import { fileHandlers } from "./ipc-handlers/files"
+import { gristAuthHandlers } from "./ipc-handlers/grist-auth"
 import { menuHandlers } from "./ipc-handlers/menu"
 import { storageHandlers } from "./ipc-handlers/storage"
 import { updaterHandlers } from "./ipc-handlers/updater"
@@ -30,6 +31,7 @@ const handlers = Layer.mergeAll(
   appHandlers,
   storageHandlers,
   fileHandlers,
+  gristAuthHandlers,
   windowHandlers,
   menuHandlers,
   updaterHandlers,

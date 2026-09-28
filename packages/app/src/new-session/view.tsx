@@ -14,6 +14,7 @@ import {
   type PromptProjectController,
 } from "@/new-session/project/selector"
 import { useLanguage } from "@/runtime/i18n/language"
+import { usePlatform } from "@/runtime/platform/platform"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { useProviders } from "@/providers/catalog/providers"
 import { NEW_SESSION_CONTENT_WIDTH } from "@/new-session/layout"
@@ -122,6 +123,7 @@ function NewSessionTips(props: {
   onWorkspace: () => void
 }) {
   const language = useLanguage()
+  const platform = usePlatform()
   const dialog = useDialog()
   const sdk = useWorkspaceLocation()
   const providers = useProviders(() => sdk().directory)
@@ -143,6 +145,7 @@ function NewSessionTips(props: {
   )
   const providerVisible = createMemo(
     () =>
+      platform.platform !== "desktop" &&
       providerReady() &&
       providers.anyConnection() === false &&
       Date.now() - providerState.dismissedAt >= providerTipDismissalDuration,
