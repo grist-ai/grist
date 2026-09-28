@@ -912,6 +912,22 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: â
           <pre id="key-secret-value"></pre>
           <button type="button" class="copy" id="copy-key">Copy</button>
         </section>
+        <section class="install" id="muse-connector">
+          <h2>Meta Muse connector</h2>
+          <p class="muted">
+            Mint a scoped token for Meta's Muse: it can route tasks, run
+            completions, and read spend on this account â€” but can never see or
+            change your provider keys, mint keys, or change caps. Paste it into
+            Muse as a custom connector credential. It is shown once.
+          </p>
+          <button class="btn" type="button" id="mcn-mint">Mint connector token</button>
+          <section class="key-secret" id="mcn-secret" hidden>
+            <h2>Copy this token now</h2>
+            <p class="muted">It will not be shown again.</p>
+            <pre id="mcn-secret-value"></pre>
+            <button type="button" class="copy" id="copy-mcn">Copy</button>
+          </section>
+        </section>
         <section class="admin-list" id="key-list"></section>
       </div>
       <div id="dash-panel-models" hidden>

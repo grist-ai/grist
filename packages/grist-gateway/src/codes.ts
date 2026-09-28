@@ -13,13 +13,22 @@ export function generateApiKeySecret(): string {
   return `grist_sk_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex")}`
 }
 
+/**
+ * Muse connector tokens look like `grist_mcn_` plus 64 hex chars. They are
+ * API keys with a scoped kind: they can route, complete, and read spend, but
+ * can never touch provider keys.
+ */
+export function generateConnectorSecret(): string {
+  return `grist_mcn_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex")}`
+}
+
 export function generateApiKeyId(): string {
   return `gsk_${randomCrockford(12)}`
 }
 
 export function canonicalApiKey(raw: string): string | undefined {
   const value = raw.trim().toLowerCase()
-  if (!/^grist_sk_[0-9a-f]{64}$/.test(value)) return
+  if (!/^grist_(sk|mcn)_[0-9a-f]{64}$/.test(value)) return
   return value
 }
 

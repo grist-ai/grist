@@ -1471,7 +1471,7 @@ describe("rung models", () => {
     expect(badShape.status).toBe(400)
   })
 
-  test("delegated grist_sk keys cannot change models (account session only)", async () => {
+  test("delegated grist_sk keys can read but not change models", async () => {
     const { gateway, code } = await rungTestGateway()
     const created = await call(gateway.fetch, "POST", "/v1/api-keys", {
       headers: { "X-Grist-Invite": code },
@@ -1483,10 +1483,13 @@ describe("rung models", () => {
       body: { overrides: { cheapest: "acct/flash" } },
     })
     expect(denied.status).toBe(401)
-    const deniedGet = await call(gateway.fetch, "GET", "/v1/rung-models", {
+    // The ladder is public info (it ships in the README): GET is open to any
+    // valid key.
+    const allowedGet = await call(gateway.fetch, "GET", "/v1/rung-models", {
       headers: { "X-Grist-Api-Key": key },
     })
-    expect(deniedGet.status).toBe(401)
+    expect(allowedGet.status).toBe(200)
+    expect((allowedGet.json as { rungs: unknown[] }).rungs.length).toBeGreaterThan(0)
   })
 
   test("override changes the model on the house request path", async () => {
@@ -1504,5 +1507,224 @@ describe("rung models", () => {
     expect(completion.status).toBe(200)
     const last = upstreamBodies[upstreamBodies.length - 1] as { model?: string }
     expect(last?.model).toBe("acct/flash")
+  })
+})
+
+describe("muse connector", () => {
+  async function connectorTestGateway() {
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 1000, completion_tokens: 500 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5, note: "muse" },
+    })
+    const code = (minted.json as { code: string }).code
+    return { gateway, code }
+  }
+
+  async function mintConnectorToken(
+    fetch: (req: Request, peerIp?: string) => Promise<Response>,
+    code: string,
+  ) {
+    const minted = await call(fetch, "POST", "/v1/connectors/muse/token", {
+      headers: { "X-Grist-Invite": code },
+      body: { name: "Muse" },
+    })
+    expect(minted.status).toBe(200)
+    const body = minted.json as { token: string; id: string; name: string; kind: string }
+    expect(body.token).toMatch(/^grist_mcn_[0-9a-f]{64}$/)
+    expect(body.kind).toBe("connector")
+    expect(body.name).toBe("Muse")
+    return body.token
+  }
+
+  test("mint requires an account session", async () => {
+    const { gateway, code } = await connectorTestGateway()
+    const noAuth = await call(gateway.fetch, "POST", "/v1/connectors/muse/token", {
+      body: { name: "Muse" },
+    })
+    expect(noAuth.status).toBe(401)
+    // A delegated standard key cannot mint either.
+    const created = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      headers: { "X-Grist-Invite": code },
+      body: { name: "agent" },
+    })
+    const key = (created.json as { key: string }).key
+    const withKey = await call(gateway.fetch, "POST", "/v1/connectors/muse/token", {
+      headers: { "X-Grist-Api-Key": key },
+      body: { name: "Muse" },
+    })
+    expect(withKey.status).toBe(401)
+  })
+
+  test("connector token can route and read spend", async () => {
+    const { gateway, code } = await connectorTestGateway()
+    const token = await mintConnectorToken(gateway.fetch, code)
+    const auth = { headers: { "X-Grist-Api-Key": token } }
+
+    const route = await call(gateway.fetch, "POST", "/v1/gate/route", {
+      ...auth,
+      body: { text: "Rename unused helper in src/graph/map.ts" },
+    })
+    expect(route.status).toBe(200)
+    expect((route.json as { rung: string }).rung).toBe("cheapest")
+
+    const usage = await call(gateway.fetch, "GET", "/v1/usage", auth)
+    expect(usage.status).toBe(200)
+    expect((usage.json as { plan: string }).plan).toBe("beta")
+
+    const ladder = await call(gateway.fetch, "GET", "/v1/rung-models", auth)
+    expect(ladder.status).toBe(200)
+
+    // Bearer form works too.
+    const bearerUsage = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(bearerUsage.status).toBe(200)
+  })
+
+  test("connector token is 403 on every /v1/provider method", async () => {
+    const { gateway, code } = await connectorTestGateway()
+    const token = await mintConnectorToken(gateway.fetch, code)
+    const auth = { headers: { "X-Grist-Api-Key": token } }
+
+    expect((await call(gateway.fetch, "GET", "/v1/provider", auth)).status).toBe(403)
+    expect(
+      (
+        await call(gateway.fetch, "POST", "/v1/provider", {
+          ...auth,
+          body: { provider: "openrouter", api_key: "sk-test" },
+        })
+      ).status,
+    ).toBe(403)
+    expect((await call(gateway.fetch, "DELETE", "/v1/provider", auth)).status).toBe(403)
+  })
+
+  test("connector token cannot mint keys or change caps", async () => {
+    const { gateway, code } = await connectorTestGateway()
+    const token = await mintConnectorToken(gateway.fetch, code)
+    const auth = { headers: { "X-Grist-Api-Key": token } }
+
+    const mint = await call(gateway.fetch, "POST", "/v1/connectors/muse/token", {
+      ...auth,
+      body: { name: "second" },
+    })
+    expect(mint.status).toBe(401)
+    const cap = await call(gateway.fetch, "POST", "/v1/account/cap", {
+      ...auth,
+      body: { cap_usd: 50 },
+    })
+    expect(cap.status).toBe(401)
+    const put = await call(gateway.fetch, "PUT", "/v1/rung-models", {
+      ...auth,
+      body: { overrides: { cheapest: "acct/flash" } },
+    })
+    expect(put.status).toBe(401)
+  })
+
+  test("standard keys keep their full route access", async () => {
+    const { gateway, code } = await connectorTestGateway()
+    const created = await call(gateway.fetch, "POST", "/v1/api-keys", {
+      headers: { "X-Grist-Invite": code },
+      body: { name: "agent" },
+    })
+    const key = (created.json as { key: string }).key
+    expect(key).toMatch(/^grist_sk_[0-9a-f]{64}$/)
+    const auth = { headers: { "X-Grist-Api-Key": key } }
+
+    expect((await call(gateway.fetch, "GET", "/v1/provider", auth)).status).toBe(200)
+    expect((await call(gateway.fetch, "GET", "/v1/usage", auth)).status).toBe(200)
+    expect(
+      (await call(gateway.fetch, "POST", "/v1/gate/route", { ...auth, body: { text: "hi" } })).status,
+    ).toBe(200)
+  })
+
+  test("minted connector tokens are listed and revocable", async () => {
+    const { gateway, code } = await connectorTestGateway()
+    const token = await mintConnectorToken(gateway.fetch, code)
+    const session = { headers: { "X-Grist-Invite": code } }
+
+    const listed = await call(gateway.fetch, "GET", "/v1/api-keys", session)
+    const rows = (listed.json as { keys: { id: string; kind: string; prefix: string }[] }).keys
+    const row = rows.find((entry) => entry.kind === "connector")
+    expect(row).toBeDefined()
+    expect(JSON.stringify(listed.json)).not.toContain(token)
+
+    const revoked = await call(gateway.fetch, "DELETE", `/v1/api-keys/${row!.id}`, session)
+    expect(revoked.status).toBe(200)
+    const after = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { "X-Grist-Api-Key": token },
+    })
+    expect(after.status).toBe(401)
+  })
+
+  test("/openapi.json documents the connector surface", async () => {
+    const { gateway } = await connectorTestGateway()
+    const response = await call(gateway.fetch, "GET", "/openapi.json")
+    expect(response.status).toBe(200)
+    const doc = response.json as {
+      openapi: string
+      info: { title: string }
+      servers: { url: string }[]
+      paths: Record<string, unknown>
+    }
+    expect(doc.openapi).toBe("3.0.3")
+    expect(doc.info.title).toBe("Grist Connector API")
+    expect(doc.servers[0]?.url).toBe("https://grist.lol")
+    for (const path of [
+      "/v1/gate/route",
+      "/v1/chat/completions",
+      "/v1/usage",
+      "/v1/rung-models",
+      "/v1/connectors/muse/token",
+    ]) {
+      expect(doc.paths[path]).toBeDefined()
+    }
+  })
+
+  test("/llms.txt is served as plain text", async () => {
+    const { gateway } = await connectorTestGateway()
+    const response = await gateway.fetch(new Request("http://gateway.test/llms.txt"))
+    expect(response.status).toBe(200)
+    expect(response.headers.get("Content-Type")).toContain("text/plain")
+    const text = await response.text()
+    expect(text).toContain("https://grist.lol")
+    expect(text).toContain("grist_mcn_")
+  })
+
+  test("canonicalApiKey accepts sk and mcn prefixes, rejects junk", () => {
+    const sk = `grist_sk_${"a".repeat(64)}`
+    const mcn = `grist_mcn_${"b".repeat(64)}`
+    expect(canonicalApiKey(sk)).toBe(sk)
+    expect(canonicalApiKey(mcn)).toBe(mcn)
+    expect(canonicalApiKey(mcn.toUpperCase())).toBe(mcn)
+    expect(canonicalApiKey("grist_xx_" + "c".repeat(64))).toBeUndefined()
+    expect(canonicalApiKey("grist_sk_short")).toBeUndefined()
+    expect(canonicalApiKey("")).toBeUndefined()
+  })
+
+  test("store round-trips connector key kind", () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite()
+    const created = store.createApiKey({ inviteCode: invite.code, name: "muse", kind: "connector" })
+    expect(created?.secret).toMatch(/^grist_mcn_[0-9a-f]{64}$/)
+    expect(created?.key.kind).toBe("connector")
+    const resolved = store.inviteForApiKey(created!.secret, Date.now())
+    expect(resolved?.keyKind).toBe("connector")
+    const standard = store.createApiKey({ inviteCode: invite.code })
+    expect(standard?.secret).toMatch(/^grist_sk_[0-9a-f]{64}$/)
+    expect(standard?.key.kind).toBe("standard")
+    store.close()
   })
 })

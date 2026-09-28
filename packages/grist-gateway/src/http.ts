@@ -10,7 +10,7 @@ import { parseByokProvider, providerEndpoints, resolveUpstream, type ByokProvide
 import { applyModeCap, type OperatingMode } from "@grist-ai/logic"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase.js"
 import { isLadderModel, publicLadderID, priceForModel, usdForUsage } from "./prices.js"
-import { ACCOUNT_TTL_MS, openGatewayStore, type GatewayStore, type InviteRow } from "./store.js"
+import { ACCOUNT_TTL_MS, openGatewayStore, type ApiKeyKind, type GatewayStore, type InviteRow } from "./store.js"
 import { canonicalApiKey } from "./codes.js"
 import { parseMasterKey } from "./provider-keys.js"
 import type { ProviderCredential } from "./store.js"
@@ -36,7 +36,7 @@ export type GatewayOptions = {
 }
 
 /** An invite plus the API key that authenticated the request, when one did. */
-type ResolvedInvite = InviteRow & { keyId: string | null }
+type ResolvedInvite = InviteRow & { keyId: string | null; keyKind: ApiKeyKind | null }
 
 const SITE_ROOT = path.join(import.meta.dir, "..", "site")
 const SITE_PAGES = new Set([
@@ -381,6 +381,17 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (pathname === "/v1/provider") {
       return providerCredentials(req)
+    }
+    if (req.method === "POST" && pathname === "/v1/connectors/muse/token") {
+      return museToken(req)
+    }
+    if (req.method === "GET" && pathname === "/openapi.json") {
+      return json(200, connectorOpenApi())
+    }
+    if (req.method === "GET" && pathname === "/llms.txt") {
+      return new Response(CONNECTOR_LLMS_TXT, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      })
     }
     if (pathname.startsWith("/v1/admin/")) {
       return admin(req, pathname)
@@ -737,17 +748,43 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   /**
+   * Mint a scoped connector token for Meta's Muse. Account session only —
+   * a delegated key can never mint more keys. The token is shown ONCE in the
+   * response and never again; it is stored hashed like every other key.
+   */
+  async function museToken(req: Request): Promise<Response> {
+    const invite = await requireAccount(req)
+    if (invite instanceof Response) return invite
+    if (!allowWindow(`keymint:${invite.code}`, limits.keyMint.limit, limits.keyMint.windowMs)) {
+      return json(429, { error: "too many key requests" })
+    }
+    const body = await readJson(req)
+    const rawName = typeof body?.name === "string" ? body.name.trim() : ""
+    const created = store.createApiKey({
+      inviteCode: invite.code,
+      name: rawName || "Muse connector",
+      kind: "connector",
+    })
+    if (!created) return json(400, { error: "key limit reached" })
+    return json(200, { token: created.secret, ...serializeApiKey(created.key) })
+  }
+
+  /**
    * Per-account rung → model overrides. GET shows each rung with the server
    * default and the effective model; PUT sets overrides (`null` resets a rung
    * to the default). Overrides win over the default ladder on every request.
    */
   async function rungModels(req: Request): Promise<Response> {
-    const invite = await requireAccount(req)
-    if (invite instanceof Response) return invite
-
+    // GET is public account info (the ladder ships in the README); PUT stays
+    // account-session-only so delegated keys can never change models.
     if (req.method === "GET") {
+      const invite = await resolveInvite(req)
+      if (invite instanceof Response) return invite
       return json(200, { rungs: rungModelView(store, invite.code) })
     }
+
+    const invite = await requireAccount(req)
+    if (invite instanceof Response) return invite
 
     if (req.method === "PUT") {
       if (!allowWindow(`models:${invite.code}`, limits.capChange.limit, limits.capChange.windowMs)) {
@@ -784,6 +821,11 @@ export function createGateway(opts: GatewayOptions = {}) {
   async function providerCredentials(req: Request): Promise<Response> {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
+    // Connector tokens are scoped: they can infer and read spend, but the
+    // provider key is never visible to them in any form.
+    if (invite.keyKind === "connector") {
+      return json(403, { error: "connector tokens cannot manage provider keys" })
+    }
 
     if (req.method === "GET") {
       const summary = store.providerCredentialSummary(invite.code)
@@ -911,7 +953,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (raw) {
       const invite = store.getInvite(raw)
       if (!invite || !inviteUsable(invite, now())) return json(401, { error: "unauthorized" })
-      return { ...invite, keyId: null }
+      return { ...invite, keyId: null, keyKind: null }
     }
     const bearer = req.headers.get("Authorization") ?? ""
     if (!bearer.startsWith("Bearer ")) return json(401, { error: "unauthorized" })
@@ -921,7 +963,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (!account) return json(401, { error: "unauthorized" })
     const invite = store.getInvite(account.invite_code)
     if (!invite || !inviteUsable(invite, now())) return json(401, { error: "unauthorized" })
-    return { ...invite, keyId: null }
+    return { ...invite, keyId: null, keyKind: null }
   }
 
   async function requireAccount(req: Request): Promise<ResolvedInvite | Response> {
@@ -1493,6 +1535,7 @@ function bearerApiKey(req: Request) {
 function serializeApiKey(row: {
   id: string
   name: string
+  kind: ApiKeyKind
   prefix: string
   created_at: number
   last_used_at: number | null
@@ -1501,9 +1544,312 @@ function serializeApiKey(row: {
   return {
     id: row.id,
     name: row.name,
+    kind: row.kind,
     prefix: row.prefix,
     created_at: new Date(row.created_at).toISOString(),
     last_used_at: row.last_used_at ? new Date(row.last_used_at).toISOString() : null,
     revoked: row.revoked,
   }
 }
+
+/**
+ * Public OpenAPI surface for third-party agents (Meta Muse custom
+ * connectors, etc.). Shapes mirror the actual handlers above — this is
+ * documentation, not a second implementation.
+ */
+function connectorOpenApi(): Record<string, unknown> {
+  return {
+    openapi: "3.0.3",
+    info: {
+      title: "Grist Connector API",
+      version: "1.0.0",
+      description:
+        "Confidence-gated coding-agent harness. Route tasks to the cheapest capable model, run OpenAI-compatible completions, and read spend — with BYOK economics and zero markup.",
+    },
+    servers: [{ url: "https://grist.lol" }],
+    security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
+    components: {
+      securitySchemes: {
+        ApiKeyAuth: {
+          type: "apiKey",
+          in: "header",
+          name: "X-Grist-Api-Key",
+          description: "A grist_sk_… key or a grist_mcn_… connector token.",
+        },
+        BearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          description: "Same Grist key as a Bearer token.",
+        },
+      },
+    },
+    paths: {
+      "/v1/gate/route": {
+        post: {
+          summary: "Route a task to the cheapest capable model rung",
+          security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["text"],
+                  properties: {
+                    text: { type: "string", description: "The task to score and route." },
+                    session_id: { type: "string", description: "Optional client session id, recorded in the burn-in log." },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Routing decision",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      rung: { type: "string", enum: ["cheapest", "medium", "frontier", "premium"] },
+                      model: {
+                        type: "object",
+                        properties: {
+                          provider_id: { type: "string" },
+                          model_id: { type: "string" },
+                        },
+                      },
+                      difficulty: { type: "number" },
+                      sensitivity: { type: "number" },
+                      underspecified: { type: "number" },
+                      reasons: { type: "array", items: { type: "string" } },
+                      mechanisms: {
+                        type: "object",
+                        properties: {
+                          observation_pack: { type: "boolean" },
+                          observation_pack_compressor: { type: "boolean" },
+                          action_fusion: { type: "boolean" },
+                        },
+                      },
+                      provider: { type: "string" },
+                      mode: { type: "string" },
+                      latency_ms: { type: "number" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/v1/chat/completions": {
+        post: {
+          summary: "OpenAI-compatible chat completions, routed through the confidence gate",
+          security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["model", "messages"],
+                  properties: {
+                    model: {
+                      type: "string",
+                      enum: ["cheapest", "medium", "frontier", "premium"],
+                      description: "Ladder rung name. Upstream model identities never ship in the client.",
+                    },
+                    messages: { type: "array", items: { type: "object" } },
+                    stream: { type: "boolean", default: false },
+                    temperature: { type: "number" },
+                    top_p: { type: "number" },
+                    stop: { type: "array", items: { type: "string" } },
+                    tools: { type: "array", items: { type: "object" } },
+                    tool_choice: {},
+                    max_tokens: { type: "integer", description: "Clamped server-side to 8192." },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "OpenAI chat completion object; the model field carries the public rung id.",
+              content: { "application/json": { schema: { type: "object" } } },
+            },
+          },
+        },
+      },
+      "/v1/usage": {
+        get: {
+          summary: "Spend, cap, and per-rung usage for the account",
+          security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Usage summary",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      spent_usd: { type: "number" },
+                      cap_usd: { type: "number" },
+                      remaining_usd: { type: "number" },
+                      plan: { type: "string" },
+                      provider: { type: "string", nullable: true },
+                      expires_at: { type: "string", format: "date-time" },
+                      by_rung: {
+                        type: "object",
+                        properties: {
+                          cheapest: { type: "number" },
+                          medium: { type: "number" },
+                          frontier: { type: "number" },
+                          premium: { type: "number" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/v1/rung-models": {
+        get: {
+          summary: "The cost-tiered model ladder",
+          security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Ladder with server defaults and per-account overrides",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      rungs: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            rung: { type: "string" },
+                            label: { type: "string" },
+                            default: {
+                              type: "object",
+                              properties: { provider: { type: "string" }, model: { type: "string" } },
+                            },
+                            effective: {
+                              type: "object",
+                              properties: { provider: { type: "string" }, model: { type: "string" } },
+                            },
+                            override: { type: "string", nullable: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/v1/connectors/muse/token": {
+        post: {
+          summary: "Mint a scoped connector token for Meta's Muse",
+          description:
+            "Account session only (dashboard sign-in). Delegated keys can never mint tokens. The token is shown once and never again.",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { name: { type: "string", description: "Label, e.g. 'Muse'." } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "The minted token (shown once)",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      token: { type: "string", description: "grist_mcn_… — store it, it will not be shown again." },
+                      id: { type: "string" },
+                      name: { type: "string" },
+                      kind: { type: "string", enum: ["connector"] },
+                      prefix: { type: "string" },
+                      created_at: { type: "string", format: "date-time" },
+                      last_used_at: { type: "string", format: "date-time", nullable: true },
+                      revoked: { type: "boolean" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }
+}
+
+/** Agent-readable guide for the connector surface. Served as text/plain. */
+const CONNECTOR_LLMS_TXT = `# Grist — connector guide for AI agents
+
+Grist is an open-source coding-agent harness. A confidence gate routes every
+task to the cheapest capable model rung, SoL-Pi mechanisms (action fusion,
+observation packing) cut token usage within every tier, doctrine guardrails
+are injected into every session, and a control plane adds escalation,
+permission, and verification hooks. Economics are BYOK: inference bills to
+the user's own provider key (OpenRouter, Vercel AI Gateway, or any
+OpenAI-compatible endpoint) with zero markup. Grist is never a subscription.
+
+Base URL: https://grist.lol
+Machine-readable spec: https://grist.lol/openapi.json (OpenAPI 3.0.3)
+
+## The Meta Muse connector
+
+Hand the user a scoped connector token so Muse can act on their Grist
+account. Connector tokens start with \`grist_mcn_\`.
+
+Mint one (dashboard session required — sign in at https://grist.lol/login
+first, or use the dashboard "Muse connector" section):
+
+  POST /v1/connectors/muse/token
+  Body: {"name": "Muse"}   (optional label)
+
+The token is returned ONCE. Store it in the connector credential store;
+never print it, log it, or write it into a file.
+
+Authenticate every call with one of:
+  X-Grist-Api-Key: grist_mcn_…
+  Authorization: Bearer grist_mcn_…
+
+## Typical flow
+
+1. Route the task: POST /v1/gate/route {"text": "<the task>"}.
+   The response names the rung and model Grist would use.
+2. Run it: POST /v1/chat/completions with "model" set to a rung name
+   (cheapest | medium | frontier | premium) and OpenAI-style messages.
+   The response is an OpenAI chat completion object.
+3. Check spend: GET /v1/usage → spent_usd, cap_usd, remaining_usd, by_rung.
+
+The ladder itself is public: GET /v1/rung-models.
+
+## Scope limits (enforced server-side)
+
+Connector tokens CAN: route tasks, run completions, read usage and the
+ladder. Spend bills to the account's cap like any other key.
+
+Connector tokens CANNOT:
+- read, set, or delete the account's BYOK provider keys (403)
+- mint or revoke API keys, or change model overrides (401)
+- change the spend cap (401)
+
+Revocation: the account holder revokes the token from the dashboard
+(API keys tab) or DELETE /v1/api-keys/{id} with an account session.
+`
