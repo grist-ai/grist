@@ -523,7 +523,8 @@ grist</pre>
           Create an account on this site with your name and email (or Google),
           or sign in — or paste a dashboard API key (<code>grist_sk_…</code>).
           After login, add your own provider key — OpenRouter, Vercel AI
-          Gateway, or any OpenAI-compatible endpoint — and Grist runs
+          Gateway, or any OpenAI-compatible endpoint — on the dashboard's
+          <a href="/dashboard/provider">Provider</a> tab, and Grist runs
           inference on it.
         </p>
         <pre>grist auth login --provider grist
@@ -532,7 +533,8 @@ grist auth login --provider grist --api-key grist_sk_…</pre>
         <p>
           Browser path: the CLI opens this site. Create an account or sign in —
           the first visit creates your account. The terminal polls until the
-          site approves it, then asks for your provider key.
+          site approves it, then you're in. To bring your own inference key,
+          add it on the dashboard's <a href="/dashboard/provider">Provider</a> tab.
         </p>
         <p>
           Usage, remaining spend, and the current plan live on the
@@ -851,6 +853,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
         <a href="/dashboard" data-dash="usage">Usage</a>
         <a href="/dashboard/api" data-dash="api">API keys</a>
         <a href="/dashboard/models" data-dash="models">Models</a>
+        <a href="/dashboard/provider" data-dash="provider">Provider</a>
       </nav>
       <p class="error" id="dash-error" hidden></p>
       <p class="remain" id="remain">—</p>
@@ -908,6 +911,38 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           <button class="btn" type="submit">Save models</button>
           <button type="button" class="text-btn" id="models-reset">Reset all to defaults</button>
           <span class="muted" id="models-msg" role="status"></span>
+        </form>
+      </div>
+      <div id="dash-panel-provider" hidden>
+        <p class="lede" id="provider-status">
+          Loading…
+        </p>
+        <p class="lede">
+          Bring your own inference key — OpenRouter, Vercel AI Gateway, or any
+          OpenAI-compatible endpoint. Every model call Grist makes, including
+          the Jev gate's own judgments, bills to that key at your provider's
+          rates. Without a key, inference runs on Grist's gateway key.
+        </p>
+        <form id="provider-form" class="key-form">
+          <div>
+            <label for="provider-select">Provider</label>
+            <select id="provider-select" name="provider">
+              <option value="openrouter">OpenRouter</option>
+              <option value="vercel">Vercel AI Gateway</option>
+              <option value="custom">Custom (OpenAI-compatible)</option>
+            </select>
+          </div>
+          <div>
+            <label for="provider-key">API key</label>
+            <input id="provider-key" name="api_key" type="password" placeholder="sk-or-…" autocomplete="off" />
+          </div>
+          <div id="provider-base-wrap" hidden>
+            <label for="provider-base">Base URL (https)</label>
+            <input id="provider-base" name="base_url" type="url" placeholder="https://…" autocomplete="off" />
+          </div>
+          <button class="btn" type="submit">Save provider key</button>
+          <button type="button" class="text-btn" id="provider-remove" hidden>Remove key</button>
+          <span class="muted" id="provider-msg" role="status"></span>
         </form>
       </div>
     </main>

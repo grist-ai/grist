@@ -30,6 +30,7 @@ const views = {
   "/dashboard": "view-dashboard",
   "/dashboard/api": "view-dashboard",
   "/dashboard/models": "view-dashboard",
+  "/dashboard/provider": "view-dashboard",
   "/admin": "view-admin",
   "/docs": "view-docs",
   "/docs/skills": "view-docs-skills",
@@ -45,6 +46,7 @@ const titles = {
   "/dashboard": "Usage — Grist",
   "/dashboard/api": "API keys — Grist",
   "/dashboard/models": "Models — Grist",
+  "/dashboard/provider": "Provider — Grist",
   "/admin": "Admin — Grist",
   "/docs": "Docs — Grist",
   "/docs/skills": "Agent skills — Grist",
@@ -360,7 +362,7 @@ async function route() {
     void loadAdmin()
     return
   }
-  if (path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models") {
+  if (path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models" || path === "/dashboard/provider") {
     if (!signedIn()) {
       history.replaceState(null, "", "/login")
       show("view-login")
@@ -368,11 +370,12 @@ async function route() {
       return
     }
     show("view-dashboard")
-    setDashTab(path === "/dashboard/api" ? "api" : path === "/dashboard/models" ? "models" : "usage")
+    setDashTab(path === "/dashboard/api" ? "api" : path === "/dashboard/models" ? "models" : path === "/dashboard/provider" ? "provider" : "usage")
     setAuthNav()
     void loadDashboard()
     if (path === "/dashboard/api") void loadApiKeys()
     if (path === "/dashboard/models") void loadModels()
+    if (path === "/dashboard/provider") void loadProvider()
     return
   }
   if (path === "/login" && device() && invite()) {
@@ -433,11 +436,12 @@ async function loadDashboard() {
 }
 
 function setDashTab(tab) {
-  const titles = { usage: "Usage", api: "API keys", models: "Models" }
+  const titles = { usage: "Usage", api: "API keys", models: "Models", provider: "Provider" }
   document.getElementById("dash-title").textContent = titles[tab] ?? "Usage"
   document.getElementById("dash-panel-usage").hidden = tab !== "usage"
   document.getElementById("dash-panel-api").hidden = tab !== "api"
   document.getElementById("dash-panel-models").hidden = tab !== "models"
+  document.getElementById("dash-panel-provider").hidden = tab !== "provider"
   for (const node of document.querySelectorAll("[data-dash]")) {
     node.classList.toggle("is-on", node.getAttribute("data-dash") === tab)
   }
@@ -863,6 +867,77 @@ document.getElementById("models-reset")?.addEventListener("click", () => {
     overrides[input.getAttribute("data-rung")] = null
   }
   void putRungModels(overrides)
+})
+
+let providerLoad = 0
+
+async function loadProvider() {
+  const gen = ++providerLoad
+  const error = document.getElementById("dash-error")
+  const status = document.getElementById("provider-status")
+  const response = await fetch("/v1/provider", { headers: await headers() })
+  if (gen !== providerLoad) return
+  if (response.status !== 200) {
+    fail(error, "Couldn’t load provider status. Sign in again.")
+    return
+  }
+  const data = await response.json()
+  if (data.provider) {
+    const when = data.updatedAt ? ` · updated ${new Date(data.updatedAt).toLocaleDateString()}` : ""
+    status.innerHTML = `Using your <strong>${escapeHtml(data.provider)}</strong> key${when}. Inference bills to your provider account.`
+    document.getElementById("provider-remove").hidden = false
+  } else {
+    status.textContent = "No provider key attached — inference runs on Grist’s gateway key."
+    document.getElementById("provider-remove").hidden = true
+  }
+}
+
+document.getElementById("provider-select")?.addEventListener("change", (event) => {
+  document.getElementById("provider-base-wrap").hidden = event.target.value !== "custom"
+})
+
+document.getElementById("provider-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault()
+  const msg = document.getElementById("provider-msg")
+  const provider = document.getElementById("provider-select").value
+  const apiKey = document.getElementById("provider-key").value.trim()
+  const baseURL = document.getElementById("provider-base").value.trim()
+  if (!apiKey) {
+    msg.textContent = "Paste your provider API key first."
+    return
+  }
+  if (provider === "custom" && !baseURL) {
+    msg.textContent = "A custom provider needs its base URL."
+    return
+  }
+  msg.textContent = "Saving…"
+  const body = { provider, api_key: apiKey }
+  if (provider === "custom") body.base_url = baseURL
+  const response = await fetch("/v1/provider", {
+    method: "POST",
+    headers: { ...(await headers()), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    msg.textContent = data.error ? `Couldn’t save: ${data.error}` : "Couldn’t save the key."
+    return
+  }
+  document.getElementById("provider-key").value = ""
+  msg.textContent = "Saved."
+  void loadProvider()
+})
+
+document.getElementById("provider-remove")?.addEventListener("click", async () => {
+  const msg = document.getElementById("provider-msg")
+  msg.textContent = "Removing…"
+  const response = await fetch("/v1/provider", { method: "DELETE", headers: await headers() })
+  if (!response.ok) {
+    msg.textContent = "Couldn’t remove the key."
+    return
+  }
+  msg.textContent = "Removed — back on Grist’s gateway key."
+  void loadProvider()
 })
 
 document.getElementById("copy-skill")?.addEventListener("click", async (event) => {
