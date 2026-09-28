@@ -703,8 +703,38 @@ export function createBrowserPage(
           transfers.map(async (file) => files.get(await files.save(file.name, file.mime, file.data)).path),
         )
         const element = target(action.ref)
-        if (action.type === "files.upload")
-          await cdp.send("DOM.setFileInputFiles", { files: local, backendNodeId: element.backendID }, element.sessionID)
+        if (action.type === "files.upload") {
+          if (local.every((file) => /^[\x00-\x7F]*$/.test(file))) {
+            await cdp.send(
+              "DOM.setFileInputFiles",
+              { files: local, backendNodeId: element.backendID },
+              element.sessionID,
+            )
+          } else {
+            // Chromium's DOM.setFileInputFiles silently drops files whose paths
+            // contain non-ASCII characters, so build the FileList in the page and
+            // assign it directly. The File.name still comes through byte-for-byte,
+            // spaces and non-ASCII included.
+            await call(
+              element,
+              `function (uploads) {
+                const transfer = new DataTransfer()
+                for (const upload of uploads) {
+                  const bytes = Uint8Array.from(atob(upload.base64), (char) => char.charCodeAt(0))
+                  transfer.items.add(new File([bytes], upload.name, { type: upload.mime }))
+                }
+                this.files = transfer.files
+              }`,
+              [
+                transfers.map((file) => ({
+                  base64: Buffer.from(file.data).toString("base64"),
+                  name: file.name,
+                  mime: file.mime,
+                })),
+              ],
+            )
+          }
+        }
         if (action.type === "files.drop") {
           const position = await point(element)
           for (const type of ["dragEnter", "dragOver", "drop"])

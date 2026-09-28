@@ -82,7 +82,12 @@ test.skipIf(!!process.env.CI).each(["native", "idle"])(
       })
       const electron: unknown = (await import("electron")).default
       if (typeof electron !== "string") throw new Error("Electron binary path is unavailable.")
-      native = Bun.spawn([electron, path.join(output, "native.mjs")], {
+      // Containers and VMs often run the suite as root, where Chromium refuses
+      // to start its sandbox. Disable it there the way Docker-based CI does;
+      // the sandbox is irrelevant to the HTTP RPC boundary under test.
+      const sandboxArgs =
+        typeof process.getuid === "function" && process.getuid() === 0 ? ["--no-sandbox"] : []
+      native = Bun.spawn([electron, ...sandboxArgs, path.join(output, "native.mjs")], {
         cwd: output,
         env: {
           ...environment,

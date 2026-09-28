@@ -162,6 +162,7 @@ async function main() {
   const ipcErrors: string[] = []
   const replaced: string[] = []
   const focusEvents: string[] = []
+  const previews: string[] = []
   const inventories = new Map<string, Browser.State | null>()
   const unbind = await Effect.runPromise(bindIpcEvents(win.webContents.id))
   const events = Effect.runFork(
@@ -172,6 +173,12 @@ async function main() {
           if (event.event.type === "state") {
             if (event.event.error === "browser.pane.replaced") replaced.push(event.bindingID)
             inventories.set(event.bindingID, event.event.state)
+            return
+          }
+          // Preview targets the Review pane, not a tab: record it instead of
+          // treating it as a focus event with no tab inventory.
+          if (event.event.type === "preview") {
+            previews.push(event.event.path)
             return
           }
           focusEvents.push(event.event.tabID)
@@ -542,6 +549,12 @@ async function main() {
       Buffer.from(await rpc.read({ path: download.files[0].path }, { location }), "base64").toString(),
       "desktop download bytes",
     )
+    // Preview resolves the server-local path in the Review pane: the round trip
+    // returns the path it was given, and the pane reports the preview to the
+    // renderer with the same path.
+    assert.equal((await call("preview", { path: upload })).path, upload)
+    await until(async () => (previews.length ? previews : undefined))
+    assert.deepEqual(previews, [upload])
     await call("evaluate", { tabID, script: "setTimeout(()=>alert('hello dialog'),0); null" })
     await until(async () => (await call("dialog", { tabID, action: "get" })).dialog)
     await fails("evaluate", { tabID, script: "1" }, /Inspect it with browser\.dialog/)
