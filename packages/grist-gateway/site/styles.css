@@ -362,6 +362,39 @@ nav a:visited,
   font-size: 0.72rem;
 }
 
+.gh-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.gh-star:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.gh-star svg.gh {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.gh-star .gh-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gh-star .gh-count:empty {
+  display: none;
+}
+
 .btn-mac {
   background: var(--fg);
   color: #000;
@@ -1930,7 +1963,7 @@ footer a:hover {
     grid-template-columns: 1fr;
   }
 
-  .top nav a:not(.btn) {
+  .top nav a:not(.btn):not(.gh-star) {
     display: none;
   }
 
