@@ -54,6 +54,22 @@
         <a class="btn btn-light" href="/login" data-auth="out">Sign in</a>
         <a href="/admin" data-auth="admin" hidden>Admin</a>
         <a href="/dashboard" data-auth="in" hidden>Dashboard</a>
+        <a
+          class="gh-star"
+          href="https://github.com/grist-ai/grist"
+          target="_blank"
+          rel="noopener"
+          aria-label="Star Grist on GitHub"
+        >
+          <svg class="gh" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+            />
+          </svg>
+          <span>Star</span>
+          <span class="gh-count" id="gh-star-count"></span>
+        </a>
       </nav>
     </header>
 
@@ -92,20 +108,6 @@ grist</pre>
               Download for macOS
             </a>
             <a class="btn" href="/#get-started">Get started</a>
-            <a
-              class="btn btn-ghost"
-              href="https://github.com/grist-ai/grist"
-              target="_blank"
-              rel="noopener"
-            >
-              <svg class="gh" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-                />
-              </svg>
-              Star on GitHub
-            </a>
           </div>
           <div class="hero-install is-fold">
             <div class="diagram-bar">
@@ -607,7 +609,10 @@ GRIST_OBS_PACK=off       # pack only</pre>
         <p>
           Inference runs on your own provider key — OpenRouter, Vercel AI
           Gateway, or any OpenAI-compatible endpoint — at your provider's
-          prices, with zero markup from us. <code>grist usage</code> and the
+          prices, with zero markup from us. Attach one key, and prefer an AI
+          gateway key: it reaches every model on every rung, while a direct
+          provider key limits all rungs to that provider's models.
+          <code>grist usage</code> and the
           dashboard show spend broken down by rung, so you can see exactly
           where the money went.
         </p>
@@ -952,6 +957,12 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           OpenAI-compatible endpoint. Every model call Grist makes, including
           the Jev gate's own judgments, bills to that key at your provider's
           rates. Without a key, inference runs on Grist's gateway key.
+        </p>
+        <p class="lede">
+          Attach <strong>one key</strong>, and make it an AI gateway key
+          (OpenRouter or Vercel AI Gateway): a gateway key reaches every model
+          on every rung. A direct provider key (e.g. Anthropic-only) also works,
+          but then every rung is limited to that provider's models.
         </p>
         <form id="provider-form" class="key-form">
           <div>

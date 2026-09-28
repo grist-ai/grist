@@ -1078,6 +1078,23 @@ document.querySelectorAll('a[href^="/"]').forEach((link) => {
   })
 })
 
+// Live GitHub star count in the nav. Fails silently — the link works regardless.
+void (async () => {
+  const node = document.getElementById("gh-star-count")
+  if (!node) return
+  try {
+    const response = await fetch("https://api.github.com/repos/grist-ai/grist")
+    if (!response.ok) return
+    const data = await response.json()
+    const n = data.stargazers_count
+    if (typeof n !== "number") return
+    node.textContent =
+      n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : `${n}`
+  } catch {
+    /* leave the count blank */
+  }
+})()
+
 await bootFirebase()
 state.ready = true
 await render()
