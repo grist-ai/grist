@@ -85,8 +85,11 @@ const require = __cjs_mod__.createRequire(import.meta.url);
         },
       },
       externalizeDeps: {
-        // Bundle the Effect family together.
-        exclude: ["effect", "@effect/platform-node", "@effect/platform-node-shared", "drizzle-orm"],
+        // Bundle the Effect family together. @grist-ai/logic ships raw TypeScript
+        // (its exports point at src/index.ts) and Electron's Node refuses to
+        // type-strip files under node_modules (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING),
+        // so it must be bundled into the main output instead of externalized.
+        exclude: ["effect", "@effect/platform-node", "@effect/platform-node-shared", "drizzle-orm", "@grist-ai/logic"],
         include: [nodePtyPkg],
       },
     },
