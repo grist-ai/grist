@@ -74,7 +74,10 @@ names only; the gateway resolves them.
 ```bash
 npm install -g grist-ai
 
-# One of: export GRIST_API_KEY (a grist_sk_… key from the dashboard),
+# Sign in (opens your browser; account is created on the spot):
+grist auth login --provider grist
+
+# …or headless: export GRIST_API_KEY (a grist_sk_… key from the dashboard),
 # or put the key + gateway URL in ~/.grist/config.json.
 export GRIST_API_KEY="grist_sk_…"
 export GRIST_GATEWAY_URL="https://grist.lol"  # default; override for self-hosted
