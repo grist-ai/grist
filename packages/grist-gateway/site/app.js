@@ -469,12 +469,14 @@ async function loadApiKeys() {
       const used = row.last_used_at
         ? `used ${new Date(row.last_used_at).toLocaleDateString()}`
         : "never used"
+      const kind = row.kind === "connector" ? `<span class="muted">connector</span>` : ""
       const revoke = row.revoked
         ? ""
         : `<button class="text-btn" type="button" data-revoke-key="${row.id}">Revoke</button>`
       return `<article class="admin-row${row.revoked ? " is-revoked" : ""}">
         <code>${row.prefix}</code>
         <span>${escapeHtml(row.name)}</span>
+        ${kind}
         <span>${row.revoked ? "revoked" : used}</span>
         ${revoke}
       </article>`
@@ -786,12 +788,38 @@ document.getElementById("key-list")?.addEventListener("click", async (event) => 
     headers: await headers(),
   })
   document.getElementById("key-secret").hidden = true
+  document.getElementById("mcn-secret").hidden = true
   void loadApiKeys()
 })
 
 document.getElementById("copy-key")?.addEventListener("click", async (event) => {
   const node = event.currentTarget
   const ok = await copyText(document.getElementById("key-secret-value").textContent)
+  if (!ok) return
+  flashCopied(node)
+})
+
+document.getElementById("mcn-mint")?.addEventListener("click", async () => {
+  const error = document.getElementById("dash-error")
+  error.hidden = true
+  const response = await fetch("/v1/connectors/muse/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await headers()) },
+    body: JSON.stringify({}),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (response.status !== 200 || !data.token) {
+    fail(error, typeof data.error === "string" ? data.error : "Couldn’t mint a connector token.")
+    return
+  }
+  document.getElementById("mcn-secret").hidden = false
+  document.getElementById("mcn-secret-value").textContent = data.token
+  void loadApiKeys()
+})
+
+document.getElementById("copy-mcn")?.addEventListener("click", async (event) => {
+  const node = event.currentTarget
+  const ok = await copyText(document.getElementById("mcn-secret-value").textContent)
   if (!ok) return
   flashCopied(node)
 })

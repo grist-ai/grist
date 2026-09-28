@@ -14,6 +14,7 @@ import {
   canonicalInviteCode,
   generateApiKeyId,
   generateApiKeySecret,
+  generateConnectorSecret,
   generateDeviceSecret,
   generateDeviceUserCode,
   generateInviteCode,
@@ -64,6 +65,7 @@ export type ApiKeyRow = {
   hash: string
   prefix: string
   name: string
+  kind: ApiKeyKind
   created_at: number
   last_used_at: number | null
   revoked: number
@@ -72,11 +74,17 @@ export type ApiKeyRow = {
 export type PublicApiKey = {
   id: string
   name: string
+  kind: ApiKeyKind
   prefix: string
   created_at: number
   last_used_at: number | null
   revoked: boolean
 }
+
+/** Key kinds. `connector` tokens are scoped for third-party agents (e.g.
+ * Meta's Muse): they can route, complete, and read spend, but can never
+ * touch provider keys. */
+export type ApiKeyKind = "standard" | "connector"
 
 export type ProviderCredentialRow = {
   code: string
@@ -173,6 +181,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       hash TEXT NOT NULL UNIQUE,
       prefix TEXT NOT NULL,
       name TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'standard',
       created_at INTEGER NOT NULL,
       last_used_at INTEGER,
       revoked INTEGER NOT NULL DEFAULT 0
@@ -209,6 +218,12 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   }
   if (!accountColumns.some((column) => column.name === "last_name")) {
     db.exec("ALTER TABLE accounts ADD COLUMN last_name TEXT")
+  }
+  // And the key kind column added for scoped connector tokens. Existing keys
+  // default to the full `standard` kind.
+  const apiKeyColumns = db.prepare("PRAGMA table_info(api_keys)").all() as { name: string }[]
+  if (!apiKeyColumns.some((column) => column.name === "kind")) {
+    db.exec("ALTER TABLE api_keys ADD COLUMN kind TEXT NOT NULL DEFAULT 'standard'")
   }
 
   const insertInvite = db.prepare(
@@ -268,8 +283,8 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   const selectAccountByInvite = db.prepare(`SELECT * FROM accounts WHERE invite_code = ?`)
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
-    `INSERT INTO api_keys (id, invite_code, hash, prefix, name, created_at, last_used_at, revoked)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, 0)`,
+    `INSERT INTO api_keys (id, invite_code, hash, prefix, name, kind, created_at, last_used_at, revoked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0)`,
   )
   const selectApiKey = db.prepare(`SELECT * FROM api_keys WHERE id = ?`)
   const selectApiKeyByHash = db.prepare(`SELECT * FROM api_keys WHERE hash = ?`)
@@ -546,17 +561,18 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       }
     },
 
-    createApiKey(input: { inviteCode: string; name?: string }): { secret: string; key: PublicApiKey } | undefined {
+    createApiKey(input: { inviteCode: string; name?: string; kind?: ApiKeyKind }): { secret: string; key: PublicApiKey } | undefined {
       const invite = lookup(input.inviteCode)
       if (!invite) return
       const active = (countActiveApiKeys.get(invite.code) as { n: number }).n
       if (active >= MAX_API_KEYS) return
-      const secret = generateApiKeySecret()
+      const kind: ApiKeyKind = input.kind ?? "standard"
+      const secret = kind === "connector" ? generateConnectorSecret() : generateApiKeySecret()
       const created_at = Date.now()
       let id = generateApiKeyId()
       while (selectApiKey.get(id)) id = generateApiKeyId()
       const name = sanitizeKeyName(input.name)
-      insertApiKey.run(id, invite.code, hashApiKey(secret), apiKeyPrefix(secret), name, created_at)
+      insertApiKey.run(id, invite.code, hashApiKey(secret), apiKeyPrefix(secret), name, kind, created_at)
       return { secret, key: publicApiKey(selectApiKey.get(id) as ApiKeyRow) }
     },
 
@@ -673,7 +689,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       return true
     },
 
-    inviteForApiKey(raw: string, now: number): (InviteRow & { keyId: string }) | undefined {
+    inviteForApiKey(raw: string, now: number): (InviteRow & { keyId: string; keyKind: ApiKeyKind }) | undefined {
       const secret = canonicalApiKey(raw)
       if (!secret) return
       const key = selectApiKeyByHash.get(hashApiKey(secret)) as ApiKeyRow | undefined
@@ -683,7 +699,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       if (!key.last_used_at || now - key.last_used_at >= TOUCH_API_KEY_MS) {
         touchApiKey.run(now, key.id)
       }
-      return { ...invite, keyId: key.id }
+      return { ...invite, keyId: key.id, keyKind: key.kind }
     },
 
     close() {
@@ -698,6 +714,7 @@ function publicApiKey(row: ApiKeyRow): PublicApiKey {
   return {
     id: row.id,
     name: row.name,
+    kind: row.kind,
     prefix: row.prefix,
     created_at: row.created_at,
     last_used_at: row.last_used_at,
