@@ -44,6 +44,7 @@ const SITE_PAGES = new Set([
   "/login",
   "/dashboard",
   "/dashboard/api",
+  "/dashboard/provider",
   "/plans",
   "/admin",
   "/docs",
