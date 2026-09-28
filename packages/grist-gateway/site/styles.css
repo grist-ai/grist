@@ -375,6 +375,29 @@ nav a:visited,
   filter: brightness(0.92);
 }
 
+.btn-ghost {
+  background: transparent;
+  color: var(--fg);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+
+.btn-ghost:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+  filter: none;
+}
+
+.btn-ghost:visited {
+  color: var(--fg);
+}
+
+.btn svg.gh {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
 .hero {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
