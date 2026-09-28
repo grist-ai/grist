@@ -1,1 +1,18 @@
-{"$schema":"https://json.schemastore.org/package.json","dependencies":{"@types/node":"catalog:"},"exports":{".":"./src/index.ts"},"license":"MIT","name":"@grist-ai/logic","scripts":{"typecheck":"tsgo --noEmit"},"sideEffects":false,"type":"module","version":"0.0.0"}
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "dependencies": {
+    "@types/node": "catalog:",
+    "bun-types": "catalog:"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "MIT",
+  "name": "@grist-ai/logic",
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "version": "0.0.0"
+}

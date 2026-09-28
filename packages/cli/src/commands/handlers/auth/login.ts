@@ -5,6 +5,7 @@ import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 import { handlePromptErrors, openUrl, prompt, requireInteractive } from "../../../ui/prompt"
 import { answerForm, secret } from "./form"
+import { gristLogin } from "./grist-login"
 import {
   createClient,
   connectMethods,
@@ -34,6 +35,9 @@ export default Runtime.handler(
       answer: input.answer,
       server: Option.getOrUndefined(input.server),
       standalone: input.standalone,
+      provider: Option.getOrUndefined(input.provider),
+      apiKey: Option.getOrUndefined(input.apiKey),
+      gatewayUrl: Option.getOrUndefined(input.gatewayUrl),
     }).pipe(handlePromptErrors),
   ),
 )
@@ -44,7 +48,12 @@ const login = Effect.fn("cli.auth.login.run")(function* (input: {
   answer?: ReadonlyArray<string>
   server?: string
   standalone: boolean
+  provider?: string
+  apiKey?: string
+  gatewayUrl?: string
 }) {
+  if (input.provider)
+    return yield* gristLogin({ provider: input.provider, apiKey: input.apiKey, gatewayUrl: input.gatewayUrl })
   if (!input.target)
     yield* requireInteractive("Pass an integration ID or name when running without an interactive terminal")
   intro("Connect an integration")

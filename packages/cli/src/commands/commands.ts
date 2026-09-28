@@ -162,6 +162,18 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
               Argument.withDescription("Integration ID, name, or well-known provider URL"),
               Argument.optional,
             ),
+            provider: Flag.string("provider").pipe(
+              Flag.withDescription("Provider to log in to (grist)"),
+              Flag.optional,
+            ),
+            apiKey: Flag.string("api-key").pipe(
+              Flag.withDescription("Grist API key (grist_sk_…) from the dashboard; skips the browser step"),
+              Flag.optional,
+            ),
+            gatewayUrl: Flag.string("gateway-url").pipe(
+              Flag.withDescription("Grist gateway URL (defaults to GRIST_GATEWAY_URL or https://grist.lol)"),
+              Flag.optional,
+            ),
             method: Flag.string("method").pipe(Flag.withDescription("Authentication method ID"), Flag.optional),
             answer: Flag.string("answer").pipe(
               Flag.withDescription("Provider form answer (key=value; repeat for multiple fields)"),

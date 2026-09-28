@@ -17,6 +17,25 @@ export function inviteConfigPath() {
 
 export const INVITE_REQUIRED_MESSAGE = "Grist needs you signed in. Run: grist auth login --provider grist"
 
+/**
+ * Persist a Grist credential (API key or invite code) plus the gateway URL to
+ * the user's config file. Merges with any existing keys and locks the file
+ * down to owner-only permissions, since it holds a bearer credential.
+ */
+export function writeInviteConfig(input: { code: string; gatewayUrl: string }) {
+  const file = inviteConfigPath()
+  const existing = readConfigFile() ?? {}
+  const next = { ...existing, code: input.code, gatewayUrl: input.gatewayUrl }
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify(next, null, 2) + "\n")
+  try {
+    fs.chmodSync(file, 0o600)
+  } catch {
+    // non-POSIX filesystems: best effort
+  }
+  return file
+}
+
 export function loadInviteConfig(): InviteConfig | undefined {
   const envUrl = process.env.GRIST_GATEWAY_URL?.trim()
   const file = readConfigFile()
