@@ -25,6 +25,7 @@ import {
 import { resolveJevRoute, type JevRoute } from "./jev-route.js"
 import { loadThresholds } from "./thresholds.js"
 import { gristLog, gristWarn } from "./debug.js"
+import { sessionEffort, type Effort } from "./mechanisms.js"
 
 export type ContinueAction = "continue" | "stop" | "escalate"
 
@@ -88,12 +89,18 @@ const VERIFY_COMMAND =
 
 const sessions = new Map<string, SessionControl>()
 
-const DEFAULT_EXPLORATORY_CAP = 8
+/** Exploratory tool budget inside a rung, keyed by the session's effort dial. */
+const EFFORT_EXPLORATORY_CAP: Record<Effort, number> = {
+  low: 4,
+  standard: 8,
+  high: 16,
+}
 
-function exploratoryCap(env: NodeJS.ProcessEnv = process.env) {
+/** `GRIST_CTRL_EXPLORE_CAP` overrides the effort mapping when explicitly set. */
+export function exploratoryCapForEffort(effort: Effort, env: NodeJS.ProcessEnv = process.env) {
   const n = Number(env.GRIST_CTRL_EXPLORE_CAP)
   if (!Number.isNaN(n) && n > 0) return Math.floor(n)
-  return DEFAULT_EXPLORATORY_CAP
+  return EFFORT_EXPLORATORY_CAP[effort]
 }
 
 export function rememberSessionControl(
@@ -698,7 +705,7 @@ export async function decideToolBudget(input: {
     sessions.set(input.sessionID, control)
   }
 
-  const cap = exploratoryCap()
+  const cap = exploratoryCapForEffort(sessionEffort(input.sessionID))
   const decision = shadowToolBudget({
     toolID: input.toolID,
     exploratory: control.exploratory,

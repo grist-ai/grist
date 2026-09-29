@@ -1,4 +1,8 @@
-import { sessionAllowsActionFusion, sessionAllowsObservationPackCompressor } from "./mechanisms.js"
+import {
+  sessionAllowsActionFusion,
+  sessionAllowsObservationPackCompressor,
+  sessionEffort,
+} from "./mechanisms.js"
 
 /**
  * Karpathy doctrine — baked into Grist identity (pre-POC spec §7).
@@ -14,6 +18,7 @@ export function surgicalEngineer(sessionID?: string, options: { mechanisms?: boo
     mechanisms && sessionAllowsObservationPackCompressor(sessionID)
       ? "\n\n## Context economy\n\nFor exploration or diagnosis, delegate to a subagent with the `task` tool: only its compressed digest returns to your context, keeping the raw trace out."
       : ""
+  const effortNudge = mechanisms ? effortAdvisory(sessionID) : ""
   return `
 # Identity — surgical engineer (Grist)
 
@@ -27,7 +32,7 @@ You are a surgical engineer. Prefer reversible, observable steps.
 6. Respect the existing system — conventions, ownership, dirty git state.
    Use the \`memory\` tool to recall verified ownership/convention facts; only
    \`remember\` after tests pass, user approval, or an explicit correction.
-7. Prefer reversible, observable steps.${compressionNudge}
+7. Prefer reversible, observable steps.${compressionNudge}${effortNudge}
 
 ## Mandatory plan (multi-file)
 
@@ -46,6 +51,16 @@ The roster is yours to use; the harness only supplies it.
 
 For trivial one-line questions, answer briefly without ceremony.
 `.trim()
+}
+
+/** Advisory (never enforced) delegation/verification line for the session's effort dial. */
+function effortAdvisory(sessionID?: string) {
+  if (!sessionID) return ""
+  const effort = sessionEffort(sessionID)
+  if (effort === "low") return "\n   Prefer doing it inline; avoid dispatching specialists."
+  if (effort === "high")
+    return "\n   Prefer dispatching grist-explore/grist-review/grist-verify; verify with grist-verify before declaring done."
+  return ""
 }
 
 /** Session-invariant doctrine for the cached prompt prefix (no mechanism nudges). */
