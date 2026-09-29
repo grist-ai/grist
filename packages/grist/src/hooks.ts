@@ -34,6 +34,8 @@ import { surgicalEngineer } from "@grist-ai/logic"
 import { gristLog, gristWarn } from "@grist-ai/logic"
 import { GRIST_PROVIDER_ID, publicRungFor, type Rung } from "@grist-ai/logic"
 
+import { truncateHistory } from "./history-truncation.js"
+
 /** v1 ToolPartLike shape, accumulated per session from `tool.execute.after`. */
 type ToolPartLike = {
   type: string
@@ -123,6 +125,14 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
       guarded("session.context", async () => {
         if (!controlPlaneEnabled()) return
         input.system.push(SystemPart.make(surgicalEngineer(input.sessionID)))
+        // Keep the serialized history under the gateway's 256 KB body cap; only
+        // old tool output is shrunk, never the recent tail.
+        const report = truncateHistory(input.messages)
+        if (!report.truncated) return
+        input.messages = report.messages
+        gristLog(
+          `[grist:hooks] context truncated session=${input.sessionID} bytes=${report.bytesDropped} parts=${report.partsShrunk} size=${report.finalSize}`,
+        )
       }),
     )
 
