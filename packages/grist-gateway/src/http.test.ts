@@ -129,8 +129,8 @@ describe("metering", () => {
   })
 })
 
-describe("atomic spend cap", () => {
-  test("applies debits only while the total stays within the cap", () => {
+describe("honest spend accounting", () => {
+  test("spent_usd always equals the usage-events sum, even past the cap", () => {
     const store = openGatewayStore()
     const invite = store.createInvite({ capUsd: 0.001 })
     const debit = (usd: number) =>
@@ -144,9 +144,14 @@ describe("atomic spend cap", () => {
       })
     expect(debit(0.0005).spent_usd).toBeCloseTo(0.0005)
     expect(debit(0.0005).spent_usd).toBeCloseTo(0.001)
-    // Would exceed the cap: rejected and clamped, never 0.0015.
-    expect(debit(0.0005).spent_usd).toBeCloseTo(0.001)
-    expect(store.getInvite(invite.code)?.spent_usd).toBeCloseTo(0.001)
+    // Past the cap the full metered amount is still debited: the running
+    // total must never diverge from the audit log (the old clamp pinned it
+    // to the cap and broke remaining_usd after a cap raise). Enforcement
+    // stays at the pre-request 402, not in the bookkeeping.
+    expect(debit(0.0005).spent_usd).toBeCloseTo(0.0015)
+    const events = store.usageFor(invite.code)
+    const summed = events.reduce((sum, event) => sum + event.usd, 0)
+    expect(store.getInvite(invite.code)?.spent_usd).toBeCloseTo(summed)
     store.close()
   })
 })
