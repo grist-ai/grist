@@ -7,7 +7,7 @@
  * - `session.model.request` (primary) → between-turn judgment; escalate via switchModel
  * - `session.compaction`    → compaction guard (observe; floors in the rung models are the fix)
  * - `tool.execute.before`   → exploratory tool budget; block by failing with Tool.Error
- * - `tool.execute.after`    → per-session tool stats + post-edit verify nudge
+ * - `tool.execute.after`    → per-session tool stats + post-edit verify nudge + warm-subagent resume nudge
  * - `permission.evaluate`   → auto-allow override (never force ask/deny)
  *
  * Kill switch: `GRIST_CTRL=off` makes every hook a no-op.
@@ -25,6 +25,10 @@ import {
   decidePermission,
   decideToolBudget,
   decideVerify,
+  noteResume,
+  recordWarmChild,
+  shouldNudge,
+  warmSubagentsEnabled,
 } from "@grist-ai/logic"
 import { surgicalEngineer } from "@grist-ai/logic"
 import { gristLog, gristWarn } from "@grist-ai/logic"
@@ -214,6 +218,31 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
                     : current
                       ? [...current, nudge]
                       : verify.message,
+              }
+            }
+          }
+          if (input.tool === "subagent" && warmSubagentsEnabled()) {
+            const agent = typeof args?.agent === "string" ? args.agent : undefined
+            const resumed =
+              typeof args?.sessionID === "string" && args.sessionID.length > 0 ? args.sessionID : undefined
+            const recorded = asRecord(input.result.metadata)?.sessionID
+            const childID = resumed ?? (typeof recorded === "string" ? recorded : undefined)
+            if (agent && childID) {
+              if (resumed) noteResume(input.sessionID, agent, childID)
+              else recordWarmChild(input.sessionID, agent, childID)
+              if (shouldNudge(input.sessionID, agent)) {
+                const message = `To re-dispatch ${agent} on a follow-up, pass sessionID: ${childID} to the subagent tool — resumes warm, skips re-briefing.`
+                const current = input.result.content
+                const nudge = { type: "text" as const, text: message }
+                input.result = {
+                  ...input.result,
+                  content:
+                    typeof current === "string"
+                      ? `${current}\n\n${message}`
+                      : current
+                        ? [...current, nudge]
+                        : message,
+                }
               }
             }
           }
