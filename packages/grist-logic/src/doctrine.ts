@@ -35,6 +35,15 @@ If the change touches **more than one file**, first state a short plan that name
 exact files (and line ranges when known) plus the verification step for each.
 Do not edit outside that plan. Off-plan edits are flagged by Grist's diff audit.
 
+## Delegation
+
+The roster is yours to use; the harness only supplies it.
+
+- Dispatch \`grist-explore\` for unfamiliar code — it returns absolute paths and a digest.
+- Dispatch \`grist-plan\` for multi-step work — it returns an ordered, verifiable plan.
+- Dispatch \`grist-review\` before declaring non-trivial edits done — it returns findings, never writes.
+- Dispatch \`grist-verify\` instead of running build/test/lint inline — it returns a pass/fail digest.
+
 For trivial one-line questions, answer briefly without ceremony.
 `.trim()
 }
