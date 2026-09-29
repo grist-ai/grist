@@ -505,6 +505,7 @@ grist</pre>
         </p>
         <nav class="docs-tabs" aria-label="Docs">
           <a href="/docs" class="is-on">Using Grist</a>
+          <a href="/docs/quickstart">Quickstart</a>
           <a href="/docs/skills">Agent skills</a>
           <a href="/docs/release-notes">Release notes</a>
         </nav>
@@ -641,6 +642,126 @@ npx skills add grist-ai/grist-skills</pre>
       </article>
     </main>
 
+    <main id="view-docs-quickstart" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ docs ]</p>
+        <h1>Quickstart</h1>
+        <p class="lede">
+          From zero to a running coding agent in under five minutes. No
+          subscription, no markup — you bring your own inference key.
+        </p>
+        <nav class="docs-tabs" aria-label="Docs">
+          <a href="/docs">Using Grist</a>
+          <a href="/docs/quickstart" class="is-on">Quickstart</a>
+          <a href="/docs/skills">Agent skills</a>
+          <a href="/docs/release-notes">Release notes</a>
+        </nav>
+
+        <h2 id="what-it-is">What it is</h2>
+        <p>
+          Grist is an open-source (MIT) coding-agent harness, a fork of
+          OpenCode. You bring your own inference key — OpenRouter, Vercel AI
+          Gateway, or any OpenAI-compatible endpoint — and Grist runs the
+          agent loop on it with zero markup. Every task passes through the
+          Jev confidence gate, which routes it to the cheapest model rung
+          capable of doing the job well.
+        </p>
+
+        <h2 id="install">Install</h2>
+        <pre>npm install -g grist-ai</pre>
+
+        <h2 id="authenticate">Authenticate</h2>
+        <p>
+          The easy path — the CLI opens your browser, you sign in (or create
+          an account on the spot), approve the terminal, and you're in:
+        </p>
+        <pre>grist auth login --provider grist</pre>
+        <p>
+          Prefer a key? Grab one from the dashboard's
+          <a href="/dashboard/api">API keys</a> tab and either paste it at
+          the prompt or pass it directly:
+        </p>
+        <pre>grist auth login --provider grist --api-key grist_sk_...</pre>
+        <p>
+          Headless fallback (agents on a VM):
+          <code>export GRIST_API_KEY=grist_sk_...</code> or write
+          <code>{"code": "grist_sk_..."}</code> to
+          <code>~/.grist/config.json</code>. Verify with
+          <code>grist doctor</code>.
+        </p>
+
+        <h2 id="inference-keys">Inference keys — how billing works</h2>
+        <p>
+          Out of the box, inference runs on Grist's own gateway key: sign in
+          and go, no provider setup. If you'd rather bring your own key
+          (OpenRouter, Vercel AI Gateway, or any OpenAI-compatible endpoint),
+          attach it on the dashboard's
+          <a href="/dashboard/provider">Provider</a> tab — every model call
+          Grist makes, including the Jev gate's own judgments, then bills to
+          that key at your provider's rates. API equivalent:
+        </p>
+        <pre>curl -s -X POST https://grist.lol/v1/provider \
+  -H "X-Grist-Api-Key: grist_sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "openrouter", "api_key": "sk-or-..."}'</pre>
+        <p>
+          (<code>provider</code> is <code>openrouter</code> |
+          <code>vercel</code> | <code>custom</code>; <code>custom</code> also
+          needs <code>base_url</code>.)
+        </p>
+
+        <h2 id="first-run">First run</h2>
+        <p>Scratch repo, under five minutes:</p>
+        <pre>mkdir hello-grist &amp;&amp; cd hello-grist
+grist run "write fib.py printing the first 10 fibonacci numbers, run it, and show me the output"</pre>
+        <p>
+          Watch it plan, write the file, execute it, and report back. Prefer
+          to drive? Bare <code>grist</code> opens the interactive TUI.
+        </p>
+
+        <h2 id="the-ladder">The ladder — don't pass <code>-m</code></h2>
+        <p>
+          The gate scores each task and picks a rung, escalating mid-run if
+          the task proves tougher than expected:
+        </p>
+        <ul>
+          <li><strong>Fast</strong> — routine work, the default</li>
+          <li><strong>Standard</strong> — medium difficulty</li>
+          <li><strong>Max</strong> — frontier, exceptions only</li>
+          <li><strong>Ultra</strong> — the hardest jobs</li>
+        </ul>
+        <p>
+          <code>grist run</code> accepts <code>-m/--model</code>, but pinning
+          a rung bypasses the gate and you lose the cost routing. Let it
+          decide.
+        </p>
+
+        <h2 id="commands">Useful commands</h2>
+        <table>
+          <tr><th>Command</th><th>What it does</th></tr>
+          <tr><td><code>grist</code></td><td>Interactive TUI</td></tr>
+          <tr><td><code>grist run "&lt;prompt&gt;"</code></td><td>Headless agentic run in the current directory</td></tr>
+          <tr><td><code>grist run -c</code></td><td>Continue the last session</td></tr>
+          <tr><td><code>grist doctor</code></td><td>Health checks: auth, gateway, gate, service, updates</td></tr>
+          <tr><td><code>grist update</code></td><td>Upgrade to the latest release</td></tr>
+          <tr><td><code>grist models</code></td><td>List available models</td></tr>
+          <tr><td><code>grist stats</code></td><td>Usage statistics</td></tr>
+        </table>
+
+        <h2 id="desktop">Desktop app</h2>
+        <p>
+          Prefer a GUI? The Mac app (0.1.16) ships as a dmg from the releases
+          page at github.com/grist-ai/grist-downloads, with the same CLI
+          bundled inside.
+        </p>
+
+        <h2 id="help">Help</h2>
+        <p>
+          Source and issues: github.com/grist-ai/grist.
+        </p>
+      </article>
+    </main>
+
     <main id="view-docs-skills" hidden>
       <article class="docs">
         <p class="eyebrow">[ docs ]</p>
@@ -652,6 +773,7 @@ npx skills add grist-ai/grist-skills</pre>
         </p>
         <nav class="docs-tabs" aria-label="Docs">
           <a href="/docs">Using Grist</a>
+          <a href="/docs/quickstart">Quickstart</a>
           <a href="/docs/skills" class="is-on">Agent skills</a>
           <a href="/docs/release-notes">Release notes</a>
         </nav>
@@ -756,6 +878,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
         </p>
         <nav class="docs-tabs" aria-label="Docs">
           <a href="/docs">Using Grist</a>
+          <a href="/docs/quickstart">Quickstart</a>
           <a href="/docs/skills">Agent skills</a>
           <a href="/docs/release-notes" class="is-on">Release notes</a>
         </nav>

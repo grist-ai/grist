@@ -48,6 +48,7 @@ const SITE_PAGES = new Set([
   "/plans",
   "/admin",
   "/docs",
+  "/docs/quickstart",
   "/docs/skills",
   "/docs/release-notes",
   "/privacy",

@@ -33,6 +33,7 @@ const views = {
   "/dashboard/provider": "view-dashboard",
   "/admin": "view-admin",
   "/docs": "view-docs",
+  "/docs/quickstart": "view-docs-quickstart",
   "/docs/skills": "view-docs-skills",
   "/docs/release-notes": "view-docs-release-notes",
   "/privacy": "view-privacy",
@@ -50,6 +51,7 @@ const titles = {
   "/dashboard/provider": "Provider — Grist",
   "/admin": "Admin — Grist",
   "/docs": "Docs — Grist",
+  "/docs/quickstart": "Quickstart — Grist",
   "/docs/skills": "Agent skills — Grist",
   "/docs/release-notes": "Release notes — Grist",
   "/privacy": "Privacy Policy — Grist",
@@ -71,6 +73,8 @@ const descriptions = {
   "/admin": "Grist admin: mint account codes with preset spend caps for testers and special cases.",
   "/docs":
     "Grist docs: install the CLI, sign in, start in a repo, and understand the gate, memory, SoL-Pi, and spend.",
+  "/docs/quickstart":
+    "Grist quickstart: install the CLI, sign in, attach your provider key, and run your first agent task.",
   "/docs/skills":
     "Give an AI agent the Grist skill so it can install the CLI on its own VM and bill your account.",
   "/docs/release-notes":
@@ -395,7 +399,7 @@ async function route() {
 function scrollHash() {
   const path = pathOf()
   const id = window.location.hash.replace(/^#/, "")
-  if ((path === "/" || path === "/docs" || path === "/docs/skills" || path === "/docs/release-notes") && id) {
+  if ((path === "/" || path === "/docs" || path === "/docs/quickstart" || path === "/docs/skills" || path === "/docs/release-notes") && id) {
     const node = document.getElementById(id)
     if (node) {
       node.scrollIntoView({ behavior: "smooth", block: "start" })
