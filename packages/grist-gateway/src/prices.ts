@@ -116,7 +116,13 @@ function scalePrice(price: TokenPrice, factor: number): TokenPrice {
 function listedPrice(modelID: string, provider: ByokProvider): TokenPrice | undefined {
   // Custom endpoints bill at their own rates, which the gateway cannot see.
   if (provider === "custom") return undefined
-  const price = RUNG_MODEL_PRICES[modelID] ?? MODEL_PRICES[modelID]
+  // Merge the rung override over the base model price so fields the override
+  // doesn't set (notably cachedInput) survive. A wholesale replace silently
+  // billed cached tokens at the full input rate (cheapest rung: $0.15/M
+  // instead of $0.0042/M).
+  const base = MODEL_PRICES[modelID]
+  const override = RUNG_MODEL_PRICES[modelID]
+  const price = override ? { ...base, ...override } : base
   if (!price) return undefined
   return provider === "vercel" ? scalePrice(price, VERCEL_PRICE_FACTOR) : price
 }

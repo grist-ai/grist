@@ -1731,4 +1731,72 @@ describe("muse connector", () => {
     expect(standard?.key.kind).toBe("standard")
     store.close()
   })
+
+  test("prefers the provider-reported usage.cost over computed pricing", async () => {
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: {
+              prompt_tokens: 1000,
+              completion_tokens: 0,
+              // Deliberately different from the computed $0.003 (1000 @ $3/M).
+              cost: 0.001,
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "medium", messages: [], stream: false },
+    })
+    expect(response.status).toBe(200)
+    // Metered at the provider's reported cost, not the recomputed $0.003.
+    expect(gateway.store.getInvite(code)?.spent_usd).toBeCloseTo(0.001, 6)
+  })
+
+  test("cheapest rung bills cached input at the cached rate, not full price", async () => {
+    const offPeak = Date.UTC(2026, 8, 21, 12, 0, 0)
+    const gateway = createGateway({
+      adminToken: "secret",
+      openrouterKey: "or-test",
+      typesafeKey: "",
+      now: () => offPeak,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: {
+              prompt_tokens: 1000,
+              completion_tokens: 0,
+              prompt_tokens_details: { cached_tokens: 900 },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    })
+    const minted = await call(gateway.fetch, "POST", "/v1/admin/invites", {
+      headers: { "X-Grist-Admin": "secret" },
+      body: { cap_usd: 5 },
+    })
+    const code = (minted.json as { code: string }).code
+    const response = await call(gateway.fetch, "POST", "/v1/chat/completions", {
+      headers: { "X-Grist-Invite": code },
+      body: { model: "cheapest", messages: [], stream: false },
+    })
+    expect(response.status).toBe(200)
+    // DeepSeek: 900 cached at $0.0042/M + 100 fresh at $0.15/M = $0.00001878.
+    // Before the fix the override dropped cachedInput and billed $0.00015.
+    expect(gateway.store.getInvite(code)?.spent_usd).toBeCloseTo(0.00001878, 8)
+  })
 })

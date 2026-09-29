@@ -1141,7 +1141,7 @@ function upstreamPayload(
 }
 
 /** Usage parsed from an upstream response: cached tokens are a subset of input. */
-type ParsedUsage = { input: number; output: number; cachedInput: number }
+type ParsedUsage = { input: number; output: number; cachedInput: number; cost?: number }
 
 function meterFromUsage(
   store: GatewayStore,
@@ -1156,7 +1156,9 @@ function meterFromUsage(
   if (!usage) return
   const at = now()
   const price = priceForModel(model, at, process.env, provider)
-  const usd = usdForUsage(model, usage.input, usage.output, { cachedInputTokens: usage.cachedInput, at, provider })
+  // Prefer the provider's reported cost when available (authoritative);
+  // fall back to computed ladder pricing for providers that don't report it.
+  const usd = usage.cost ?? usdForUsage(model, usage.input, usage.output, { cachedInputTokens: usage.cachedInput, at, provider })
   if (usd <= 0) return
   const updated = store.addSpend({
     code: invite.code,
@@ -1341,7 +1343,13 @@ function usageFromUnknown(value: unknown): ParsedUsage | undefined {
   const input = Number(rec.prompt_tokens ?? rec.input_tokens ?? 0)
   const output = Number(rec.completion_tokens ?? rec.output_tokens ?? 0)
   if (!Number.isFinite(input) || !Number.isFinite(output)) return
-  return { input, output, cachedInput: cachedInputFrom(rec) }
+  // OpenRouter reports the authoritative billed cost on every response
+  // (usage.cost, in USD credits). Prefer it over recomputing from the price
+  // table — the table can drift from the provider's actual billing (cached
+  // token handling, price changes), which silently over/under-meters spend.
+  const rawCost = Number(rec.cost)
+  const cost = Number.isFinite(rawCost) && rawCost >= 0 ? rawCost : undefined
+  return { input, output, cachedInput: cachedInputFrom(rec), cost }
 }
 
 function cacheHitLabel(usage: ParsedUsage | undefined) {
