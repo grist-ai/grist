@@ -571,7 +571,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const mode = store.getMode()
     const { rung, reasons } = composeRung(scores, undefined, mode)
     const model = publicModelRef(rung)
-    const mechanisms = composeMechanisms(text, loadMechanismProfile())
+    const mechanisms = await composeMechanisms(text, loadMechanismProfile())
     const decision = {
       rung,
       model: { provider_id: model.providerID, model_id: model.modelID },
