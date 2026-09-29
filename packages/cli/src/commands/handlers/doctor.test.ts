@@ -1,5 +1,8 @@
-import { describe, expect, test } from "bun:test"
-import { compareVersions, describeInvite, formatChecklist, summarize, type CheckResult } from "./doctor"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
+import { checkAuth, compareVersions, describeInvite, formatChecklist, summarize, type CheckResult } from "./doctor"
 
 const results = (statuses: CheckResult["status"][]): CheckResult[] =>
   statuses.map((status, i) => ({ name: `check-${i}`, status, detail: "detail" }))
@@ -46,5 +49,84 @@ describe("doctor", () => {
     expect(text).toContain("doctor found problems")
     const clean = formatChecklist(results(["pass", "pass"]))
     expect(clean).toContain("all checks passed")
+  })
+})
+
+const apiKey = "grist_sk_" + "d".repeat(64)
+const ORIGINAL_CONFIG_PATH = process.env.GRIST_CONFIG_PATH
+const ORIGINAL_API_KEY = process.env.GRIST_API_KEY
+const ORIGINAL_INVITE = process.env.GRIST_INVITE
+const originalFetch = globalThis.fetch
+let dir: string
+
+const stubFetch = (impl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>) => {
+  globalThis.fetch = impl as unknown as typeof fetch
+}
+
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "grist-doctor-test-"))
+  process.env.GRIST_CONFIG_PATH = path.join(dir, "config.json")
+  delete process.env.GRIST_API_KEY
+  delete process.env.GRIST_INVITE
+  fs.writeFileSync(process.env.GRIST_CONFIG_PATH, JSON.stringify({ code: apiKey, gatewayUrl: "https://grist.test" }))
+})
+
+afterEach(() => {
+  globalThis.fetch = originalFetch
+  if (ORIGINAL_CONFIG_PATH === undefined) delete process.env.GRIST_CONFIG_PATH
+  else process.env.GRIST_CONFIG_PATH = ORIGINAL_CONFIG_PATH
+  if (ORIGINAL_API_KEY === undefined) delete process.env.GRIST_API_KEY
+  else process.env.GRIST_API_KEY = ORIGINAL_API_KEY
+  if (ORIGINAL_INVITE === undefined) delete process.env.GRIST_INVITE
+  else process.env.GRIST_INVITE = ORIGINAL_INVITE
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+describe("checkAuth", () => {
+  test("verifies the credential with one authenticated call", async () => {
+    let seen: { url: string; headers?: HeadersInit } | undefined
+    stubFetch(async (url, init) => {
+      seen = { url: String(url), headers: init?.headers }
+      return new Response("{}", { status: 200 })
+    })
+
+    const result = await checkAuth()
+    expect(result.status).toBe("pass")
+    expect(result.detail).toContain("key verified")
+    expect(result.detail).not.toContain(apiKey)
+    expect(seen?.url).toBe("https://grist.test/v1/provider")
+    expect(seen?.headers).toMatchObject({ "X-Grist-Api-Key": apiKey })
+  })
+
+  test("fails when the gateway rejects the credential", async () => {
+    stubFetch(async () => new Response("", { status: 401 }))
+
+    const result = await checkAuth()
+    expect(result.status).toBe("fail")
+    expect(result.detail).toContain("rejected the credential")
+    expect(result.detail).toContain("grist auth login")
+    expect(result.detail).not.toContain(apiKey)
+  })
+
+  test("warns, not fails, when the gateway is unreachable", async () => {
+    stubFetch(async () => {
+      throw new Error("connect ECONNREFUSED")
+    })
+
+    const result = await checkAuth()
+    expect(result.status).toBe("warn")
+    expect(result.detail).toContain("could not validate the key")
+    expect(result.detail).toContain("ECONNREFUSED")
+  })
+
+  test("fails without calling the gateway when no credential is stored", async () => {
+    fs.rmSync(process.env.GRIST_CONFIG_PATH!)
+    stubFetch(async () => {
+      throw new Error("should not be called")
+    })
+
+    const result = await checkAuth()
+    expect(result.status).toBe("fail")
+    expect(result.detail).toContain("grist auth login")
   })
 })

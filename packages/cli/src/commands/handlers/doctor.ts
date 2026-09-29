@@ -1,7 +1,7 @@
 import { Service } from "@opencode/client/effect/service"
 import { names as configFileNames } from "@opencode/core/config/discovery"
 import { Global } from "@opencode/util/global"
-import { loadInviteConfig, type InviteConfig } from "@grist-ai/logic"
+import { gatewayAuthHeaders, loadInviteConfig, type InviteConfig } from "@grist-ai/logic"
 import { Effect } from "effect"
 import fs from "node:fs"
 import os from "node:os"
@@ -62,6 +62,10 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 {
   return 0
 }
 
+function inviteVia(invite: InviteConfig): string {
+  return invite.kind === "api_key" ? "api key" : "invite code"
+}
+
 /** Pure rendering of the auth check. Never includes the credential itself. */
 export function describeInvite(invite: InviteConfig | undefined): CheckResult {
   if (!invite) {
@@ -70,8 +74,7 @@ export function describeInvite(invite: InviteConfig | undefined): CheckResult {
       "not signed in — run: grist auth login --provider grist",
     )
   }
-  const via = invite.kind === "api_key" ? "api key" : "invite code"
-  return ok("auth", `signed in via ${via} → ${invite.gatewayUrl}`)
+  return ok("auth", `signed in via ${inviteVia(invite)} → ${invite.gatewayUrl}`)
 }
 
 function checkBinary(): CheckResult {
@@ -113,8 +116,33 @@ function checkProjectConfig(): CheckResult {
   return warn("project config", "none found — using global defaults")
 }
 
-function checkAuth(): CheckResult {
-  return describeInvite(loadInviteConfig())
+/**
+ * Validates the stored credential with one cheap authenticated call instead of
+ * only detecting its presence, so a dead/rotated key is reported as a failure.
+ * Never includes the credential itself. Connectivity alone is `checkGateway`'s job.
+ */
+export async function checkAuth(): Promise<CheckResult> {
+  const invite = loadInviteConfig()
+  if (!invite) return describeInvite(undefined)
+  const via = inviteVia(invite)
+  const url = `${invite.gatewayUrl}/v1/provider`
+  try {
+    const response = await fetch(url, {
+      headers: gatewayAuthHeaders(invite),
+      signal: AbortSignal.timeout(8000),
+    })
+    if (response.ok) return ok("auth", `signed in via ${via} → ${invite.gatewayUrl} (key verified)`)
+    if (response.status === 401 || response.status === 403) {
+      return fail(
+        "auth",
+        `signed in via ${via} but the gateway rejected the credential — re-run: grist auth login --provider grist`,
+      )
+    }
+    return warn("auth", `signed in via ${via}; could not validate the key (gateway returned ${response.status})`)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return warn("auth", `signed in via ${via}; could not validate the key (${message})`)
+  }
 }
 
 async function checkGateway(): Promise<CheckResult> {
@@ -185,8 +213,8 @@ export default Runtime.handler(
       checkBinary(),
       checkGlobalDirs(),
       checkProjectConfig(),
-      checkAuth(),
     ]
+    results.push(yield* Effect.promise(() => checkAuth()))
     results.push(yield* Effect.promise(() => checkGateway()))
     results.push(checkJevGate())
     results.push(yield* checkService())
