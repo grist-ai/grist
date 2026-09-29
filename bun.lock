@@ -411,7 +411,7 @@
     },
     "packages/desktop": {
       "name": "@opencode/desktop",
-      "version": "0.1.14",
+      "version": "0.1.16",
       "dependencies": {
         "@grist-ai/logic": "workspace:*",
         "@zip.js/zip.js": "2.7.62",
