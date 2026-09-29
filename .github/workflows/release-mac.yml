@@ -1,0 +1,147 @@
+name: release-mac
+
+# Manual releases ONLY (workflow_dispatch) — same policy as publish-grist.
+# Building, signing, and notarizing the Mac app ships a user-facing artifact,
+# so every release is a human decision with an explicit version.
+#
+# One-time setup (repo Settings → Secrets and variables → Actions):
+#   MAC_CERT_P12_BASE64  base64 of the exported Developer ID .p12
+#   MAC_CERT_PASSWORD    password for that .p12
+#   CSC_NAME             signing identity, e.g. "Developer ID Application: Name (TEAMID)"
+#   APPLE_API_KEY_P8     raw contents of the App Store Connect API .p8 key
+#   APPLE_API_KEY_ID     key ID
+#   APPLE_API_ISSUER     issuer UUID
+#   DOWNLOADS_TOKEN      fine-grained PAT with write access to grist-ai/grist-downloads
+#                        (used by `gh release upload` in publish-mac-release.ts)
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Desktop version to release. Must match PRODUCT_VERSION in packages/desktop/brand.ts (e.g. 0.1.17)."
+        required: true
+        type: string
+      cli_version:
+        description: "CLI version to stamp into the bundled grist binary's package.json (e.g. 0.1.13)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TURBO_TELEMETRY_DISABLED: 1
+      DO_NOT_TRACK: 1
+      COPYFILE_DISABLE: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Pre-release secret gate: fail the release if gitleaks finds anything
+      # outside .gitleaks.toml's reviewed allowlist.
+      - name: Secret scan (gitleaks)
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_darwin_arm64.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --no-git --config .gitleaks.toml --verbose
+
+      - name: Verify PRODUCT_VERSION matches input
+        run: |
+          set -euo pipefail
+          bv=$(grep -o 'PRODUCT_VERSION = "[^"]*"' packages/desktop/brand.ts | cut -d'"' -f2)
+          if [ "$bv" != "${{ inputs.version }}" ]; then
+            echo "input version ${{ inputs.version }} != PRODUCT_VERSION $bv — bump packages/desktop/brand.ts (and package.json) first"
+            exit 1
+          fi
+
+      - name: Install
+        run: bun install --os="*" --cpu="*" --ignore-scripts
+
+      # Build the CLI from this exact commit so the desktop bundles what was
+      # reviewed, then stage it in the unpacked-npm-package layout that
+      # OPENCODE_CLI_DIST expects (grist-darwin-arm64/{bin/grist,package.json}).
+      - name: Build darwin-arm64 CLI
+        run: |
+          set -euo pipefail
+          bun run script/build.ts --target=bun-darwin-arm64 --outdir=/tmp/grist-cli-build --cwd packages/grist
+          mkdir -p /tmp/grist-cli-dist/grist-darwin-arm64/bin
+          cp /tmp/grist-cli-build/grist /tmp/grist-cli-dist/grist-darwin-arm64/bin/grist
+          printf '{"name":"grist-darwin-arm64","version":"%s"}\n' "${{ inputs.cli_version }}" \
+            > /tmp/grist-cli-dist/grist-darwin-arm64/package.json
+
+      - name: Import signing certificate
+        env:
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KC_PW=$(openssl rand -base64 32)
+          echo "KC_PW=$KC_PW" >> "$GITHUB_ENV"
+          security create-keychain -p "$KC_PW" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security unlock-keychain -p "$KC_PW" build.keychain
+          echo "$MAC_CERT_P12_BASE64" | base64 --decode > /tmp/grist-cert.p12
+          security import /tmp/grist-cert.p12 -k build.keychain -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign
+          rm /tmp/grist-cert.p12
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PW" build.keychain
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Build and package
+        env:
+          OPENCODE_CHANNEL: prod
+          OPENCODE_CLI_DIST: /tmp/grist-cli-dist
+          CSC_NAME: ${{ secrets.CSC_NAME }}
+          APPLE_API_KEY: /tmp/AuthKey.p8
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$APPLE_API_KEY_P8" > /tmp/AuthKey.p8
+          chmod 600 /tmp/AuthKey.p8
+          rm -rf /tmp/grist-desktop-dist
+          cd packages/desktop
+          bun run build
+          bun run package:mac -- -c.directories.output=/tmp/grist-desktop-dist
+          rm /tmp/AuthKey.p8
+
+      - name: Staple
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$APPLE_API_KEY_P8" > /tmp/AuthKey.p8
+          chmod 600 /tmp/AuthKey.p8
+          APP=$(find /tmp/grist-desktop-dist -maxdepth 2 -name "Grist.app" | head -1)
+          DMG=$(find /tmp/grist-desktop-dist -maxdepth 1 -name "*.dmg" | head -1)
+          xcrun stapler staple "$APP"
+          # The DMG needs its own notarization ticket before it will staple.
+          xcrun notarytool submit "$DMG" \
+            --key /tmp/AuthKey.p8 --key-id "${{ secrets.APPLE_API_KEY_ID }}" \
+            --issuer "${{ secrets.APPLE_API_ISSUER }}" --wait || true
+          xcrun stapler staple "$DMG"
+          rm /tmp/AuthKey.p8
+
+      - name: Publish to grist-downloads
+        env:
+          GRIST_DESKTOP_DIST: /tmp/grist-desktop-dist
+          GH_TOKEN: ${{ secrets.DOWNLOADS_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd packages/desktop
+          bun run publish:mac
