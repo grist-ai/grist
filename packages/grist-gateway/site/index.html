@@ -506,6 +506,7 @@ grist</pre>
         <nav class="docs-tabs" aria-label="Docs">
           <a href="/docs" class="is-on">Using Grist</a>
           <a href="/docs/skills">Agent skills</a>
+          <a href="/docs/release-notes">Release notes</a>
         </nav>
         <nav class="docs-toc" aria-label="On this page">
           <a href="/docs#install">Install</a>
@@ -652,6 +653,7 @@ npx skills add grist-ai/grist-skills</pre>
         <nav class="docs-tabs" aria-label="Docs">
           <a href="/docs">Using Grist</a>
           <a href="/docs/skills" class="is-on">Agent skills</a>
+          <a href="/docs/release-notes">Release notes</a>
         </nav>
 
         <h2 id="install-skill">Install</h2>
@@ -740,6 +742,76 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           <li>Test results</li>
           <li>Roughly what it cost (<code>grist usage</code> before and after, or remaining USD)</li>
         </ul>
+      </article>
+    </main>
+
+    <main id="view-docs-release-notes" hidden>
+      <article class="docs">
+        <p class="eyebrow">[ docs ]</p>
+        <h1>Release notes</h1>
+        <p class="lede">
+          What changed in Grist, in plain language. Items marked
+          <strong>shipped</strong> are live; items marked
+          <strong>in progress</strong> are built and under review.
+        </p>
+        <nav class="docs-tabs" aria-label="Docs">
+          <a href="/docs">Using Grist</a>
+          <a href="/docs/skills">Agent skills</a>
+          <a href="/docs/release-notes" class="is-on">Release notes</a>
+        </nav>
+
+        <h2 id="specialists">Specialist subagents <span class="pill">shipped</span></h2>
+        <p>
+          Grist now has four named specialists the agent can delegate to, each
+          with a narrowly scoped job and permissions:
+        </p>
+        <ul>
+          <li><strong>grist-explore</strong> — read-only codebase exploration; reports back a digest.</li>
+          <li><strong>grist-review</strong> — read-only code review; never writes.</li>
+          <li><strong>grist-verify</strong> — runs builds, tests, and checks; its shell access is limited to build/test commands.</li>
+          <li><strong>grist-plan</strong> — read-only planning before doing.</li>
+        </ul>
+        <p>
+          You don't invoke them directly — the agent dispatches one when the task
+          fits, instead of doing everything inline. This is the main way Grist
+          keeps cheap-rung runs capable: a small model plus the right specialist
+          beats a bigger model alone.
+        </p>
+
+        <h2 id="effort">Effort dial <span class="pill">in progress</span></h2>
+        <p>
+          Each task now gets an effort level — <code>low</code>,
+          <code>standard</code>, or <code>high</code> — <em>inside</em> its cost
+          rung. High effort means a larger exploration budget and more specialist
+          use; low effort means quick, inline answers. The level is picked per
+          task, but your setting wins if you set one:
+        </p>
+        <pre>GRIST_EFFORT=high grist run "migrate the auth module"</pre>
+
+        <h2 id="warm-resume">Warm subagent resume <span class="pill">in progress</span></h2>
+        <p>
+          When the agent uses the same specialist twice in one session, the
+          second call now resumes the first one's session instead of starting
+          over — no re-briefing, faster and cheaper follow-ups. On by default;
+          <code>GRIST_WARM_SUBAGENTS=0</code> turns it off.
+        </p>
+
+        <h2 id="doctor">grist doctor actually checks your key <span class="pill">in progress</span></h2>
+        <p>
+          <code>grist doctor</code> used to report "signed in" whenever a
+          credential was <em>stored</em> — even a revoked one. It now validates
+          the key against the gateway with one cheap call: a good key reports
+          "key verified", a rejected one tells you to sign in again.
+        </p>
+
+        <h2 id="truncation">Long sessions survive the gateway size limit <span class="pill">in progress</span></h2>
+        <p>
+          Long runs used to die with an HTTP 413 once their history passed the
+          gateway's request-size limit — and the session was unrecoverable. The
+          CLI now trims old tool output (leaving a marker where it cut) before
+          requests approach the limit, keeping the recent conversation intact.
+          Long tasks finish instead of failing partway.
+        </p>
       </article>
     </main>
 

@@ -472,6 +472,10 @@ describe("gateway HTTP", () => {
     const skills = await gateway.fetch(new Request("http://gateway.test/docs/skills"))
     expect(await skills.text()).toContain("When to reach for Grist")
 
+    const releaseNotes = await gateway.fetch(new Request("http://gateway.test/docs/release-notes"))
+    expect(releaseNotes.headers.get("Content-Type")).toContain("text/html")
+    expect(await releaseNotes.text()).toContain("Release notes")
+
     const skillFile = await gateway.fetch(new Request("http://gateway.test/grist-skill.md"))
     expect(skillFile.headers.get("Content-Type")).toContain("text/markdown")
     const skillText = await skillFile.text()

@@ -49,6 +49,7 @@ const SITE_PAGES = new Set([
   "/admin",
   "/docs",
   "/docs/skills",
+  "/docs/release-notes",
   "/privacy",
   "/terms",
   "/acceptable-use",

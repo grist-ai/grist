@@ -34,6 +34,7 @@ const views = {
   "/admin": "view-admin",
   "/docs": "view-docs",
   "/docs/skills": "view-docs-skills",
+  "/docs/release-notes": "view-docs-release-notes",
   "/privacy": "view-privacy",
   "/terms": "view-terms",
   "/acceptable-use": "view-acceptable-use",
@@ -50,6 +51,7 @@ const titles = {
   "/admin": "Admin — Grist",
   "/docs": "Docs — Grist",
   "/docs/skills": "Agent skills — Grist",
+  "/docs/release-notes": "Release notes — Grist",
   "/privacy": "Privacy Policy — Grist",
   "/terms": "Terms of Use — Grist",
   "/acceptable-use": "Acceptable Use — Grist",
@@ -71,6 +73,8 @@ const descriptions = {
     "Grist docs: install the CLI, sign in, start in a repo, and understand the gate, memory, SoL-Pi, and spend.",
   "/docs/skills":
     "Give an AI agent the Grist skill so it can install the CLI on its own VM and bill your account.",
+  "/docs/release-notes":
+    "Grist release notes: specialist subagents, the effort dial, warm subagent resume, and what changed in plain language.",
   "/privacy": "Grist privacy policy: what we collect, what leaves your machine, and what we refuse to do.",
   "/terms": "Terms of use for Grist: the rules for the coding-agent harness, the gateway, and the open beta.",
   "/acceptable-use":
@@ -391,7 +395,7 @@ async function route() {
 function scrollHash() {
   const path = pathOf()
   const id = window.location.hash.replace(/^#/, "")
-  if ((path === "/" || path === "/docs" || path === "/docs/skills") && id) {
+  if ((path === "/" || path === "/docs" || path === "/docs/skills" || path === "/docs/release-notes") && id) {
     const node = document.getElementById(id)
     if (node) {
       node.scrollIntoView({ behavior: "smooth", block: "start" })
