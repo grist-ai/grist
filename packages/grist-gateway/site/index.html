@@ -384,7 +384,7 @@ grist</pre>
           <p class="eyebrow">[ architecture ]</p>
           <h2>How a prompt becomes a diff.</h2>
           <p class="lede">
-            One request, six moves. The client never sees a model id — only
+            One request, seven moves. The client never sees a model id — only
             rung names. The gateway resolves everything, and your provider key
             pays for inference. Not ours.
           </p>
@@ -403,7 +403,7 @@ grist</pre>
           <li>
             <span class="arch-n">3</span>
             <h3>Jev gate routes</h3>
-            <p>A confidence gate scores difficulty once per run and picks the cheapest rung that can handle it.</p>
+            <p>A confidence gate scores difficulty once per run, picks the cheapest rung that can handle it, and dials exploratory effort — trivial tasks get a tight budget, ambiguous ones get room to investigate.</p>
           </li>
           <li>
             <span class="arch-n">4</span>
@@ -419,6 +419,11 @@ grist</pre>
             <span class="arch-n">6</span>
             <h3>Memory compounds</h3>
             <p>Approved diffs and proven changes become memory — code map, ownership, Supermemory. The next run starts briefed.</p>
+          </li>
+          <li>
+            <span class="arch-n">7</span>
+            <h3>Specialists delegate</h3>
+            <p>The gate hands work to named specialists — explore, plan, review, verify — each running inside the assigned rung. Repeat calls resume warm, so context compounds.</p>
           </li>
         </ol>
         <p class="arch-note">
@@ -583,6 +588,28 @@ grist</pre>
           <code>[grist:gate] cheapest via openrouter mode=normal · diff=0.31 sens=0.05 under=0.62 · routine · 3ms</code>.
         </p>
         <p>Turn the gate off with <code>GRIST_GATE=off</code> (not recommended).</p>
+        <p>
+          Within a rung, the gate also dials exploratory effort
+          (<code>low</code> / <code>standard</code> / <code>high</code>) from the
+          confidence score: trivial tasks get a tight exploration budget,
+          ambiguous ones get room to investigate. Pin it with
+          <code>GRIST_EFFORT=low|standard|high</code>, or let the gate decide.
+        </p>
+
+        <h2 id="specialists">Specialists</h2>
+        <p>
+          The gate delegates to named specialist subagents —
+          <code>grist-explore</code>, <code>grist-plan</code>,
+          <code>grist-review</code>, <code>grist-verify</code> — each running
+          <em>inside</em> the assigned rung with doctrine for its role.
+          Decomposition can only shed cost, never gain it: a subagent re-gates
+          on its delegation text with the parent's rung as a ceiling.
+        </p>
+        <p>
+          Repeat subagent calls resume the previous session warm instead of
+          starting cold, so context compounds (cap 3 resumes per parent
+          session; <code>GRIST_WARM_SUBAGENTS=0</code> to disable).
+        </p>
 
         <h2 id="memory">Memory</h2>
         <p>

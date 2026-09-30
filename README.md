@@ -52,6 +52,28 @@ plugin (now tracking upstream v2.0.18). What changed:
   and `.grist/`, and global state lives under `~/.grist`, `~/.config/grist`,
   `~/.cache/grist`, `~/.local/state/grist`, and `~/.local/share/grist`.
 
+## What's new
+
+Recent improvements to the harness:
+
+- **Specialist subagents** — the gate now delegates to named specialists
+  (`grist-explore`, `grist-plan`, `grist-review`, `grist-verify`) that run
+  *within* the assigned rung. Decomposition happens inside the rung, so
+  subagents can only shed cost, never gain it. Each specialist ships with
+  doctrine for its role.
+- **Effort dial** — within a rung, the gate dials exploratory effort
+  (`low` / `standard` / `high`) from the Jev confidence score: trivial tasks
+  get a tight exploration budget, ambiguous ones get room to investigate.
+  Set `GRIST_EFFORT` to pin it, or let the gate decide.
+- **Warm subagent resume** — repeat subagent calls resume the previous
+  session instead of starting cold, so context compounds across calls
+  (cap 3 resumes per parent session; `GRIST_WARM_SUBAGENTS=0` to disable).
+- **Honest spend metering** — the gateway bills from the provider's own
+  reported cost when available, and cached tokens are priced at cached
+  rates. What your dashboard shows is what your provider charged.
+- **`grist doctor`** now validates your gateway credential with a live
+  authenticated call, not just a presence check.
+
 ## The ladder
 
 Four cost-tiered rungs. The gate picks per task — never pin one with `-m`
