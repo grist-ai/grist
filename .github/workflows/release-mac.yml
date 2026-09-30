@@ -117,6 +117,8 @@ jobs:
           wc -l /tmp/AuthKey.p8
           openssl pkcs8 -in /tmp/AuthKey.p8 -nocrypt -out /dev/null \
             && echo "PEM OK" || { echo "PEM INVALID"; exit 1; }
+          echo "--- key algorithm (not content) ---"
+          openssl pkey -in /tmp/AuthKey.p8 -text -noout 2>&1 | head -4
 
       - name: Build and package
         env:
