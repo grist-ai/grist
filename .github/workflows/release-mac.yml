@@ -107,7 +107,9 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           set -euo pipefail
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | sed 's/[[:space:]]*$//' > /tmp/AuthKey.p8
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
+          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
+          rm -f /tmp/_keybody.txt
           chmod 600 /tmp/AuthKey.p8
           echo "--- key structure (headers only, not content) ---"
           head -1 /tmp/AuthKey.p8
@@ -127,7 +129,9 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           set -euo pipefail
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | sed 's/[[:space:]]*$//' > /tmp/AuthKey.p8
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
+          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
+          rm -f /tmp/_keybody.txt
           chmod 600 /tmp/AuthKey.p8
           rm -rf /tmp/grist-desktop-dist
           cd packages/desktop
@@ -140,7 +144,9 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           set -euo pipefail
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | sed 's/[[:space:]]*$//' > /tmp/AuthKey.p8
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
+          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
+          rm -f /tmp/_keybody.txt
           chmod 600 /tmp/AuthKey.p8
           APP=$(find /tmp/grist-desktop-dist -maxdepth 2 -name "Grist.app" | head -1)
           DMG=$(find /tmp/grist-desktop-dist -maxdepth 1 -name "*.dmg" | head -1)
