@@ -117,8 +117,27 @@ jobs:
           wc -l /tmp/AuthKey.p8
           openssl pkcs8 -in /tmp/AuthKey.p8 -nocrypt -out /dev/null \
             && echo "PEM OK" || { echo "PEM INVALID"; exit 1; }
-          echo "--- key algorithm (not content) ---"
-          openssl pkey -in /tmp/AuthKey.p8 -text -noout 2>&1 | head -4
+          echo "--- key algorithm (name only, never key material) ---"
+          openssl pkey -in /tmp/AuthKey.p8 -noout -text 2>&1 | grep -E "^(Private-Key|ASN1 OID|NIST CURVE)" | head -3
+
+      - name: Test notarytool key directly
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
+          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
+          rm -f /tmp/_keybody.txt
+          chmod 600 /tmp/AuthKey.p8
+          echo "grist-notarytool-key-test" > /tmp/notary-test.txt
+          cd /tmp && zip -q notary-test.zip notary-test.txt
+          xcrun notarytool submit /tmp/notary-test.zip \
+            --key /tmp/AuthKey.p8 \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" \
+            --verbose 2>&1 | head -40 || true
 
       - name: Build and package
         env:
