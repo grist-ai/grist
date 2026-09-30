@@ -77,7 +77,8 @@ jobs:
       - name: Build darwin-arm64 CLI
         run: |
           set -euo pipefail
-          bun run script/build.ts --target=bun-darwin-arm64 --outdir=/tmp/grist-cli-build --cwd packages/grist
+          cd packages/grist
+          bun run script/build.ts --target=bun-darwin-arm64 --outdir=/tmp/grist-cli-build
           mkdir -p /tmp/grist-cli-dist/grist-darwin-arm64/bin
           cp /tmp/grist-cli-build/grist /tmp/grist-cli-dist/grist-darwin-arm64/bin/grist
           printf '{"name":"grist-darwin-arm64","version":"%s"}\n' "${{ inputs.cli_version }}" \
