@@ -161,7 +161,7 @@ jobs:
           rm -rf /tmp/grist-desktop-dist
           cd packages/desktop
           bun run build
-          bun run package:mac -- -c.directories.output=/tmp/grist-desktop-dist
+          bun run package:mac -- --publish never -c.directories.output=/tmp/grist-desktop-dist
           rm /tmp/AuthKey.p8
 
       - name: Staple
