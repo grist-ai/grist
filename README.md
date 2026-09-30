@@ -91,6 +91,24 @@ Prices snapshotted from OpenRouter and checked into
 Upstream model identities never ship in the client — the client speaks rung
 names only; the gateway resolves them.
 
+## Benchmarks
+
+Internal Pareto benchmark (Sep 2026): 49 coding tasks across 6 routing
+configs, 294 runs. The confidence gate solved every task — routing simple
+work to `cheapest`, harder multi-file work to `medium` — and never needed
+`frontier`.
+
+| | Gate (cheapest → medium) | Raw frontier rung |
+|---|---|---|
+| Single-file tasks (35) | 100% solved · $0.0064/solved task | 29% solved · $0.1513/solved task |
+| Multi-file tasks (14) | 100% solved · $0.0067/solved task | 100% solved · $0.4202/solved task |
+
+Raw frontier only matches the gate's accuracy by dispatching ~11 subagents
+per task — the cost structure the gate exists to avoid.
+
+Full methodology, configs, and limitations: [`docs/benchmarks.md`](docs/benchmarks.md).
+Repro bundle: [`benchmarks/`](benchmarks/).
+
 ## Quickstart (BYOK)
 
 ```bash
