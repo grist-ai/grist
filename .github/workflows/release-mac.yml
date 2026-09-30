@@ -119,8 +119,8 @@ jobs:
             && echo "PEM OK" || { echo "PEM INVALID"; exit 1; }
           echo "--- key algorithm (name only, never key material) ---"
           openssl pkey -in /tmp/AuthKey.p8 -noout -text 2>&1 | grep -E "^(Private-Key|ASN1 OID|NIST CURVE)" | head -3
-          echo "--- ASN.1 structure (offsets/OIDs only) ---"
-          openssl asn1parse -in /tmp/AuthKey.p8 | head -12
+          echo "--- ASN.1 OIDs only (no key material) ---"
+          openssl asn1parse -in /tmp/AuthKey.p8 | grep -E "OBJECT" || true
           echo "--- file size (Apple .p8 is ~240 bytes) ---"
           wc -c /tmp/AuthKey.p8
 
