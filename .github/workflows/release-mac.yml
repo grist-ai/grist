@@ -107,9 +107,9 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           set -euo pipefail
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | awk '/BEGIN/{c=1;next} /END/{exit} c' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
-          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
-          rm -f /tmp/_keybody.txt
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_all.txt
+          for n in 3 4 5 6 7 8; do head -$n /tmp/_all.txt > /tmp/_kb.txt; { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_kb.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/_test.p8; if [ "$(openssl asn1parse -in /tmp/_test.p8 2>/dev/null | grep -c ':id-ecPublicKey' || true)" = "1" ]; then cp /tmp/_test.p8 /tmp/AuthKey.p8; echo "key ok: $n lines"; break; fi; done
+          rm -f /tmp/_all.txt /tmp/_kb.txt /tmp/_test.p8
           chmod 600 /tmp/AuthKey.p8
           echo "--- key structure (headers only, not content) ---"
           head -1 /tmp/AuthKey.p8
@@ -131,9 +131,9 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
           set -euo pipefail
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | awk '/BEGIN/{c=1;next} /END/{exit} c' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
-          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
-          rm -f /tmp/_keybody.txt
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_all.txt
+          for n in 3 4 5 6 7 8; do head -$n /tmp/_all.txt > /tmp/_kb.txt; { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_kb.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/_test.p8; if [ "$(openssl asn1parse -in /tmp/_test.p8 2>/dev/null | grep -c ':id-ecPublicKey' || true)" = "1" ]; then cp /tmp/_test.p8 /tmp/AuthKey.p8; echo "key ok: $n lines"; break; fi; done
+          rm -f /tmp/_all.txt /tmp/_kb.txt /tmp/_test.p8
           chmod 600 /tmp/AuthKey.p8
           echo "grist-notarytool-key-test" > /tmp/notary-test.txt
           cd /tmp && zip -q notary-test.zip notary-test.txt
@@ -154,9 +154,9 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           set -euo pipefail
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | awk '/BEGIN/{c=1;next} /END/{exit} c' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
-          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
-          rm -f /tmp/_keybody.txt
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_all.txt
+          for n in 3 4 5 6 7 8; do head -$n /tmp/_all.txt > /tmp/_kb.txt; { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_kb.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/_test.p8; if [ "$(openssl asn1parse -in /tmp/_test.p8 2>/dev/null | grep -c ':id-ecPublicKey' || true)" = "1" ]; then cp /tmp/_test.p8 /tmp/AuthKey.p8; echo "key ok: $n lines"; break; fi; done
+          rm -f /tmp/_all.txt /tmp/_kb.txt /tmp/_test.p8
           chmod 600 /tmp/AuthKey.p8
           rm -rf /tmp/grist-desktop-dist
           cd packages/desktop
@@ -169,9 +169,9 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           set -euo pipefail
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | awk '/BEGIN/{c=1;next} /END/{exit} c' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_keybody.txt
-          { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_keybody.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/AuthKey.p8
-          rm -f /tmp/_keybody.txt
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' | grep -E '^[A-Za-z0-9+/=]+$' > /tmp/_all.txt
+          for n in 3 4 5 6 7 8; do head -$n /tmp/_all.txt > /tmp/_kb.txt; { echo "-----BEGIN PRIVATE KEY-----"; cat /tmp/_kb.txt; echo "-----END PRIVATE KEY-----"; } > /tmp/_test.p8; if [ "$(openssl asn1parse -in /tmp/_test.p8 2>/dev/null | grep -c ':id-ecPublicKey' || true)" = "1" ]; then cp /tmp/_test.p8 /tmp/AuthKey.p8; echo "key ok: $n lines"; break; fi; done
+          rm -f /tmp/_all.txt /tmp/_kb.txt /tmp/_test.p8
           chmod 600 /tmp/AuthKey.p8
           APP=$(find /tmp/grist-desktop-dist -maxdepth 2 -name "Grist.app" | head -1)
           DMG=$(find /tmp/grist-desktop-dist -maxdepth 1 -name "*.dmg" | head -1)
