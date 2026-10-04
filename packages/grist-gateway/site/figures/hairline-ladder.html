@@ -786,8 +786,18 @@ function mount({ stage, svg, read }, value) {
     put(st.s, prism(P, front, st.ring, st.inner, zTop(i) - ST + lift, zTop(i) + lift));
   }
 
+  // ?autoplay=1: the figure cycles the rungs on its own until the pointer
+  // takes over. Driven inside the register loop (rule 07: no clock of its own —
+  // the loop sleeps offscreen and honours reduced motion), and the takeover is
+  // seen through HL.pointer (rule 01), not a listener of its own.
+  let auto = new URLSearchParams(location.search).get("autoplay") === "1";
+  let idx = -1, last = 0;
   const B = register(stage, (_dt, now) => {
-    let moving = false;
+    if (auto) {
+      if (!last) last = now;
+      if (now - last >= 1700) { last = now; idx = (idx + 1) % (N + 1); setActive(idx < N ? idx : -1); }
+    }
+    let moving = auto;
     for (let i = 0; i < N; i++) {
       const st = steps[i];
       draw(i, tval(st.lift, now));
@@ -825,7 +835,10 @@ function mount({ stage, svg, read }, value) {
     B.wake();
   }
 
-  bag.add(pointer(stage, { move: (p) => setActive(hit(p)), leave: () => setActive(-1) }));
+  bag.add(pointer(stage, {
+    move: (p) => { auto = false; setActive(hit(p)); },
+    leave: () => setActive(-1),
+  }));
   bag.add(() => svg.replaceChildren());
 
   return {
