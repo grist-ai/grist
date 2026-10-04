@@ -128,46 +128,9 @@ grist</pre>
             <span><i class="mute"></i> Prompt goes out. Source does not.</span>
           </p>
         </div>
-        <figure class="fig-bare" aria-hidden="true">
-          <svg class="diagram-svg fig-map" viewBox="0 0 440 318" fill="none">
-            <text class="fig-col" x="56" y="28">PATH</text>
-            <text class="fig-col" x="392" y="28" text-anchor="end">OWNER</text>
-            <path class="fig-spine" d="M 28 48 V 214" />
-            <g class="fig-map-n fig-map-n1">
-              <path class="fig-spine" d="M 28 64 H 48" />
-              <rect class="fig-node" x="48" y="48" width="360" height="32" rx="4" />
-              <text class="fig-fg" x="62" y="69">auth/cookie.ts</text>
-              <rect class="fig-chip" x="348" y="55" width="48" height="18" rx="2" />
-              <text class="fig-chip-t" x="372" y="68" text-anchor="middle">you</text>
-            </g>
-            <g class="fig-map-n fig-map-n2">
-              <path class="fig-spine" d="M 28 108 H 48" />
-              <rect class="fig-node" x="48" y="92" width="360" height="32" rx="4" />
-              <text class="fig-fg" x="62" y="113">pay/intent.ts</text>
-              <rect class="fig-chip" x="348" y="99" width="48" height="18" rx="2" />
-              <text class="fig-chip-t" x="372" y="112" text-anchor="middle">you</text>
-            </g>
-            <g class="fig-map-n fig-map-n3">
-              <path class="fig-spine" d="M 28 152 H 48" />
-              <rect class="fig-node" x="48" y="136" width="360" height="32" rx="4" />
-              <text class="fig-fg" x="62" y="157">graph/map.ts</text>
-              <rect class="fig-chip dim" x="342" y="143" width="54" height="18" rx="2" />
-              <text class="fig-dim" x="369" y="156" text-anchor="middle">team</text>
-            </g>
-            <g class="fig-map-n fig-map-n4">
-              <path class="fig-spine" d="M 28 196 H 48" />
-              <rect class="fig-node mute" x="48" y="180" width="360" height="32" rx="4" />
-              <text class="fig-dim" x="62" y="201">infra/redis.go</text>
-              <text class="fig-dim" x="392" y="201" text-anchor="end">infra</text>
-            </g>
-            <rect class="fig-map-scan" x="20" y="44" width="400" height="40" rx="4" />
-            <g class="fig-map-hit">
-              <rect class="fig-hit" x="20" y="232" width="400" height="56" rx="4" />
-              <circle class="fig-pulse" cx="44" cy="260" r="4" />
-              <text class="fig-accent" x="60" y="257">SESSION RESTORED</text>
-              <text class="fig-accent" x="60" y="276">already briefed</text>
-            </g>
-          </svg>
+        <figure class="fig-frame">
+          <iframe src="/figures/hairline-map.html?bare=1&theme=dark&autoplay=1" title="Interactive figure: the code map — pick a file, see its owner" loading="lazy"></iframe>
+          <figcaption>Plays on its own — hover to take over.</figcaption>
         </figure>
       </section>
 
@@ -191,66 +154,16 @@ grist</pre>
             context. It already knows who owns the file.
           </p>
         </div>
-        <figure class="fig-bare fig-wide" aria-hidden="true">
-          <svg class="diagram-svg fig-pipe" viewBox="0 0 440 220" fill="none">
-            <path class="fig-flow fig-pipe-path" d="M 84 88 H 356" />
-            <circle class="fig-pipe-dot" r="5" cx="0" cy="0" />
-            <g class="fig-pipe-n fig-pipe-n1">
-              <rect class="fig-card" x="24" y="44" width="120" height="88" rx="4" />
-              <text class="fig-label" x="84" y="76" text-anchor="middle">HISTORY</text>
-              <text class="fig-cap" x="84" y="98" text-anchor="middle">commits</text>
-              <text class="fig-cap" x="84" y="114" text-anchor="middle">reviews · diffs</text>
-            </g>
-            <g class="fig-pipe-n fig-pipe-n2">
-              <rect class="fig-card on" x="160" y="44" width="120" height="88" rx="4" />
-              <text class="fig-accent" x="220" y="76" text-anchor="middle">MAP</text>
-              <text class="fig-cap" x="220" y="98" text-anchor="middle">ownership</text>
-              <text class="fig-cap" x="220" y="114" text-anchor="middle">conventions</text>
-            </g>
-            <g class="fig-pipe-n fig-pipe-n3">
-              <rect class="fig-card" x="296" y="44" width="120" height="88" rx="4" />
-              <text class="fig-label" x="356" y="76" text-anchor="middle">SESSION</text>
-              <text class="fig-cap" x="356" y="98" text-anchor="middle">already</text>
-              <text class="fig-cap" x="356" y="114" text-anchor="middle">briefed</text>
-            </g>
-            <g class="fig-pipe-hit">
-              <rect class="fig-hit" x="24" y="156" width="392" height="44" rx="4" />
-              <text class="fig-accent" x="220" y="184" text-anchor="middle">no re-explain</text>
-            </g>
-          </svg>
+        <figure class="fig-frame">
+          <iframe src="/figures/hairline-brief.html?bare=1&theme=dark&autoplay=1" title="Interactive figure: the briefing — history, map, session" loading="lazy"></iframe>
+          <figcaption>Plays on its own — hover to take over.</figcaption>
         </figure>
       </section>
 
       <section class="split reverse" id="improve">
-        <figure class="fig-bare" aria-hidden="true">
-          <svg class="diagram-svg fig-loop" viewBox="0 0 440 300" fill="none">
-            <path
-              class="fig-flow fig-loop-path"
-              d="M 118 86 H 322 Q 352 86 352 116 V 184 Q 352 214 322 214 H 118 Q 88 214 88 184 V 116 Q 88 86 118 86"
-            />
-            <circle class="fig-loop-dot" r="5" cx="0" cy="0" />
-            <g class="fig-loop-n fig-loop-n1">
-              <rect class="fig-card" x="28" y="28" width="120" height="56" rx="4" />
-              <text class="fig-label" x="88" y="52" text-anchor="middle">TASK</text>
-              <text class="fig-cap" x="88" y="68" text-anchor="middle">incoming</text>
-            </g>
-            <g class="fig-loop-n fig-loop-n2">
-              <rect class="fig-card" x="292" y="28" width="120" height="56" rx="4" />
-              <text class="fig-label" x="352" y="52" text-anchor="middle">GATE</text>
-              <text class="fig-cap" x="352" y="68" text-anchor="middle">then DIFF</text>
-            </g>
-            <g class="fig-loop-n fig-loop-n3">
-              <rect class="fig-card on" x="292" y="216" width="120" height="56" rx="4" />
-              <text class="fig-accent" x="352" y="240" text-anchor="middle">tests pass</text>
-              <text class="fig-cap" x="352" y="256" text-anchor="middle">proven</text>
-            </g>
-            <g class="fig-loop-n fig-loop-n4">
-              <rect class="fig-card" x="28" y="216" width="120" height="56" rx="4" />
-              <text class="fig-label" x="88" y="240" text-anchor="middle">MEMORY</text>
-              <text class="fig-cap" x="88" y="256" text-anchor="middle">corpus</text>
-            </g>
-            <text class="fig-loop-core" x="220" y="156" text-anchor="middle">cheaper · faster · right</text>
-          </svg>
+        <figure class="fig-frame">
+          <iframe src="/figures/hairline-loop.html?bare=1&theme=dark&autoplay=1" title="Interactive figure: the self-improvement loop — task, gate, proof, memory" loading="lazy"></iframe>
+          <figcaption>Plays on its own — hover to take over.</figcaption>
         </figure>
         <div>
           <p class="eyebrow">[ self-improves ]</p>
@@ -285,30 +198,9 @@ grist</pre>
             </article>
           </div>
         </div>
-        <figure class="fig-bare fig-wide" aria-hidden="true">
-          <svg class="diagram-svg fig-pack" viewBox="0 0 440 240" fill="none">
-            <text class="fig-col" x="24" y="28">TOOL OUTPUT · 48 KB</text>
-            <g class="fig-pack-stack">
-              <rect class="fig-bar fig-bar-1" x="24" y="44" width="168" height="14" rx="2" />
-              <rect class="fig-bar fig-bar-2" x="24" y="64" width="156" height="14" rx="2" />
-              <rect class="fig-bar fig-bar-3" x="24" y="84" width="172" height="14" rx="2" />
-              <rect class="fig-bar fig-bar-4" x="24" y="104" width="140" height="14" rx="2" />
-              <rect class="fig-bar fig-bar-5" x="24" y="124" width="162" height="14" rx="2" />
-              <rect class="fig-bar fig-bar-6" x="24" y="144" width="148" height="14" rx="2" />
-              <rect class="fig-bar fig-bar-7" x="24" y="164" width="132" height="14" rx="2" />
-            </g>
-            <text class="fig-dim" x="24" y="202">log spam billed every turn</text>
-            <path class="fig-flow fig-pack-path" d="M 204 108 H 248" />
-            <polygon class="fig-arrow" points="248,102 262,108 248,114" />
-            <circle class="fig-pack-dot" r="4" cx="0" cy="0" />
-            <g class="fig-pack-card">
-              <rect class="fig-card on" x="270" y="52" width="146" height="128" rx="4" />
-              <text class="fig-accent" x="343" y="82" text-anchor="middle">ObservationPack</text>
-              <text class="fig-fg" x="343" y="108" text-anchor="middle">~1 KB handle</text>
-              <text class="fig-cap" x="343" y="128" text-anchor="middle">excerpt only</text>
-              <text class="fig-cap" x="343" y="146" text-anchor="middle">full text on disk</text>
-            </g>
-          </svg>
+        <figure class="fig-frame">
+          <iframe src="/figures/hairline-pack.html?bare=1&theme=dark&autoplay=1" title="Interactive figure: SoL-Pi — the press packs 48KB down to a handle" loading="lazy"></iframe>
+          <figcaption>Plays on its own — hover to take over.</figcaption>
         </figure>
       </section>
 
@@ -356,30 +248,10 @@ grist</pre>
             your code.
           </p>
         </div>
-        <div class="bound-stage" aria-hidden="true">
-          <article class="bound-pane on">
-            <p class="kicker">Your disk</p>
-            <ul>
-              <li>Source files</li>
-              <li>Git history</li>
-              <li>Tool execution</li>
-              <li>Tests</li>
-            </ul>
-          </article>
-          <div class="bound-wire">
-            <span class="bound-packet"></span>
-            <span>prompt only</span>
-          </div>
-          <article class="bound-pane">
-            <p class="kicker">Gateway</p>
-            <ul>
-              <li>Prompt tokens</li>
-              <li>ObservationPack</li>
-              <li>Meter + cap</li>
-              <li>No source ingest</li>
-            </ul>
-          </article>
-        </div>
+        <figure class="fig-frame">
+          <iframe src="/figures/hairline-wall.html?bare=1&theme=dark&autoplay=1" title="Interactive figure: the privacy wall — the prompt goes through, the source stays" loading="lazy"></iframe>
+          <figcaption>Plays on its own — hover to take over.</figcaption>
+        </figure>
         <p class="bound-receipt">3 files · tests passed · $0.012</p>
       </section>
 
@@ -393,6 +265,10 @@ grist</pre>
             pays for inference. Not ours.
           </p>
         </div>
+        <figure class="fig-frame">
+          <iframe src="/figures/hairline-steps.html?bare=1&theme=dark&autoplay=1" title="Interactive figure: the seven moves from prompt to diff" loading="lazy"></iframe>
+          <figcaption>Plays on its own — hover to take over.</figcaption>
+        </figure>
         <ol class="arch-flow">
           <li>
             <span class="arch-n">1</span>

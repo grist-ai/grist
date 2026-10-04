@@ -68,6 +68,12 @@ const SITE_FILES: Record<string, string> = {
   "figures/hairline-ladder.html": "text/html; charset=utf-8",
   "figures/hairline-gate.html": "text/html; charset=utf-8",
   "figures/hairline-dial.html": "text/html; charset=utf-8",
+  "figures/hairline-map.html": "text/html; charset=utf-8",
+  "figures/hairline-brief.html": "text/html; charset=utf-8",
+  "figures/hairline-loop.html": "text/html; charset=utf-8",
+  "figures/hairline-pack.html": "text/html; charset=utf-8",
+  "figures/hairline-wall.html": "text/html; charset=utf-8",
+  "figures/hairline-steps.html": "text/html; charset=utf-8",
 }
 const MAC_DMG = /^\/download\/(grist-desktop-mac-(arm64|x64)\.dmg)$/
 const PUBLIC_MAC_DMGS: Record<string, string> = {
