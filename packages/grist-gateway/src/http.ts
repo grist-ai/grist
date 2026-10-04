@@ -65,6 +65,9 @@ const SITE_FILES: Record<string, string> = {
   "apple-touch-icon.png": "image/png",
   "robots.txt": "text/plain; charset=utf-8",
   "sitemap.xml": "application/xml; charset=utf-8",
+  "figures/hairline-ladder.html": "text/html; charset=utf-8",
+  "figures/hairline-gate.html": "text/html; charset=utf-8",
+  "figures/hairline-dial.html": "text/html; charset=utf-8",
 }
 const MAC_DMG = /^\/download\/(grist-desktop-mac-(arm64|x64)\.dmg)$/
 const PUBLIC_MAC_DMGS: Record<string, string> = {
