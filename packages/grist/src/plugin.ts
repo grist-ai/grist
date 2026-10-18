@@ -3,8 +3,18 @@ import { Agent } from "@opencode/schema/agent"
 import { Model } from "@opencode/schema/model"
 import { Permission } from "@opencode/schema/permission"
 import { Provider } from "@opencode/schema/provider"
-import { Effect } from "effect"
-import { gatewayAuthHeaders, loadInviteConfig } from "@grist-ai/logic"
+import { existsSync } from "node:fs"
+import { Effect, Schema } from "effect"
+import {
+  createProvider as createCodeMapProvider,
+  createMemoryStore,
+  formatHits,
+  formatSubgraph,
+  gatewayAuthHeaders,
+  loadInviteConfig,
+  type CodeMapProvider,
+  type OutcomeKind,
+} from "@grist-ai/logic"
 import { registerGristHooks } from "./hooks.js"
 import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "@grist-ai/logic"
 
@@ -127,6 +137,72 @@ export const Plugin = define({
   id: "grist-ai.plugin",
   effect: Effect.fn(function* (ctx) {
     yield* registerGristHooks(ctx)
+    // R1: verified-outcomes memory (ported from v1). Registered whenever a
+    // store resolves (GRIST_MEMORY=off disables it). The store enforces the
+    // verified-outcomes gate itself — unverified writes are refused there,
+    // never silently accepted here.
+    const memoryStore = createMemoryStore({ cwd: ctx.location.directory })
+    if (memoryStore) {
+      const defaultContainer =
+        ctx.location.directory.split("/").filter(Boolean).pop() ?? "default"
+      yield* ctx.tool.transform((editor) => {
+        editor.add({
+          name: "memory",
+          description:
+            "Verified-outcomes memory for this codebase. Actions: 'recall' (search prior verified learnings by query before assuming ownership or conventions), 'remember' (persist a learning ONLY with a verified outcome: tests_passed, user_approved, or user_corrected — anything else is refused), 'status' (backend health). Container defaults to this repository.",
+          input: Schema.Struct({
+            action: Schema.Literals(["recall", "remember", "status"]),
+            query: Schema.optional(Schema.String),
+            content: Schema.optional(Schema.String),
+            outcome: Schema.optional(Schema.Literals(["tests_passed", "user_approved", "user_corrected"])),
+            container: Schema.optional(Schema.String),
+          }),
+          options: { codemode: false },
+          execute: (input, toolCtx) =>
+            Effect.promise(async () => {
+              const container = input.container ?? defaultContainer
+              try {
+                if (input.action === "status") {
+                  const status = await memoryStore.status()
+                  return {
+                    content: `[grist:memory] backend=${status.backend} available=${status.available} detail=${status.detail}`,
+                  }
+                }
+                if (input.action === "recall") {
+                  const query = (input.query ?? "").trim()
+                  if (!query) return { content: "[grist:memory] recall requires a query" }
+                  const status = await memoryStore.status()
+                  const hits = await memoryStore.recall({ query, container, limit: 8 })
+                  return { content: formatHits({ query, hits, backend: status.backend }) }
+                }
+                const content = (input.content ?? "").trim()
+                const outcome = input.outcome as OutcomeKind | undefined
+                if (!content || !outcome) {
+                  return {
+                    content:
+                      "[grist:memory] remember requires content and a verified outcome (tests_passed | user_approved | user_corrected)",
+                  }
+                }
+                const record = await memoryStore.remember({
+                  content,
+                  container,
+                  outcome,
+                  sessionID: String(toolCtx.sessionID),
+                })
+                if (!record) {
+                  return {
+                    content:
+                      "[grist:memory] not stored — only verified outcomes are persisted (tests_passed, user_approved, user_corrected)",
+                  }
+                }
+                return { content: `[grist:memory] stored id=${record.id} outcome=${record.outcome} container=${record.container}` }
+              } catch (error) {
+                return { content: `[grist:memory] error: ${error instanceof Error ? error.message : String(error)}` }
+              }
+            }),
+        })
+      })
+    }
     yield* ctx.agent.transform((editor) => {
       editor.update(Agent.ID.make("grist-explore"), (item) => {
         item.name = Agent.Name.make("Grist Explore")
@@ -168,6 +244,95 @@ export const Plugin = define({
         item.permissions.push(...READ_ONLY_PERMISSIONS)
       })
     })
+    // R2: code map (ported from v1; Graphify locked by the 2026-09-23
+    // bake-off). Reads graphify-out/graph.json; the `augment` action merges
+    // Express route registrations (@grist-ai/route-graph) into
+    // graph.aug.json, which then takes precedence — that closes the
+    // route-registration blind spot both bake-off tools shared.
+    const codeMapBase = `${ctx.location.directory}/graphify-out/graph.json`
+    const codeMapAug = `${ctx.location.directory}/graphify-out/graph.aug.json`
+    let codeMapProvider: CodeMapProvider | undefined = createCodeMapProvider({
+      cwd: ctx.location.directory,
+      graphPath:
+        process.env.GRIST_GRAPHIFY_PATH ?? (existsSync(codeMapAug) ? codeMapAug : codeMapBase),
+    })
+    if (codeMapProvider) {
+      yield* ctx.tool.transform((editor) => {
+        editor.add({
+          name: "code_map",
+          description:
+            "Structural code map for this repository (Graphify graph). Actions: 'status' (graph availability/size), 'search' (find nodes by label or file), 'subgraph' (blast-radius neighborhood of a seed file/symbol, ranked by connectedness — use for escalation context instead of reading the whole repo), 'augment' (merge Express route registrations into the graph so 'which endpoint reaches this code?' resolves; writes graph.aug.json). Requires graphify-out/graph.json (build with Graphify); status reports when it is missing.",
+          input: Schema.Struct({
+            action: Schema.Literals(["status", "search", "subgraph", "augment"]),
+            query: Schema.optional(Schema.String),
+            seed: Schema.optional(Schema.String),
+            hops: Schema.optional(Schema.Number),
+          }),
+          options: { codemode: false },
+          execute: (input) =>
+            Effect.promise(async () => {
+              const provider = codeMapProvider
+              if (!provider) return { content: "[grist:code-map] provider disabled" }
+              try {
+                if (input.action === "status") {
+                  const status = await provider.status()
+                  return {
+                    content: `[grist:code-map] provider=${status.id} available=${status.available} detail=${status.detail} graph=${status.graphPath ?? ""}`,
+                  }
+                }
+                if (input.action === "search") {
+                  const query = (input.query ?? "").trim()
+                  if (!query) return { content: "[grist:code-map] search requires a query" }
+                  const nodes = await provider.search(query, 20)
+                  if (nodes.length === 0) return { content: `[grist:code-map] no nodes match ${JSON.stringify(query)}` }
+                  return {
+                    content: nodes
+                      .map((n) => `- ${n.label}${n.kind ? ` (${n.kind})` : ""}${n.sourceFile ? ` @ ${n.sourceFile}` : ""} [${n.id}]`)
+                      .join("\n"),
+                  }
+                }
+                if (input.action === "subgraph") {
+                  const seed = (input.seed ?? "").trim()
+                  if (!seed) return { content: "[grist:code-map] subgraph requires a seed" }
+                  const sub = await provider.subgraph({ seed, hops: input.hops ?? 2 })
+                  if (!sub) return { content: `[grist:code-map] no subgraph for seed ${JSON.stringify(seed)} (graph missing or seed not found)` }
+                  return { content: formatSubgraph(sub) }
+                }
+                // augment: route registrations → graph.aug.json (non-destructive)
+                const mod = (await import("@grist-ai/route-graph")) as unknown as {
+                  augmentGraph: (opts: {
+                    graphPath: string
+                    repoDir: string
+                    outPath?: string
+                    write?: boolean
+                  }) => Promise<{
+                    registrations: number
+                    nodesAdded: number
+                    linksAdded: number
+                    resolved: number
+                    unresolved: number
+                  }>
+                }
+                const stats = await mod.augmentGraph({
+                  graphPath: codeMapBase,
+                  repoDir: ctx.location.directory,
+                  outPath: codeMapAug,
+                  write: true,
+                })
+                codeMapProvider = createCodeMapProvider({
+                  cwd: ctx.location.directory,
+                  graphPath: codeMapAug,
+                })
+                return {
+                  content: `[grist:code-map] augmented: registrations=${stats.registrations} nodesAdded=${stats.nodesAdded} linksAdded=${stats.linksAdded} resolved=${stats.resolved} unresolved=${stats.unresolved} → graphify-out/graph.aug.json now in use`,
+                }
+              } catch (error) {
+                return { content: `[grist:code-map] error: ${error instanceof Error ? error.message : String(error)}` }
+              }
+            }),
+        })
+      })
+    }
     const invite = loadInviteConfig()
     if (!invite) return
     yield* ctx.provider.transform((editor) => {

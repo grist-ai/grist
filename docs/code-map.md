@@ -2,11 +2,14 @@
 
 > **Status (2026-10-18):** bake-off **completed 2026-09-23** on Prosh —
 > Graphify locked (see `~/workspace/grist-work/codegraph-bakeoff/results.md`
-> in the founder workspace). The implementation described below is the
-> **v1 tree** (`packages/opencode/src/grist/code-map/`, branch
-> `v1-archive`); the code map is **not in v2 `main`** yet — the port is
-> pending, and the v2 control plane's code-map context ranking is
-> explicitly deferred until it lands.
+> in the founder workspace). **Ported to v2 the same day:** the algebra
+> lives at `packages/grist-logic/src/code-map/`, the `code_map` tool is
+> registered by the v2 plugin, `rankContextNodes` ranks subgraph nodes by
+> blast radius, and `packages/route-graph` (rescued from the v1-line
+> branch `route-graph-rule`, renamed `@grist-ai/route-graph`) merges
+> Express route registrations via the tool's `augment` action. The v1
+> tree (`packages/opencode/src/grist/code-map/`, branch `v1-archive`)
+> remains the historical reference.
 
 Lock the knowledge-layer code map by measuring **Graphify** vs
 **code-review-graph (CRG)** on Prosh (pre-POC §6 / §9).

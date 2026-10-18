@@ -4,10 +4,10 @@
 > **v1 tree** (`packages/opencode/src/grist/…`). On v2 `main`, the harness,
 > ladder, gate, control plane, operating modes, SoL-Pi mechanisms, doctrine,
 > usage, and burn-in are implemented in `packages/grist`,
-> `packages/grist-logic`, and `packages/grist-gateway`. **Code map and
-> verified-outcome memory are v1-only — they are not in v2 yet** (port
-> pending; see the Code map / Memory rows below). Commands below that
-> reference `packages/opencode` are v1 commands and will not run on v2.
+> `packages/grist-logic`, and `packages/grist-gateway`. Verified-outcome
+> memory and the code map were both ported to v2 on 2026-10-18.
+> Commands below that reference `packages/opencode` are v1 commands and
+> will not run on v2.
 
 Grist pre-POC phases **1–6 were implemented in the v1 fork**. Pilot-repo exits
 (Prosh bake-off / burn-in) are **out of scope until Grist itself is run** —
@@ -26,8 +26,8 @@ do not block harness work on an external codebase.
 | Escalation context | code-map subgraph on medium/frontier (`GRIST_CTX_MIN`) — **v1 only; deferred in v2 (no code-map port yet)** |
 | Doctrine | surgical-engineer + multi-file plan; diff audit on edit/write |
 | Usage | `[grist:usage]` + Langfuse; `[grist:event]` for mode-cap / diff-audit |
-| Code map | **v1 only** — Graphify / CRG algebra + `code_map` tool (bake-off done 2026-09-23: Graphify locked; not ported to v2) |
-| Memory | **v1 only** — verified-outcomes file / Supermemory + `memory` tool (not ported to v2) |
+| Code map | Graphify / CRG algebra + `code_map` tool — **ported to v2 2026-10-18**, incl. route-graph augmentation (`packages/route-graph`) |
+| Memory | verified-outcomes file / Supermemory + `memory` tool — **ported to v2 2026-10-18** (personal scope; team namespaces spec-only) |
 | Burn-in | JSONL + thresholds + report |
 | Eval | `bun scripts/grist-eval.ts` — gate battery + threshold suggestions |
 

@@ -769,5 +769,6 @@ export async function decideToolBudget(input: {
 }
 
 
-// Note: `rankContextNodes` (code-map node ranking on escalation) is deferred to
-// the code-map port — it needs MapNode, which does not exist in v2 yet.
+// Note: `rankContextNodes` landed with the code-map port (2026-10-18) in
+// `code-map/graphify.ts`; the subgraph walk ranks nodes by blast radius so
+// escalation context leads with the most-connected nodes.
