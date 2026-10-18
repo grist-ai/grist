@@ -30,7 +30,7 @@
   <a href="#concepts">Concepts</a>
   <a href="/docs">Docs</a>
   <a href="https://github.com/grist-ai/grist">GitHub</a>
-  <a href="/login">Sign in</a>
+  <a class="btn ghost" href="/login">Sign in</a>
   <a class="btn accent" href="#get-started">Get started</a>
 </nav>
 </div></header>
@@ -43,7 +43,7 @@
   <div class="hero-ctas">
     <span class="install"><span><span class="dollar">$</span> npm install -g grist-ai</span><button class="copy-btn" data-copy="npm install -g grist-ai">copy</button></span>
     <a class="btn" href="/login">Sign in with Google</a>
-    <a class="btn ghost" href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a>
+    <a class="btn ghost" href="/download/grist-desktop-mac-arm64.dmg"><svg class="apple" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>Download for macOS</a>
   </div>
   <div class="flow-card reveal">
     <svg class="flow" viewBox="0 0 1040 132" role="img" aria-label="How a prompt becomes a diff: you prompt, the Jev gate routes, the ladder resolves, specialists execute, a diff lands in your tree">
@@ -104,7 +104,7 @@
   <div class="sec-head reveal">
     <p class="kicker">[ the concepts ]</p>
     <h2>Everything in the harness, explained.</h2>
-    <p class="lede">Six ideas do the heavy lifting. Each one has a full page in the docs &mdash; what it is, why it exists, and how it behaves.</p>
+    <p class="lede">Ten ideas do the heavy lifting. Each one has a full page in the docs &mdash; what it is, why it exists, and how it behaves.</p>
   </div>
   <div class="concepts">
     <article class="concept reveal">
@@ -130,6 +130,17 @@
     </article>
     <article class="concept reveal">
       <div class="viz" aria-hidden="true">
+        <div class="row"><span class="rung-chip">explore</span><span class="note">maps the code before anyone commits</span></div>
+        <div class="row"><span class="rung-chip">plan</span><span class="note">breaks the task into steps</span></div>
+        <div class="row"><span class="rung-chip">review</span><span class="note">reads the diff like a skeptic</span></div>
+        <div class="row"><span class="rung-chip">verify</span><span class="note">runs the checks, reports honestly</span></div>
+      </div>
+      <h3>Specialists</h3>
+      <p>Four named roles the gate can delegate to. Every sub-task re-gates with the parent&rsquo;s rung as a ceiling &mdash; decomposed work can only get cheaper, never pricier.</p>
+      <a class="more" href="/docs/specialists">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
         <div class="row"><span class="kind ok">&#10003; tests passed</span><span class="note">worker retries use exponential backoff</span></div>
         <div class="row"><span class="kind ok">&#10003; you approved</span><span class="note">prefer small diffs, one concern per change</span></div>
         <div class="row"><span class="kind bad">&#10007; check failed</span><span class="note">never hand-edit generated client files</span></div>
@@ -137,6 +148,17 @@
       <h3>Memory that learns your codebase</h3>
       <p>Grist remembers only what was verified &mdash; tests passed, you approved, you corrected. A nightly Dreaming pass curates it, so the next session starts briefed instead of blank.</p>
       <a class="more" href="/docs/memory">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="kind ok">merged</span><span class="note">2 near-duplicate records</span></div>
+        <div class="row"><span class="kind ok">archived</span><span class="note">3 decayed records</span></div>
+        <div class="row"><span class="kind bad">superseded</span><span class="note">1 trap retired by a newer success</span></div>
+        <div class="row"><span class="kind">audit</span><span class="note">every change a git commit</span></div>
+      </div>
+      <h3>Dreaming &amp; calibration</h3>
+      <p>Memory curates itself mechanically &mdash; no human in the loop, every change a Git commit on an audit trail. Calibration tunes the gate&rsquo;s thresholds from real outcomes, one bounded step at a time.</p>
+      <a class="more" href="/docs/dreaming">Read more &rarr;</a>
     </article>
     <article class="concept reveal">
       <div class="viz" aria-hidden="true">
@@ -181,6 +203,26 @@
       </div>
       <h3>The desktop app</h3>
       <p>Supervise every thread from one window: a worktree per thread, per-hunk review, automations, and a review queue for anything that needs your eyes.</p>
+      <a class="more" href="/docs/desktop">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="note">grist_sk_&hellip;prod</span><span class="cost">cap $25 · $6.20 spent</span></div>
+        <div class="row"><span class="note">your provider key</span><span class="cost">billed direct · 0% markup</span></div>
+        <div class="row"><span class="note">over the cap</span><span class="cost">402 · never a surprise bill</span></div>
+      </div>
+      <h3>Gateway &amp; keys</h3>
+      <p>One account, named keys you can revoke independently, per-key spend caps and attribution. Bring your own provider key &mdash; inference bills to it directly, and your source never leaves your machine.</p>
+      <a class="more" href="/docs/gateway">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="dot run"></span><span class="note">Failure-mining digest</span><span class="cost">daily 09:00</span></div>
+        <div class="row"><span class="dot run"></span><span class="note">Dreaming curation</span><span class="cost">Mon 09:00</span></div>
+        <div class="row"><span class="dot review"></span><span class="note">Every run lands in the review queue</span><span class="cost">nothing self-merges</span></div>
+      </div>
+      <h3>Automations</h3>
+      <p>Recurring jobs on a schedule &mdash; the failure digest and memory curation ship built in. Whatever an automation produces waits for your review; nothing merges itself.</p>
       <a class="more" href="/docs/desktop">Read more &rarr;</a>
     </article>
   </div>
