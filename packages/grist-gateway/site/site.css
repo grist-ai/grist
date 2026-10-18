@@ -26,6 +26,7 @@
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
+  overflow-x: clip;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font);
@@ -182,7 +183,7 @@ section:first-of-type { border-top: none; }
 .concepts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .concept {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 30px; display: flex; flex-direction: column; gap: 10px;
+  padding: 30px; display: flex; flex-direction: column; gap: 10px; min-width: 0;
 }
 .concept:hover { border-color: var(--line-strong); }
 .concept h3 { font-size: 21px; }
@@ -194,7 +195,7 @@ section:first-of-type { border-top: none; }
   display: flex; flex-direction: column; gap: 8px; min-height: 118px; justify-content: center;
 }
 .viz .row { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.viz .task { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viz .task { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .viz .arrow { color: var(--muted); flex: none; }
 .viz .rung-chip {
   flex: none; margin-left: auto; border: 1px solid var(--line-strong); border-radius: 999px;
@@ -205,7 +206,7 @@ section:first-of-type { border-top: none; }
 .viz .kind { flex: none; font-size: 11px; letter-spacing: .02em; }
 .viz .kind.ok { color: var(--accent-deep); }
 .viz .kind.bad { color: #ff6d5a; }
-.viz .note { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viz .note { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .viz .bar { height: 10px; border-radius: 5px; background: #2c2117; }
 .viz .bar.full { width: 100%; }
 .viz .bar.packed { width: 17%; background: var(--accent); }
@@ -331,15 +332,43 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 56px; }
   .steps, .concepts, .cards { grid-template-columns: 1fr; }
   .step { border-left: none; border-top: 1px solid var(--line); }
   .step:first-child { border-top: none; }
-  .docs-layout { grid-template-columns: 1fr; }
-  .docs-side { position: static; flex-direction: row; flex-wrap: wrap; }
+  .docs-layout { grid-template-columns: 1fr; gap: 26px; padding-top: 26px; }
+  /* Docs nav becomes one swipeable row instead of a wrapped pile. */
+  .docs-side {
+    position: static; flex-direction: row; flex-wrap: nowrap; align-items: center;
+    overflow-x: auto; gap: 4px; padding-bottom: 10px; scrollbar-width: none;
+  }
+  .docs-side::-webkit-scrollbar { display: none; }
+  .docs-side b { display: none; }
+  .docs-side a { white-space: nowrap; }
   .move { grid-template-columns: 34px 1fr; }
   .move p { grid-column: 2; }
   .local-grid { grid-template-columns: 1fr; }
   .local-arrow { justify-self: center; transform: rotate(90deg); }
+  /* Compact single-row nav: logo, star chip, Sign in, Get started. */
+  .nav-in { gap: 12px; }
+  .nav-links { gap: 10px; }
   .nav-links a:not(.btn) { display: none; }
-  .nav-links a.star-chip { display: inline-flex; }
+  .nav-links a.star-chip { display: inline-flex; padding: 3px 9px; white-space: nowrap; }
+  .btn { padding: 7px 13px; font-size: 13.5px; white-space: nowrap; }
+  .wordmark { height: 19px; }
   section { padding: 64px 0; }
+  .hero { padding: 52px 0 44px; }
+  .sec-head { margin-bottom: 32px; }
+  /* Diagrams keep legible type: scroll sideways instead of shrinking. */
+  .flow-card { overflow-x: auto; }
+  .flow { min-width: 600px; }
+  .diagram { overflow-x: auto; }
+  .diagram svg { min-width: 540px; }
+  /* Wide tables and long code tokens wrap instead of forcing page width. */
+  .prose table { font-size: 14px; }
+  .prose th, .prose td { padding: 8px 10px; overflow-wrap: anywhere; }
+  .prose code { overflow-wrap: anywhere; }
+  .prose pre code { overflow-wrap: normal; }
+  .prose p, .prose li { overflow-wrap: break-word; }
+  .pager { flex-wrap: wrap; gap: 10px 16px; }
+  .install { max-width: 100%; font-size: 13px; }
+  .concept { padding: 22px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
