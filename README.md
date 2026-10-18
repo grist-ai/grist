@@ -27,20 +27,33 @@ control-plane hooks with zero user config.
 What makes it different is what's wrapped around that loop: a **Jev confidence
 gate** that routes every task to the cheapest capable model rung; **doctrine**
 injected into session context; **escalate-only model switching** mid-run;
+**SoL-Pi** token cuts (packed tool output, fused edit+verify); a **verified
+memory** and **code map** that brief every session on your codebase; and
 **BYOK economics** — inference bills to your provider account (OpenRouter,
 Vercel AI Gateway, or any OpenAI-compatible endpoint) with zero markup. Grist
 never holds your inference budget.
 
+**Docs:** [grist.lol/docs](https://grist.lol/docs) — every concept explained:
+the [gate](https://grist.lol/docs/gate), the
+[ladder](https://grist.lol/docs/ladder),
+[specialists](https://grist.lol/docs/specialists),
+[SoL-Pi](https://grist.lol/docs/solpi),
+[memory](https://grist.lol/docs/memory),
+[Dreaming](https://grist.lol/docs/dreaming), the
+[code map](https://grist.lol/docs/codemap), the
+[desktop app](https://grist.lol/docs/desktop), and
+[enterprise](https://grist.lol/docs/enterprise).
+
 ## New in v2
 
 Grist moved from a surgical fork of OpenCode v1 to a first-class OpenCode v2
-plugin (now tracking upstream v2.0.18). What changed:
+plugin (now tracking upstream v2.0.32). What changed:
 
 - **Zero-config plugin** — `@grist-ai/plugin` is baked into the `grist`
   binary. Every session loads the Jev gate, doctrine injector, and control
   plane with no user setup. The only upstream edit is one additive registry
-  function, so future upstream releases merge as plain tags — no fork diff
-  to carry.
+  function, so there is no fork diff to carry — upstream syncs land as tree
+  overlays.
 - **Full CLI surface** — the v2 move brings the whole OpenCode command set:
   `grist auth`, `grist models`, `grist debug`, `grist service`,
   `grist upgrade`, `grist stats`, `grist session`, `grist mcp`, `grist pair`,
@@ -54,7 +67,33 @@ plugin (now tracking upstream v2.0.18). What changed:
 
 ## What's new
 
-Recent improvements to the harness:
+Latest release: **0.1.19** (CLI + desktop, October 2026).
+
+- **Verified memory** — sessions record only verified outcomes (tests
+  passed, you approved, you corrected, observed check failures) and recall
+  them in later sessions, so the agent starts briefed instead of blank.
+  File-backed store with an optional Supermemory backend, Agent Memory Repo
+  interchange, and a memory browser in the desktop app.
+- **Code map** — a Graphify-backed graph of your repository (files, symbols,
+  routes, ownership) the agent navigates by structure instead of grepping
+  blind. Subgraph queries are token-capped; the desktop app surfaces the
+  landmarks.
+- **Failure mining + Dreaming** — repeated failure signatures are distilled
+  into negative memories deterministically (no LLM in the loop); a Dreaming
+  pass curates memory — merging near-duplicates, archiving decayed records,
+  superseding traps retired by newer successes — with every change a Git
+  commit on an audit trail. Gate calibration proposes bounded threshold
+  steps from joined run evidence.
+- **Desktop app** — a supervision sidebar with per-thread cost and status,
+  a worktree per thread on its own auto-named branch, a review pane with
+  per-hunk accept/revert and commit, scheduled automations whose output
+  lands in a review queue (nothing merges itself), and the memory browser
+  and code-map card built in. Settings is a Grist sign-in — no provider or
+  model pickers anywhere. [Download for macOS](https://grist.lol/download/grist-desktop-mac-arm64.dmg).
+- **Website + docs** — grist.lol rebuilt: a new landing and full concept
+  docs at [grist.lol/docs](https://grist.lol/docs).
+
+Earlier improvements:
 
 - **Specialist subagents** — the gate now delegates to named specialists
   (`grist-explore`, `grist-plan`, `grist-review`, `grist-verify`) that run
@@ -137,6 +176,18 @@ Check spend any time:
 curl -s -H "X-Grist-Api-Key: $GRIST_API_KEY" "$GRIST_GATEWAY_URL/v1/usage"
 ```
 
+## Desktop app
+
+Prefer supervising over typing? The macOS app wraps the same harness:
+threads grouped by project with unread and pending-request badges, a
+worktree per thread, per-hunk review (accept, revert, commit), automations
+on a schedule with a review queue, and built-in memory and code-map
+panels. Sign in with your Grist account or paste an API key — providers
+and models stay hidden; the gate decides.
+
+[Download for macOS](https://grist.lol/download/grist-desktop-mac-arm64.dmg) ·
+[Desktop docs](https://grist.lol/docs/desktop)
+
 ## How it works
 
 ```
@@ -164,8 +215,9 @@ curl -s -H "X-Grist-Api-Key: $GRIST_API_KEY" "$GRIST_GATEWAY_URL/v1/usage"
   keys (AES-256-GCM, never logged). Ships as a Docker image
   (`packages/grist-gateway/Dockerfile`) for Railway.
 - **Shared logic** (`packages/grist-logic`): rung/mode/thresholds, Jev client,
-  gate, control plane, doctrine, invite config — imported by both the plugin
-  and the gateway.
+  gate, control plane, doctrine, invite config, plus the memory store,
+  failure mining, Dreaming planner, calibration, and code-map algebra —
+  imported by the plugin, the gateway, and the server.
 - **Skill** (`skills/grist`, published as `@grist-ai/grist-skills`): teaches
   any personal AI agent to delegate multi-step coding tasks to the CLI.
 
@@ -173,8 +225,9 @@ curl -s -H "X-Grist-Api-Key: $GRIST_API_KEY" "$GRIST_GATEWAY_URL/v1/usage"
 
 ```
 packages/grist/            @grist-ai/plugin — provider, hooks, CLI build/publish scripts
-packages/grist-gateway/    @grist-ai/gateway — BYOK gateway (Bun.serve + bun:sqlite)
-packages/grist-logic/      @grist-ai/logic — shared rung/gate/control-plane logic
+packages/grist-gateway/    @grist-ai/gateway — BYOK gateway + the grist.lol site (Bun.serve + bun:sqlite)
+packages/grist-logic/      @grist-ai/logic — shared rung/gate/control-plane logic, memory, code map
+packages/route-graph/      route graph extraction for the code map
 skills/grist/              @grist-ai/grist-skills — agent skill for delegating to Grist
 docs/v2-migration-plan.md  the v2 migration plan (7 phases)
 ```
@@ -188,7 +241,7 @@ startup behind the `GRIST_BINARY` build define.
 
 ```bash
 export TURBO_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1
-export PATH="$HOME/workspace/tools/bun-linux-x64-1.4.2:$PATH"  # bun ^1.4.2
+# requires bun ^1.4.2
 
 bun install --os="*" --cpu="*"   # full-platform install (builds need every pty binary)
 bun typecheck                    # per package: bun typecheck from the package dir
@@ -202,10 +255,12 @@ bun run --cwd packages/grist build:all
 
 ## Upstream
 
-Forked from [anomalyco/opencode](https://github.com/anomalyco/opencode) at
-v2.0.18 (upstream `v2` branch). Rebase strategy: keep the Grist surface to
-`packages/grist*`, `skills/grist`, and the additive instance-plugin registry —
-everything else stays pristine upstream.
+Forked from [anomalyco/opencode](https://github.com/anomalyco/opencode)
+(upstream `v2` branch), currently synced to **v2.0.32**. The two trees share
+no git ancestry, so upstream syncs land as tree overlays, never merges.
+Strategy: keep the Grist surface to `packages/grist*`, `packages/route-graph`,
+`skills/grist`, and the additive instance-plugin registry — everything else
+stays pristine upstream.
 
 ## License
 
