@@ -147,6 +147,34 @@ PR/CI status per thread (needs a GitHub integration policy, the same
 open question as D3's open-PR), and automation editing UI (templates
 are store JSON today).
 
+## D5 — Grist surfaces
+
+The desktop now shows the three things no other agent desktop shows:
+what Grist remembers, what the code map says, and what a thread cost.
+
+- **Cost**: thread rows in the D1 sidebar carry a per-thread cost
+  readout (`formatThreadCost` in grist-logic) whenever the session's
+  summed cost is non-zero.
+- **Memory browser**: a new protocol group `server.grist`
+  (`GET /api/grist/memory`, `POST /api/grist/memory/forget`) served
+  from the project's file memory store (`<project>/.grist/memory.json`)
+  via the new optional `list`/`forget` store methods. Home renders
+  `packages/app/src/grist/memory-browser.tsx` — search + forget-this —
+  scoped to the most recently active project.
+- **Code-map card**: `GET /api/grist/code-map` summarizes the
+  project's Graphify graph (`summarizeGraph` in grist-logic: counts +
+  most-connected landmark nodes). Home renders
+  `packages/app/src/grist/code-map-card.tsx`, which says so plainly
+  when no map exists yet.
+- **Settings pass**: the settings nav no longer lists Providers or
+  Models tabs — the Jev gate picks the model, and sign-in is the
+  Grist account (device flow or API-key paste) on the Account tab.
+  The pages remain routed for deep links and BYOK plumbing.
+
+Deferred: session-view panels for memory/code-map (Home sections ship
+first), a Supermemory-backed browser (the endpoints serve the file
+backend, the local default), and memory editing beyond forget.
+
 ## Ephemeral events
 
 Delta events (`session.text.delta`, `session.reasoning.delta`,

@@ -294,6 +294,25 @@ export type VcsFileStatus = {
 
 export type VcsBranchList = Array<string>
 
+export type GristMemoryRecord = {
+  id: string
+  content: string
+  container: string
+  outcome: "tests_passed" | "user_approved" | "user_corrected" | "check_failed"
+  weight: number | "Infinity" | "-Infinity" | "NaN"
+  createdAt: number | "Infinity" | "-Infinity" | "NaN"
+  sessionID?: string
+  metadata?: { [x: string]: string }
+}
+
+export type GristCodeMapSummary = {
+  available: boolean
+  detail: string
+  nodes: number
+  edges: number
+  top: Array<{ id: string; label: string; degree: number }>
+}
+
 export type WebSearchID = string
 
 export type WebSearchResult = { url: string; title?: string; content?: string; time: { published?: number } }
@@ -851,6 +870,8 @@ export type FormMultiselectField1 = {
 export type FormAnswer2 = { [x: string]: FormValue1 }
 
 export type VcsInfo = { provider?: string; branch: VcsBranch }
+
+export type GristMemoryList = { backend: string; records: Array<GristMemoryRecord> }
 
 export type WebSearchProvider = { id: WebSearchID; name: string }
 
@@ -6859,6 +6880,25 @@ export type VcsCommitInput = {
 }
 
 export type VcsCommitOutput = { hash: string }
+
+export type GristMemoryListInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type GristMemoryListOutput = GristMemoryList
+
+export type GristMemoryForgetInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly id: { readonly id: string }["id"]
+}
+
+export type GristMemoryForgetOutput = void
+
+export type GristCodeMapGetInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type GristCodeMapGetOutput = GristCodeMapSummary
 
 export type DebugLocationListOutput = Array<LocationPublicRef>
 

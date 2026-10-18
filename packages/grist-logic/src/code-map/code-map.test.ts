@@ -88,3 +88,15 @@ describe("rankContextNodes", () => {
     expect(ranked[ranked.length - 1]).toBe("fn:verifyToken")
   })
 })
+
+describe("summarizeGraph", () => {
+  test("counts and ranks landmarks by degree", async () => {
+    const { loadGraphifyDocument, summarizeGraph } = await import("./graphify.js")
+    const summary = summarizeGraph(loadGraphifyDocument(fixture as never))
+    expect(summary.nodes).toBeGreaterThan(0)
+    expect(summary.edges).toBeGreaterThan(0)
+    expect(summary.top.length).toBeGreaterThan(0)
+    const degrees = summary.top.map((row) => row.degree)
+    expect(degrees).toEqual([...degrees].toSorted((a, b) => b - a))
+  })
+})

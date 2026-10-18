@@ -24,7 +24,15 @@ export function createProvider(input?: {
 
 export * from "./types.js"
 export * from "./minimize.js"
-export { loadGraphifyDocument, walkSubgraph, searchNodes, resolveSeeds, rankContextNodes } from "./graphify.js"
+export {
+  loadGraphifyDocument,
+  walkSubgraph,
+  searchNodes,
+  resolveSeeds,
+  rankContextNodes,
+  summarizeGraph,
+  type GraphSummary,
+} from "./graphify.js"
 export { createGraphifyProvider } from "./graphify-provider.js"
 export { createCrgProvider } from "./crg-provider.js"
 export { scoreRetrieval, type BakeTask, type BakeResult } from "./bakeoff.js"

@@ -261,6 +261,12 @@ import type {
   VcsApplyOutput,
   VcsCommitInput,
   VcsCommitOutput,
+  GristMemoryListInput,
+  GristMemoryListOutput,
+  GristMemoryForgetInput,
+  GristMemoryForgetOutput,
+  GristCodeMapGetInput,
+  GristCodeMapGetOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -2186,6 +2192,49 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+    },
+    grist: {
+      memory: {
+        list: (input?: GristMemoryListInput, requestOptions?: RequestOptions) =>
+          request<GristMemoryListOutput>(
+            {
+              method: "GET",
+              path: `/api/grist/memory`,
+              query: { location: input?.["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        forget: (input: GristMemoryForgetInput, requestOptions?: RequestOptions) =>
+          request<GristMemoryForgetOutput>(
+            {
+              method: "POST",
+              path: `/api/grist/memory/forget`,
+              query: { location: input["location"] },
+              body: { id: input["id"] },
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      codeMap: {
+        get: (input?: GristCodeMapGetInput, requestOptions?: RequestOptions) =>
+          request<GristCodeMapGetOutput>(
+            {
+              method: "GET",
+              path: `/api/grist/code-map`,
+              query: { location: input?.["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
     },
     debug: {
       location: {

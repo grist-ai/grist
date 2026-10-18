@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { groupThreadsByProject, summaryFromSessionInfo, threadBadge, type SessionInfoLike } from "./sidebar.js"
+import {
+  formatThreadCost,
+  groupThreadsByProject,
+  summaryFromSessionInfo,
+  threadBadge,
+  type SessionInfoLike,
+} from "./sidebar.js"
 
 const info = (over: Partial<SessionInfoLike> = {}): SessionInfoLike => ({
   id: "ses_1",
@@ -52,5 +58,14 @@ describe("groupThreadsByProject", () => {
     const threads = [summaryFromSessionInfo(info({ time: { created: 1, updated: 2, archived: 5 } }))]
     expect(groupThreadsByProject(threads)).toEqual([])
     expect(groupThreadsByProject(threads, new Map(), { includeArchived: true })[0].threads).toHaveLength(1)
+  })
+})
+
+describe("formatThreadCost", () => {
+  test("formats dollars, cents, and zero", () => {
+    expect(formatThreadCost(1.234)).toBe("$1.23")
+    expect(formatThreadCost(0.05)).toBe("$0.05")
+    expect(formatThreadCost(0.001)).toBe("<$0.01")
+    expect(formatThreadCost(0)).toBe("—")
   })
 })

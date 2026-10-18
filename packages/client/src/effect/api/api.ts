@@ -2227,6 +2227,50 @@ export interface VcsApi<E = never> {
   readonly commit: VcsCommitOperation<E>
 }
 
+export type GristMemoryListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GristMemoryListOutput = {
+  readonly backend: string
+  readonly records: ReadonlyArray<{
+    readonly id: string
+    readonly content: string
+    readonly container: string
+    readonly outcome: "tests_passed" | "user_approved" | "user_corrected" | "check_failed"
+    readonly weight: number
+    readonly createdAt: number
+    readonly sessionID?: string | undefined
+    readonly metadata?: { readonly [x: string]: string } | undefined
+  }>
+}
+export type GristMemoryListOperation<E = never> = (
+  input?: GristMemoryListInput,
+) => Effect.Effect<GristMemoryListOutput, E>
+
+export type GristMemoryForgetInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly id: string
+}
+export type GristMemoryForgetOutput = void
+export type GristMemoryForgetOperation<E = never> = (
+  input: GristMemoryForgetInput,
+) => Effect.Effect<GristMemoryForgetOutput, E>
+
+export type GristCodeMapGetInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GristCodeMapGetOutput = {
+  readonly available: boolean
+  readonly detail: string
+  readonly nodes: number
+  readonly edges: number
+  readonly top: ReadonlyArray<{ readonly id: string; readonly label: string; readonly degree: number }>
+}
+export type GristCodeMapGetOperation<E = never> = (
+  input?: GristCodeMapGetInput,
+) => Effect.Effect<GristCodeMapGetOutput, E>
+
+export interface GristApi<E = never> {
+  readonly memory: { readonly list: GristMemoryListOperation<E>; readonly forget: GristMemoryForgetOperation<E> }
+  readonly codeMap: { readonly get: GristCodeMapGetOperation<E> }
+}
+
 export type DebugLocationListOutput = ReadonlyArray<Location.PublicRef>
 export type DebugLocationListOperation<E = never> = () => Effect.Effect<DebugLocationListOutput, E>
 
@@ -2328,6 +2372,7 @@ export interface AppApi<E = never> {
   readonly reference: ReferenceApi<E>
   readonly worktree: WorktreeApi<E>
   readonly vcs: VcsApi<E>
+  readonly grist: GristApi<E>
   readonly debug: DebugApi<E>
   readonly migration: MigrationApi<E>
   readonly websearch: WebsearchApi<E>

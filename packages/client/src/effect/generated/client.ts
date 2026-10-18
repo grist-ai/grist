@@ -263,6 +263,12 @@ import type {
   VcsApplyOutput,
   VcsCommitInput,
   VcsCommitOutput,
+  GristMemoryListInput,
+  GristMemoryListOutput,
+  GristMemoryForgetInput,
+  GristMemoryForgetOutput,
+  GristCodeMapGetInput,
+  GristCodeMapGetOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -1589,6 +1595,28 @@ const adaptGroupVcs = (raw: RawClient["server.vcs"]) => ({
   commit: EndpointVcsCommit(raw),
 })
 
+const EndpointGristMemoryList = (raw: RawClient["server.grist"]) => (input?: GristMemoryListInput) =>
+  preserveEffect<GristMemoryListOutput>()(
+    raw["grist.memory.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGristMemoryForget = (raw: RawClient["server.grist"]) => (input: GristMemoryForgetInput) =>
+  preserveEffect<GristMemoryForgetOutput>()(
+    raw["grist.memory.forget"]({ query: { location: input["location"] }, payload: { id: input["id"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointGristCodeMapGet = (raw: RawClient["server.grist"]) => (input?: GristCodeMapGetInput) =>
+  preserveEffect<GristCodeMapGetOutput>()(
+    raw["grist.codeMap.get"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupGrist = (raw: RawClient["server.grist"]) => ({
+  memory: { list: EndpointGristMemoryList(raw), forget: EndpointGristMemoryForget(raw) },
+  codeMap: { get: EndpointGristCodeMapGet(raw) },
+})
+
 const EndpointDebugLocationList = (raw: RawClient["server.debug"]) => () =>
   preserveEffect<DebugLocationListOutput>()(raw["debug.location"]({}).pipe(Effect.mapError(mapClientError)))
 
@@ -1671,6 +1699,7 @@ const adaptClient = (raw: RawClient) => ({
   reference: adaptGroupReference(raw["server.reference"]),
   worktree: adaptGroupWorktree(raw["server.worktree"]),
   vcs: adaptGroupVcs(raw["server.vcs"]),
+  grist: adaptGroupGrist(raw["server.grist"]),
   debug: adaptGroupDebug(raw["server.debug"]),
   migration: adaptGroupMigration(raw["server.migration"]),
   websearch: adaptGroupWebsearch(raw["server.websearch"]),

@@ -121,3 +121,10 @@ function labelFor(summary: ThreadSummary): string {
   const parts = directory.split("/").filter((part) => part.length > 0)
   return parts[parts.length - 1] ?? directory
 }
+
+/** Per-thread cost readout for the sidebar (D5): `$1.23`, `$0.05`, `—` at zero. */
+export function formatThreadCost(cost: number): string {
+  if (!Number.isFinite(cost) || cost <= 0) return "—"
+  if (cost < 0.01) return "<$0.01"
+  return `$${cost.toFixed(2)}`
+}
