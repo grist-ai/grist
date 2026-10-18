@@ -1,18 +1,17 @@
 import { useFilteredList } from "@opencode/ui/hooks"
 import { Switch } from "@opencode/ui/switch"
-import { type Component, createEffect, For, Show } from "solid-js"
+import { type Component, createEffect, createMemo, For, Show } from "solid-js"
 
 import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import { useLanguage } from "@/runtime/i18n/language"
-import { usePlatform } from "@/runtime/platform/platform"
 import { useModels } from "@/providers/models/models"
 import { useServerSDK } from "@/runtime/server/client"
 import { popularProviders } from "@/providers/catalog/providers"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
-import { ProviderModelSections } from "@/providers/models/provider-group"
+import { CONSOLE_GROUP_KEY, consoleModelGroup, ProviderModelSections } from "@/providers/models/provider-group"
 import { SettingsSearchEmpty } from "@/settings/search-empty"
 import { SettingsSearchField } from "@/settings/search-field"
 
@@ -29,17 +28,16 @@ export const SettingsModels: Component<{
   provider?: string
   onReveal?: () => void
 }> = (props) => {
-  const platform = usePlatform()
-  // The desktop app hides all provider and model surfaces; the Jev gate selects models.
-  if (platform.platform === "desktop") return null
   const language = useLanguage()
   const models = useModels()
   const serverSdk = useServerSDK()
+
   const [store, setStore] = persisted(
     Persist.serverGlobal(serverSdk.scope, "settings-v2.models.providers"),
     ModelProvidersSchema,
     { collapsed: {} },
   )
+
   const sections = new Map<string, HTMLElement>()
 
   const list = useFilteredList<ModelItem>({
@@ -55,16 +53,22 @@ export const SettingsModels: Component<{
       const bPopular = bIndex >= 0
 
       if (aPopular && !bPopular) return -1
+
       if (!aPopular && bPopular) return 1
+
       if (aPopular && bPopular) return aIndex - bIndex
 
       const aName = a.items[0].provider.name
       const bName = b.items[0].provider.name
+
       return aName.localeCompare(bName)
     },
   })
+
+  const managed = createMemo(() => consoleModelGroup(models.list()))
   const searching = () => list.filter().length > 0
   const expanded = (key: string) => searching() || !store.collapsed[key]
+
   const setProviderVisibility = (providerID: string, visible: boolean) =>
     models
       .list()
@@ -77,6 +81,7 @@ export const SettingsModels: Component<{
         <For each={props.items}>
           {(item) => {
             const key = { providerID: item.provider.id, modelID: item.id }
+
             return (
               <SettingsRow title={item.name} description="">
                 <div>
@@ -99,18 +104,25 @@ export const SettingsModels: Component<{
   createEffect(() => {
     if (!props.active || !props.provider) return
     const provider = props.provider
+
     if (list.filter()) {
       list.clear()
+
       return
     }
+
     if (!list.grouped.latest.some((group) => group.category === provider)) return
     const section = sections.get(provider)
+
     if (!section?.isConnected) return
+
     // Expand only the path to the target so the saved layout of other providers is kept.
+    if (managed()?.providers.some((item) => item.id === provider)) setStore("collapsed", CONSOLE_GROUP_KEY, false)
     setStore("collapsed", provider, false)
     requestAnimationFrame(() => {
       const panel = section.closest<HTMLElement>(".settings-panel")
       const header = panel?.querySelector<HTMLElement>(".settings-tab-header")
+
       if (panel && header) {
         panel.scrollTo({
           top: panel.scrollTop + section.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 24,
@@ -118,6 +130,7 @@ export const SettingsModels: Component<{
       } else {
         section.scrollIntoView({ block: "start" })
       }
+
       section
         .querySelector<HTMLElement>(".provider-model-group-trigger, .settings-models-group-trigger")
         ?.focus({ preventScroll: true })
@@ -167,6 +180,7 @@ export const SettingsModels: Component<{
           >
             <ProviderModelSections
               groups={list.grouped.latest}
+              managed={managed()}
               expanded={expanded}
               disabled={searching()}
               onExpandedChange={(key, value) => setStore("collapsed", key, !value)}

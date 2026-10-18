@@ -1,12 +1,7 @@
-import type { BrowserPaneEvent } from "@opencode/app/desktop"
 import type { DesktopMenuAction } from "@opencode/app/desktop-menu"
 import type { GristAuthPlatform } from "@opencode/app/grist-auth"
+import type { PairingInfo } from "../shared/ipc-rpc/app"
 import type { DesktopNativeBundle } from "@opencode/app/i18n/desktop-native"
-import type { UpdaterState } from "@opencode/app/updater"
-import type { WslServersPlatform } from "@opencode/app/wsl/types"
-import type { SshPlatform } from "@opencode/app/ssh"
-import type { Browser } from "@opencode/plugin-browser/rpc"
-import type { BrowserPaneRequest } from "../shared/ipc-rpc/browser"
 import type { WindowBootstrap } from "../shared/window-bootstrap"
 import type {
   ClipboardImage,
@@ -18,31 +13,12 @@ import type {
   ServerReadyData,
   TitlebarTheme,
 } from "../shared/ipc-contract"
-import type { PairingInfo } from "../shared/ipc-rpc/app"
-
-export type WslServersAPI = WslServersPlatform
-export type UpdaterAPI = {
-  subscribe(cb: (state: UpdaterState) => void): Promise<() => void>
-  check(): Promise<UpdaterState>
-  install(): Promise<void>
-}
 
 export type ElectronAPI = {
+  gristAuth: GristAuthPlatform
   awaitInitialization(): Promise<ServerReadyData>
   reconnectService(): Promise<ServerReadyData>
-  browserPane: {
-    request(request: BrowserPaneRequest): Promise<void>
-    send(request: BrowserPaneRequest): void
-    capture(bindingID: string, tabID: Browser.TabID): Promise<ArrayBuffer | null>
-    onEvent(callback: (value: { readonly bindingID: string; readonly event: BrowserPaneEvent }) => void): () => void
-  }
-  wslServers: WslServersAPI
-  sshServers: SshPlatform
-  updater: UpdaterAPI
-  gristAuth: GristAuthPlatform
   consumeInitialDeepLinks(): Promise<string[]>
-  getDefaultServerUrl(): Promise<string | null>
-  setDefaultServerUrl(url: string | null): Promise<void>
   isFirstLaunchOnboardingPending(): Promise<boolean>
   finishFirstLaunchOnboarding(createDefaultProject: boolean): Promise<string | null>
   checkAppExists(appName: string): Promise<boolean>

@@ -6,11 +6,26 @@ const root = path.resolve(import.meta.dir, "../../..")
 
 describe("CLI frontend import boundaries", () => {
   test("does not import Core directly", async () => {
+    // Grist exceptions: src/index.ts registers the baked-in Grist plugin with Core's
+    // instance-plugin registry (GRIST_BINARY builds only), and the doctor handler reads
+    // Core's config discovery file names. Everything else goes through @opencode/client.
+    const exceptions = new Set(["src/index.ts", "src/commands/handlers/doctor.ts"])
     const glob = new Bun.Glob("{src,test}/**/*.{ts,tsx}")
     const imports: string[] = []
     for await (const file of glob.scan({ cwd: path.join(root, "packages/cli") })) {
+      if (exceptions.has(file)) continue
       const source = await Bun.file(path.join(root, "packages/cli", file)).text()
       if (/["']@opencode\/core(?:\/[^"']*)?["']/.test(source)) imports.push(file)
+    }
+    expect(imports).toEqual([])
+  })
+
+  test("keeps ACP and its tests off the promise client", async () => {
+    const glob = new Bun.Glob("{src,test}/acp/**/*.ts")
+    const imports: string[] = []
+    for await (const file of glob.scan({ cwd: path.join(root, "packages/cli") })) {
+      const source = await Bun.file(path.join(root, "packages/cli", file)).text()
+      if (/["']@opencode\/client(?:\/promise(?:\/[^"']*)?|\/service)?["']/.test(source)) imports.push(file)
     }
     expect(imports).toEqual([])
   })

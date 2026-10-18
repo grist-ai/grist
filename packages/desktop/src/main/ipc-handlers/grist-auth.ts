@@ -60,7 +60,7 @@ export const gristAuthHandlers = GristAuthRpcs.toLayer(
         },
         catch: () => "unreachable" as const,
       }),
-    GristAuthPollDevice: ({ deviceCode }) =>
+    GristAuthPollDevice: ({ deviceCode }: { deviceCode: string }) =>
       Effect.tryPromise({
         try: async () => {
           const url = gatewayUrl()
@@ -72,7 +72,7 @@ export const gristAuthHandlers = GristAuthRpcs.toLayer(
         // failure as still-pending and keeps waiting.
         catch: () => "unreachable" as const,
       }),
-    GristAuthSaveApiKey: ({ apiKey }) => {
+    GristAuthSaveApiKey: ({ apiKey }: { apiKey: string }) => {
       const key = canonicalApiKey(apiKey)
       return key
         ? Effect.asVoid(

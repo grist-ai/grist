@@ -24,7 +24,7 @@ const sessionID = Session.ID.make("ses_plan_test")
 const plan = Agent.ID.make("plan")
 const build = Agent.ID.make("build")
 const home = "/home/plan-test"
-const planDirectory = path.join(home, ".opencode", "plan")
+const planDirectory = path.join(home, ".grist", "plan")
 
 const agentSelected = (agent: Agent.ID, previous: Agent.ID): SessionEvent.AgentSelected => ({
   id: Event.ID.create(),
@@ -39,16 +39,10 @@ const run = Effect.fnUntraced(function* (events: ReadonlyArray<SessionEvent.Agen
   const persisted = new Array<string>()
   let contextHook: ((input: SessionContext) => Effect.Effect<void>) | undefined
   let toolHook: ((input: ToolHooks["execute.after"]) => Effect.Effect<void>) | undefined
+  const defaults = Agent.Info.default(plan)
   const planAgent = {
-    id: plan,
-    name: Agent.Name.make("Plan"),
-    request: { settings: {}, headers: {}, body: {} },
-    mode: "primary",
-    hidden: false,
-    permissions: [
-      { action: "*", resource: "*", effect: "allow" },
-      { action: "external_directory", resource: "*", effect: "ask" },
-    ],
+    ...defaults,
+    permissions: [...defaults.permissions],
   } satisfies Types.DeepMutable<Agent.Info>
   const driver = Environment.makeMemoryDriver()
   yield* PlanPlugin.Plugin.effect(
@@ -263,17 +257,13 @@ describe("plan plugin mutations", () => {
     }),
   )
 
-  it.effect("allows the Plan directory external boundary", () =>
+  it.effect("allows external directories without asking", () =>
     Effect.gen(function* () {
       const { planAgent } = yield* run()
       expect(
         Permission.evaluate("external_directory", path.join(planDirectory, "*"), planAgent.permissions).effect,
       ).toBe("allow")
-      expect(
-        Permission.evaluate("external_directory", path.join(planDirectory, "nested", "*"), planAgent.permissions)
-          .effect,
-      ).toBe("allow")
-      expect(Permission.evaluate("external_directory", "/outside/*", planAgent.permissions).effect).toBe("ask")
+      expect(Permission.evaluate("external_directory", "/outside/*", planAgent.permissions).effect).toBe("allow")
     }),
   )
 

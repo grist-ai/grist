@@ -193,7 +193,7 @@ const fromRequest = Effect.fn("OpenAITranscription.fromRequest")(function* (requ
     {
       overlay: mergeJsonRecords(request.providerOptions, request.http?.body),
       reserved: RESERVED_FORM_FIELDS,
-      repeatArrays: true,
+      repeatArrays: "key[]",
     },
   )
   return MediaProtocol.multipart(form)
@@ -210,7 +210,7 @@ const segment = (value: Schema.Schema.Type<typeof Segment>): TranscriptionSegmen
   speaker: value.speaker,
 })
 
-const onEvent = Effect.fn("OpenAITranscription.onEvent")(function* (state: State, frame: string) {
+const onEvent = Effect.fnUntraced(function* (state: State, frame: string) {
   if (!EVENT_TYPES.has((yield* decodeEventType(frame)).type)) return [state, []] as const
   const event = yield* decodeEvent(frame)
   if (event.type === "error")

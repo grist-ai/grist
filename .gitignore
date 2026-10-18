@@ -36,6 +36,3 @@ RELEASE_REVIEW.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
-
-# Downloaded Moonshine speech model (fetched at build time, ~300MB)
-packages/desktop/resources/moonshine/

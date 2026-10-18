@@ -54,6 +54,9 @@ export const Plugin = Schema.Union([
   }),
 ])
 
+export const DiffSource = Schema.Union([Vcs.Mode, Schema.Literal("turn")])
+export type DiffSource = Schema.Schema.Type<typeof DiffSource>
+
 export const Cursor = Schema.Struct({
   style: Schema.optional(Schema.Literals(["block", "underline", "line", "default"])).annotate({
     description: "Cursor shape. Use 'default' to preserve the terminal setting",
@@ -108,14 +111,18 @@ export const Info = Schema.Struct({
   ).annotate({ description: "System notification and sound settings" }),
   diffs: Schema.optional(
     Schema.Struct({
-      source: Schema.optional(Vcs.Mode).annotate({
-        description: "Initial diff source; defaults to 'branch' (branch and uncommitted changes)",
+      source: Schema.optional(DiffSource).annotate({
+        description:
+          "Initial diff source; defaults to 'branch' (branch and uncommitted changes). 'turn' shows the session's last turn and falls back to 'branch' outside a session",
       }),
       wrap: Schema.optional(Schema.Literals(["word", "none"])).annotate({
         description: "Line wrapping behavior in diff output",
       }),
       tree: Schema.optional(Schema.Boolean).annotate({ description: "Show the diff file tree" }),
       single: Schema.optional(Schema.Boolean).annotate({ description: "Show only the selected file patch" }),
+      fullscreen: Schema.optional(Schema.Boolean).annotate({
+        description: "Open the diff side panel full screen; remembers the last full screen toggle",
+      }),
       view: Schema.optional(Schema.Literals(["auto", "split", "unified"])).annotate({
         description: "Diff layout; 'auto' selects a layout from the available width",
       }),
@@ -155,7 +162,8 @@ export const Info = Schema.Struct({
         description: "Group related transcript items automatically or render each item separately",
       }),
       verbosity: Schema.optional(Schema.Literals(["low", "medium", "high"])).annotate({
-        description: "Transcript detail level: low summarizes each run of tools and thoughts, high opens exploration and instruction groups",
+        description:
+          "Transcript detail level: low summarizes each run of tools and thoughts, high opens exploration and instruction groups",
       }),
       image_preview: Schema.optional(Schema.Boolean).annotate({
         description: "Show user attachment and tool-result images in the session transcript",
@@ -240,6 +248,9 @@ export const Info = Schema.Struct({
     description: "Experimental features that may change or be removed at any time",
   }),
   animations: Schema.optional(Schema.Boolean).annotate({ description: "Enable interface animations" }),
+  highlights: Schema.optional(Schema.Boolean).annotate({
+    description: "Show the release highlights once after OpenCode updates",
+  }),
   mouse: Schema.optional(Schema.Boolean).annotate({ description: "Enable terminal mouse capture" }),
   cursor: Schema.optional(Cursor),
 })
@@ -263,7 +274,6 @@ export type Resolved = Omit<Info, "attention" | "cursor" | "keybinds" | "leader"
   session: Omit<NonNullable<Info["session"]>, "new_location" | "permissions" | "tps"> & {
     new_location: "launch" | "inherit"
     permissions: "prompt" | "autoaccept"
-    terminal: boolean
     tps: boolean
   }
   tabs: {
@@ -279,8 +289,7 @@ export function resolve(
   input: Info,
   options: { terminalSuspend: boolean; environment?: Readonly<Record<string, string | undefined>> },
 ): Resolved {
-  const tabsMode =
-    input.tabs?.mode ?? (input.tabs?.enabled === undefined ? "auto" : input.tabs.enabled ? "on" : "off")
+  const tabsMode = input.tabs?.mode ?? (input.tabs?.enabled === undefined ? "auto" : input.tabs.enabled ? "on" : "off")
   const keybinds: TuiKeybind.KeybindOverrides = { ...input.keybinds }
   if (!options.terminalSuspend) {
     keybinds["terminal.suspend"] = "none"
@@ -316,8 +325,6 @@ export function resolve(
       ...input.session,
       new_location: input.session?.new_location ?? "launch",
       permissions: input.session?.permissions ?? "prompt",
-      // Persistent terminal panes need the opencode-pty daemon, which does not ship Windows binaries.
-      terminal: process.platform !== "win32",
       tps: input.session?.tps ?? true,
     },
     tabs: {
@@ -371,4 +378,10 @@ export function useConfig() {
   const value = useContext(ConfigContext)
   if (!value) throw new Error("ConfigProvider is missing")
   return value
+}
+
+/** Reactive accessor for the temporary "new-designs" experiment. */
+export function useNewDesigns() {
+  const config = useConfig()
+  return () => config.data.experimental?.["new-designs"] === true
 }

@@ -10,13 +10,18 @@ import { storedBackgroundColor, titlebarOverlay, tone } from "./defaults"
 import { PRODUCT_NAME } from "../../../brand"
 
 const titlebarThemes = new WeakMap<BrowserWindow, Partial<TitlebarTheme>>()
+
 const pinchZoomEnabled = new WeakMap<BrowserWindow, boolean>()
+
 const maxZoomLevel = 10
+
 const minZoomLevel = 0.2
+
 let backgroundColor: string | undefined
 
 export function windowAppearance(path: Path.Path, paths: DesktopPaths.Resolved) {
   const mode = tone()
+
   return {
     title: PRODUCT_NAME,
     icon: iconPath(path, paths),
@@ -46,6 +51,7 @@ export function windowAppearance(path: Path.Path, paths: DesktopPaths.Resolved) 
 export function setDockIcon(path: Path.Path, paths: DesktopPaths.Resolved) {
   if (process.platform !== "darwin") return
   const icon = nativeImage.createFromPath(path.join(iconsDir(path, paths), "dock.png"))
+
   if (!icon.isEmpty()) app.dock?.setIcon(icon)
 }
 
@@ -56,21 +62,25 @@ export function setBackgroundColor(color: string) {
   backgroundColor = color
   BrowserWindow.getAllWindows().forEach((win) => {
     win.setBackgroundColor(color)
+
     if (process.platform === "darwin") win.invalidateShadow()
   })
 }
 
 export function getBackgroundColor() {
   const stored = getStore().get(BACKGROUND_COLOR_KEY)
+
   return backgroundColor ?? (typeof stored === "string" ? stored : undefined)
 }
 
 export function setTitlebar(win: BrowserWindow, theme: Partial<TitlebarTheme> = {}) {
   titlebarThemes.set(win, theme)
+
   // Native window controls follow nativeTheme, not the renderer theme.
   if (process.platform === "darwin" || process.platform === "win32") {
     nativeTheme.themeSource = theme.scheme ?? theme.mode ?? "system"
   }
+
   updateTitlebar(win)
 }
 
@@ -84,6 +94,7 @@ export function setPinchZoomEnabled(enabled: boolean) {
   BrowserWindow.getAllWindows().forEach((win) => {
     pinchZoomEnabled.set(win, enabled)
     emitIpcEvent(win.webContents, new WindowPinchZoomChanged({ enabled }))
+
     if (!enabled && win.webContents.getZoomFactor() !== 1) win.webContents.setZoomFactor(1)
     updateZoom(win)
   })
@@ -103,12 +114,15 @@ export function wireZoom(win: BrowserWindow) {
   win.webContents.setZoomFactor(1)
   win.webContents.on("zoom-changed", (event, direction) => {
     event.preventDefault()
+
     if (pinchZoomEnabled.get(win)) {
       const delta = direction === "in" ? 0.2 : -0.2
       win.webContents.setZoomFactor(clampZoom(win.webContents.getZoomFactor() + delta))
       updateZoom(win)
+
       return
     }
+
     if (win.webContents.getZoomFactor() !== 1) win.webContents.setZoomFactor(1)
     updateZoom(win)
   })
@@ -119,6 +133,7 @@ export function wireFullscreen(win: BrowserWindow) {
     if (win.isDestroyed() || win.webContents.isDestroyed()) return
     emitIpcEvent(win.webContents, new WindowFullscreenChanged({ fullscreen }))
   }
+
   win.on("enter-full-screen", () => send(true))
   win.on("leave-full-screen", () => send(false))
 }

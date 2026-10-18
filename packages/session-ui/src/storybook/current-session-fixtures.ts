@@ -14,6 +14,7 @@ import type { SessionDocument } from "../document"
 import type { SessionUserPresentation } from "../timeline/session-timeline"
 
 export const CURRENT_SESSION_ID = "session_current_story"
+
 export const STORY_TIME = 1_735_689_600_000
 
 export const STORY_MODEL = {
@@ -90,6 +91,10 @@ function runningTool(input: {
   output?: string
   metadata?: Record<string, JsonValue>
 }): SessionMessageAssistantTool {
+  const metadata = { ...input.metadata }
+
+  if (input.output !== undefined) metadata.output = input.output
+
   return {
     type: "tool",
     id: input.id,
@@ -97,10 +102,7 @@ function runningTool(input: {
     state: {
       status: "running",
       input: input.args,
-      metadata: {
-        ...input.metadata,
-        ...(input.output === undefined ? {} : { output: input.output }),
-      },
+      metadata,
     },
     time: { created: STORY_TIME + input.offset, ran: STORY_TIME + input.offset + 100 },
   }
@@ -1116,6 +1118,44 @@ export const attachmentsAndCommentsPresentation = {
   },
 } satisfies Record<string, SessionUserPresentation>
 
+// The header and body as the OpenCode iOS app's `VoiceHandoff.format` writes them.
+const voiceHeader =
+  "Voice delegation. The user is on a voice call with a voice agent, which hands their requests to you. Instruction is the user's own spoken words since the previous delegation, transcribed from speech, so it may contain recognition errors and disfluencies: resolve meaning from the complete utterance, not a disfluent prefix. Voice, when present, is how the voice agent framed the request. Transcript delta is the surrounding voice conversation, both sides, for context, not additional commands. Lead your reply with one or two plain sentences suitable for reading aloud, then any detail; answer only what was asked, with no unrequested tips. If this arrives while you are already working (a follow-up, nudge, or status check), answer it promptly: a clear status update, the finished result if you have enough, or the precise blocker or input you need; then continue on the fastest safe path."
+
+const voiceInstruction =
+  "okay so the upload test keeps failing on CI but only sometimes, can you look at the last few runs, figure out whether it's the retry timing or the fixture cleanup, and if it's the fixture just fix it and open a PR"
+
+export const voiceDocument = document([
+  user(
+    "msg_user_voice",
+    `${voiceHeader}\n${JSON.stringify({ instruction: "check the upload test", transcript_delta: ["user: check the upload test"], voice: "Checking the upload test." }, null, 2)}`,
+    100_000,
+  ),
+  assistant({
+    id: "msg_assistant_voice",
+    offset: 101_000,
+    completed: 104_000,
+    content: [{ type: "text", text: "The upload test is flaky on CI: it fails about one run in five." }],
+  }),
+  user(
+    "msg_user_voice_continued",
+    `Voice delegation (continued). Same fields as before.\n${JSON.stringify({ instruction: voiceInstruction, transcript_delta: [`user: ${voiceInstruction}`] }, null, 2)}`,
+    110_000,
+  ),
+  assistant({
+    id: "msg_assistant_voice_continued",
+    offset: 111_000,
+    completed: 118_000,
+    content: [{ type: "text", text: "It was the fixture cleanup. I fixed it and opened a pull request." }],
+  }),
+  user("msg_user_typed", "Thanks, merge it once CI is green.", 120_000),
+] satisfies SessionMessageInfo[])
+
+export const voicePresentation = {
+  msg_user_voice: { displayText: "Checking the upload test.", voice: true },
+  msg_user_voice_continued: { displayText: voiceInstruction, voice: true },
+} satisfies Record<string, SessionUserPresentation>
+
 export const revertDocument = document([
   user("msg_user_revert_base", "Add a compact Session summary.", 90_000),
   assistant({
@@ -1137,6 +1177,7 @@ const largeMessages = Array.from({ length: 16 }, (_, index) => {
   const offset = 110_000 + index * 5_000
   const userID = `msg_user_large_${String(index + 1).padStart(2, "0")}`
   const assistantID = `msg_assistant_large_${String(index + 1).padStart(2, "0")}`
+
   const context =
     index % 4 === 0
       ? [
@@ -1150,6 +1191,7 @@ const largeMessages = Array.from({ length: 16 }, (_, index) => {
           }),
         ]
       : []
+
   return [
     user(userID, `Complete deterministic Session UI checkpoint ${index + 1}.`, offset),
     assistant({

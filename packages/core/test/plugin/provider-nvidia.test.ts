@@ -35,8 +35,8 @@ describe("NvidiaPlugin", () => {
       yield* addPlugin()
       expect((yield* catalog.get(Provider.ID.make("nvidia")))?.headers).toEqual({
         Existing: "value",
-        "HTTP-Referer": "https://opencode.ai/",
-        "X-Title": "opencode",
+        "HTTP-Referer": "https://github.com/grist-ai/grist",
+        "X-Title": "grist",
         "X-BILLING-INVOKE-ORIGIN": "OpenCode",
       })
       expect((yield* catalog.get(Provider.ID.openrouter))?.headers).toBeUndefined()
@@ -55,8 +55,8 @@ describe("NvidiaPlugin", () => {
       yield* addPlugin()
 
       expect((yield* catalog.get(Provider.ID.make("nvidia")))?.headers).toEqual({
-        "HTTP-Referer": "https://opencode.ai/",
-        "X-Title": "opencode",
+        "HTTP-Referer": "https://github.com/grist-ai/grist",
+        "X-Title": "grist",
         "X-BILLING-INVOKE-ORIGIN": "OpenCode",
       })
     }),
@@ -75,8 +75,8 @@ describe("NvidiaPlugin", () => {
       yield* addPlugin()
 
       expect((yield* catalog.get(Provider.ID.make("nvidia")))?.headers).toEqual({
-        "HTTP-Referer": "https://opencode.ai/",
-        "X-Title": "opencode",
+        "HTTP-Referer": "https://github.com/grist-ai/grist",
+        "X-Title": "grist",
         "X-BILLING-INVOKE-ORIGIN": "CustomOrigin",
       })
     }),

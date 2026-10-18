@@ -7,6 +7,7 @@ for (const direction of ["ltr", "rtl"]) {
         args: { alternate },
         globals: { direction },
       })
+
       const controls = component.locator('[data-slot="composer-controls"]')
       const actions = component.locator('[data-slot="composer-actions"]')
       const submit = component.locator('[data-action="composer-submit"]')
@@ -21,6 +22,8 @@ for (const direction of ["ltr", "rtl"]) {
       await expect(component.locator('[data-action="composer-alternate-delivery"]')).toHaveCount(
         alternate === "none" ? 0 : 1,
       )
+      // A late Inter swap resizes the delivery keybind and shifts the toolbar; measure after fonts settle.
+      await page.evaluate(() => document.fonts.ready.then(() => undefined))
 
       for (const width of [1024, 360]) {
         await page.setViewportSize({ width, height: 720 })
@@ -35,6 +38,7 @@ for (const direction of ["ltr", "rtl"]) {
         expect(viewport).not.toBeNull()
         expect(action).not.toBeNull()
         expect(fixedAdd).not.toBeNull()
+
         if (!fixed || !viewport || !action || !fixedAdd) return
         expect(direction === "ltr" ? fixedAdd.x + fixedAdd.width : viewport.x + viewport.width).toBeCloseTo(
           direction === "ltr" ? viewport.x - 4 : fixedAdd.x - 4,
@@ -55,6 +59,7 @@ for (const direction of ["ltr", "rtl"]) {
           `linear-gradient(to ${direction === "ltr" ? "right" : "left"}, rgba(0, 0, 0, 0), rgb(0, 0, 0) 0px, rgb(0, 0, 0) calc(100% - 16px), rgba(0, 0, 0, 0))`,
         )
         const first = await agent.boundingBox()
+
         if (!first) throw new Error("Missing agent control")
         expect(
           direction === "ltr" ? first.x - viewport.x : viewport.x + viewport.width - first.x - first.width,
@@ -83,6 +88,7 @@ for (const direction of ["ltr", "rtl"]) {
         await expect(controls).toHaveAttribute("data-overflow-start", "true")
         await expect(controls).toHaveAttribute("data-overflow-end", "false")
         const last = await variant.boundingBox()
+
         if (!last) throw new Error("Missing variant control")
         expect(
           Math.abs(direction === "ltr" ? viewport.x + viewport.width - last.x - last.width : last.x - viewport.x),
@@ -91,7 +97,14 @@ for (const direction of ["ltr", "rtl"]) {
           Math.abs((direction === "ltr" ? action.x - last.x - last.width : last.x - action.x - action.width) - 12),
         ).toBeLessThan(1)
         await page.keyboard.press("Enter")
-        await expect(page.getByRole("menuitemradio", { name: "high", exact: true })).toBeVisible()
+        // Below the mobile breakpoint the variant picker opens in a bottom drawer instead of a menu.
+        await expect(
+          width < 768
+            ? page
+                .getByRole("dialog", { name: "Choose model variant", exact: true })
+                .getByRole("button", { name: "high", exact: true })
+            : page.getByRole("menuitemradio", { name: "high", exact: true }),
+        ).toBeVisible()
         await page.keyboard.press("Escape")
         await expect(variant).toBeFocused()
         await expect(submit).toBeInViewport()
@@ -99,6 +112,7 @@ for (const direction of ["ltr", "rtl"]) {
         await add.click()
         await expect(page.getByRole("menuitem", { name: "Images and files" })).toBeVisible()
         await page.keyboard.press("Escape")
+        await expect(add).toBeFocused()
         expect(await add.boundingBox()).toEqual(fixedAdd)
       }
 
@@ -133,14 +147,18 @@ story("grows suggestions while preserving visible timeline context", async ({ mo
   await expect
     .poll(async () => {
       const menu = await suggestions.boundingBox()
+
       const items = await suggestions.locator("[data-suggestion-id]").evaluateAll((elements) =>
         elements.map((element) => {
           const rect = element.getBoundingClientRect()
+
           return { top: rect.top, bottom: rect.bottom }
         }),
       )
+
       if (!menu) return false
       const bottom = menu.y + menu.height
+
       return items.some((item) => item.top < bottom && item.bottom > bottom)
     })
     .toBe(true)
@@ -174,9 +192,11 @@ story("centers add menu shortcuts in a consistent column", async ({ mount, page 
 
   const shortcuts = page.locator('[role="menu"] [data-slot="menu-v2-item-shortcut"]')
   await expect(shortcuts).toHaveCount(4)
+
   const boxes = await shortcuts.evaluateAll((items) =>
     items.map((item) => {
       const box = item.getBoundingClientRect()
+
       return { width: box.width, center: box.left + box.width / 2 }
     }),
   )
@@ -196,6 +216,7 @@ for (const draft of ["empty-draft", "multiline-draft", "mixed-attachments"]) {
       expect(
         await input.evaluate((editor) => {
           const selection = window.getSelection()
+
           return {
             text: selection?.toString(),
             inside: editor.contains(selection?.anchorNode ?? null) && editor.contains(selection?.focusNode ?? null),
@@ -207,6 +228,7 @@ for (const draft of ["empty-draft", "multiline-draft", "mixed-attachments"]) {
     await page.keyboard.type("Replacement draft")
     await expect(input).toHaveText("Replacement draft")
     await expect(component.getByRole("status")).toHaveText("Ready")
+
     if (draft === "mixed-attachments") {
       await expect(component.getByAltText("layout.png")).toBeVisible()
       await expect(component.getByText("Keep the normal flow flat", { exact: true })).toBeVisible()
@@ -223,6 +245,7 @@ story.describe("touch attachments", () => {
 
     const remove = component.getByRole("button", { name: "Remove attachment", exact: true })
     await expect(remove).not.toHaveCount(0)
+
     for (const button of await remove.all()) await expect(button).toHaveCSS("opacity", "1")
 
     const count = await remove.count()
@@ -237,6 +260,7 @@ story("renders a draft once and supports editing, caret restoration, and failure
     Element.prototype.replaceChildren = function (this: Element, ...nodes) {
       // The ref can run before data-component is assigned, so count on every target.
       this.setAttribute("data-test-replacements", String(Number(this.getAttribute("data-test-replacements")) + 1))
+
       return replace.apply(this, nodes)
     }
   })
@@ -346,4 +370,60 @@ story("keeps default thinking accessible by keyboard without composer hover", as
   await page.keyboard.press("Tab")
   await expect(control).not.toBeFocused()
   await expect(control).toHaveCSS("opacity", "0")
+})
+
+story.describe("mobile variant drawer", () => {
+  story.use({ viewport: { width: 360, height: 720 } })
+
+  // Guards patches/@corvu%2Fdrawer@0.2.4.patch. The drawer starts its opening transition two frames after it opens.
+  // Dismissing it before then used to slide it open anyway, and dismissing it in that frame left it closing off screen
+  // for good, holding focus and disabling pointer input on the page. Playwright input cannot target those frames, so
+  // the page dismisses it.
+  for (const moment of ["before", "as"] as const) {
+    story(`closes and restores focus when dismissed ${moment} it starts opening`, async ({ mount, page }) => {
+      const component = await mount("opencode-composer-flow--model-and-variant")
+      const variant = component.getByRole("button", { name: "Choose model variant" })
+      const drawer = page.getByRole("dialog", { name: "Choose model variant", exact: true })
+      const high = drawer.getByRole("button", { name: "high", exact: true })
+
+      // Load the lazy drawer first so the dismissal below races only the drawer's own transition.
+      await variant.click()
+      await expect(high).toBeInViewport()
+      const content = await drawer.elementHandle()
+
+      if (!content) throw new Error("Missing variant drawer")
+      await page.keyboard.press("Escape")
+      await expect(drawer).toBeHidden()
+      await expect(variant).toBeFocused()
+
+      await variant.evaluate(
+        (trigger: HTMLElement, race) =>
+          new Promise<void>((resolve) => {
+            const dismiss = () => {
+              document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+              resolve()
+            }
+
+            // Mutation records arrive before the browser renders the opening transition's first frame.
+            const observer = new MutationObserver(() => {
+              if (!race.content.hasAttribute("data-opening")) return
+              observer.disconnect()
+              dismiss()
+            })
+
+            if (race.moment === "as") observer.observe(race.content, { attributeFilter: ["data-opening"] })
+            trigger.click()
+
+            if (race.moment === "before") dismiss()
+          }),
+        { content, moment },
+      )
+      await expect(drawer).toBeHidden()
+      await expect(variant).toBeFocused()
+      await expect(page.locator("body")).not.toHaveCSS("pointer-events", "none")
+
+      await variant.click()
+      await expect(high).toBeInViewport()
+    })
+  }
 })

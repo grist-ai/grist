@@ -2,6 +2,7 @@ import { resolveChannel } from "./utils"
 import { APP_IDS, APP_NAMES, PRODUCT_NAME } from "../brand"
 
 const arg = process.argv[2]
+
 const channel = arg === "dev" || arg === "beta" || arg === "prod" ? arg : resolveChannel()
 
 const appId = APP_IDS[channel]
@@ -38,4 +39,5 @@ const xml = `<?xml version="1.0" encoding="UTF-8"?>
 `
 
 await Bun.write(`resources/${appId}.metainfo.xml`, xml)
+
 console.log(`Generated metainfo for ${channel} at resources/${appId}.metainfo.xml`)

@@ -28,12 +28,20 @@ export const SettingsExtensions: Component<{
   const language = useLanguage()
   const serverSdk = useServerSDK()
   const data = useData()
+
+  // Reading `.latest` rethrows a failed fetch, so these lists fall back to empty instead of crashing the page.
   const [mcpList, { refetch: refetchMcp }] = createResource(
     () => serverSdk.connection.status() === "connected",
-    () => serverSdk.api.mcp.list().then((result) => result.data),
+    () =>
+      serverSdk.api.mcp
+        .list()
+        .then((result) => result.data)
+        .catch(() => []),
     { initialValue: [] },
   )
+
   const toggleMcp = useMcpToggle(() => undefined, refetchMcp)
+
   const mcps = createMemo<McpRowItem[]>(() => {
     return (mcpList.latest ?? []).map((server) => ({
       name: server.name,
@@ -48,9 +56,14 @@ export const SettingsExtensions: Component<{
 
   const [pluginList] = createResource(
     () => serverSdk.connection.status() === "connected",
-    () => serverSdk.api.plugin.list().then((result) => result.data),
+    () =>
+      serverSdk.api.plugin
+        .list()
+        .then((result) => result.data)
+        .catch(() => []),
     { initialValue: [] },
   )
+
   const plugins = createMemo<PluginRowItem[]>(() => pluginLabels(pluginList.latest ?? []).map((name) => ({ name })))
 
   createEffect(() => {
@@ -81,7 +94,7 @@ export const SettingsExtensions: Component<{
         >
           <Tabs.List>
             <Tabs.Trigger value="mcps">{language.t("settings.extensions.tab.mcps")}</Tabs.Trigger>
-            <Tabs.Trigger value="plugins">{language.t("status.popover.tab.plugins")}</Tabs.Trigger>
+            <Tabs.Trigger value="plugins">{language.t("settings.extensions.tab.plugins")}</Tabs.Trigger>
             <Tabs.Trigger value="skills">{language.t("settings.extensions.tab.skills")}</Tabs.Trigger>
           </Tabs.List>
 

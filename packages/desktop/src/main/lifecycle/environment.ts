@@ -37,6 +37,7 @@ export const preferApplicationEnvironment = Effect.gen(function* () {
 export const prepareDesktop = Effect.gen(function* () {
   const path = yield* Path.Path
   const paths = yield* DesktopPaths.resolve
+
   if (app.isPackaged || process.env.OPENCODE_DESKTOP_DISABLE_PROTOCOL_REGISTRATION !== "1")
     app.setAsDefaultProtocolClient(PROTOCOL_SCHEME)
   const runFork = Effect.runForkWith(yield* Effect.context())
@@ -66,11 +67,13 @@ const loadSystemCertificates = Effect.try({
 
 function ensureLoopbackNoProxy() {
   const loopback = ["127.0.0.1", "localhost", "::1"]
+
   ;["NO_PROXY", "no_proxy"].forEach((key) => {
     const items = (process.env[key] ?? "")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
+
     loopback.forEach((host) => {
       if (!items.some((value) => value.toLowerCase() === host)) items.push(host)
     })

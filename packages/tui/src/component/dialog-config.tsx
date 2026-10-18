@@ -1,5 +1,5 @@
 import { createMemo, createSignal } from "solid-js"
-import { useConfig } from "../config"
+import { useConfig, useNewDesigns } from "../config"
 import { useThemes } from "../context/theme"
 import { DialogSelect } from "../ui/dialog-select"
 import { useToast } from "../ui/toast"
@@ -290,6 +290,15 @@ export const settings: Setting[] = [
     keywords: ["sound volume", "audio volume"],
   },
   {
+    title: "Release highlights",
+    category: "Alerts",
+    path: ["highlights"],
+    default: true,
+    values: [false, true],
+    labels: ["off", "on"],
+    keywords: ["what's new", "changelog", "release notes"],
+  },
+  {
     title: "Window title",
     category: "Terminal",
     path: ["terminal", "title"],
@@ -323,6 +332,7 @@ export function settingID(setting: Setting) {
 
 export function DialogConfig(props: { current?: string }) {
   const config = useConfig()
+  const newDesigns = useNewDesigns()
   const toast = useToast()
   const themes = useThemes()
   const current = Math.max(
@@ -385,12 +395,14 @@ export function DialogConfig(props: { current?: string }) {
   return (
     <DialogSelect
       title="Settings"
+      searchInTitle
+      titlePlaceholder="Search settings"
       options={options()}
       current={current}
       filterThreshold={0.7}
       onMove={(option) => setSelected(option.value)}
       onSelect={(option) => void change(1, option.value)}
-      footerHints={[{ title: "←/→", label: "change" }]}
+      footerHints={newDesigns() ? [] : [{ title: "change", label: "←/→" }]}
       bindings={[
         {
           bind: "left",

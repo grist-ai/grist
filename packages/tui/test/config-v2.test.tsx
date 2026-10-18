@@ -9,8 +9,8 @@ import { CommandMap, Definitions } from "../src/config/v1/keybind"
 
 const decodeInfo = Schema.decodeUnknownSync(Info)
 
-test("validates the three explicit diff source defaults", () => {
-  for (const source of ["branch", "committed", "working"] as const) {
+test("validates the explicit diff source defaults", () => {
+  for (const source of ["branch", "committed", "working", "turn"] as const) {
     expect(decodeInfo({ diffs: { source } })).toEqual({ diffs: { source } })
   }
   expect(decodeInfo({ diffs: {} })).toEqual({ diffs: {} })
@@ -243,6 +243,7 @@ test("centralizes named command defaults and resolves explicit none", () => {
     "diff.next_hunk": "]",
     "diff.previous_hunk": "[",
     "diff.mark_reviewed": "m",
+    "diff.toggle_fullscreen": "f",
     "diff.help": "?,shift+?,shift+/",
   }
   const config = resolve({}, { terminalSuspend: true })

@@ -11,6 +11,7 @@ import { Model } from "../../model.js"
 import { Agent } from "../../agent.js"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Provider } from "../../provider.js"
+import { SessionAffinity } from "../../session/affinity.js"
 import type { PluginInternal } from "../internal.js"
 
 const clientID = "Ov23li8tweQw6odWQebz"
@@ -225,10 +226,22 @@ export const GithubCopilotPlugin = define({
         })
         return
       }
+      // Without the live model list, the models.dev package says which Copilot API serves
+      // each model: Anthropic Messages stays native, OpenAI means Responses, and anything
+      // else goes through the bundled Copilot SDK's model ID fallback.
       for (const id of item.models.keys()) {
         evt.models.update(item.provider.id, id, (model) => {
+          if (model.package === "@opencode/ai/providers/anthropic") {
+            if (loaded.baseURL)
+              model.settings = Provider.mergeOverlay(model.settings, { baseURL: `${loaded.baseURL}/v1` })
+            return
+          }
+          const responses = model.package === "@opencode/ai/providers/openai"
           model.package = Provider.aisdk("@ai-sdk/github-copilot")
-          if (loaded.baseURL) model.settings = Provider.mergeOverlay(model.settings, { baseURL: loaded.baseURL })
+          model.settings = Provider.mergeOverlay(model.settings, {
+            ...(loaded.baseURL ? { baseURL: loaded.baseURL } : {}),
+            ...(responses ? { endpoint: "responses" } : {}),
+          })
         })
       }
     })
@@ -272,7 +285,7 @@ export const GithubCopilotPlugin = define({
             .pipe(Effect.orElseSucceed(() => undefined))
           const interaction = interactionType(evt.kind, session?.parentID !== undefined)
           evt.headers["X-Interaction-Type"] = interaction
-          evt.headers["X-Interaction-Id"] = evt.sessionID
+          evt.headers["X-Interaction-Id"] = session ? SessionAffinity.get(session) : evt.sessionID
           if (interaction !== "conversation-agent") evt.headers["x-initiator"] = "agent"
         }),
       { providerID: Provider.ID.githubCopilot },
@@ -330,13 +343,13 @@ export const GithubCopilotPlugin = define({
           return
         }
         const id = evt.model.modelID ?? evt.model.id
-        // Copilot serves Grok, Gemini, and MAI Code only on /responses; advertised
-        // endpoint metadata above wins whenever the live model list provides it.
+        // Copilot serves Grok and MAI Code only on /responses, and Gemini only on
+        // /chat/completions; advertised endpoint metadata above wins whenever the
+        // live model list provides it.
         const gpt = /^gpt-(\d+)/.exec(id)
         const responses =
           (gpt !== null && Number(gpt[1]) >= 5 && !id.startsWith("gpt-5-mini")) ||
           id.startsWith("grok-") ||
-          id.startsWith("gemini-") ||
           id.startsWith("mai-code-")
         evt.language = responses ? evt.sdk.responses(id) : evt.sdk.chat(id)
       }),
