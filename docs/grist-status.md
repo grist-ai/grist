@@ -28,7 +28,7 @@ do not block harness work on an external codebase.
 | Usage | `[grist:usage]` + Langfuse; `[grist:event]` for mode-cap / diff-audit |
 | Code map | Graphify / CRG algebra + `code_map` tool — **ported to v2 2026-10-18**, incl. route-graph augmentation (`packages/route-graph`) |
 | Memory | verified-outcomes file / Supermemory + `memory` tool — **ported to v2 2026-10-18** (personal scope; team namespaces spec-only) |
-| Burn-in | JSONL (decisions + outcomes, stable `~/.grist` path) + thresholds + report; failure mining (`script/grist-failure-mining.ts`) + negative-memory distiller (R3) |
+| Burn-in | JSONL (decisions + outcomes, stable `~/.grist` path) + thresholds + report; failure mining (`script/grist-failure-mining.ts`) + negative-memory distiller (R3); Dreaming curation (`script/grist-dream.ts`) + calibration suggestions (`script/grist-calibrate.ts`) (R4) |
 | Eval | `bun scripts/grist-eval.ts` — gate battery + threshold suggestions |
 
 ## Run Grist (no pilot repo)
