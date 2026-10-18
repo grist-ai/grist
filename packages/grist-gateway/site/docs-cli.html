@@ -27,7 +27,7 @@
 <nav class="nav-links">
   <a href="/#concepts">Concepts</a>
   <a href="/docs">Docs</a>
-  <a href="https://github.com/grist-ai/grist">GitHub</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
   <a class="btn ghost" href="/login">Sign in</a>
   <a class="btn accent" href="/#get-started">Get started</a>
 </nav>
@@ -85,7 +85,19 @@
 <h2>Resuming work</h2>
 <p>There is deliberately no <code>grist resume</code> command. A session already knows where it lives: resume it with <code>grist run --session &lt;id&gt; "next instruction"</code> and it restores its own directory and history. Find ids with <code>grist session</code>, or read them from <code>--format json</code> output at creation time.</p>
 <div class="callout"><p>When something looks wrong, run <code>grist doctor</code> first. It spends nothing, and it separates the three failure classes that matter &mdash; sign-in, gateway reachability, and gate mode &mdash; in one pass.</p></div>
-    <nav class="pager"><a href="/docs/gateway">&larr; Gateway & keys</a><a href="/docs/desktop">Desktop &rarr;</a></nav>
+    
+<h2>Environment knobs</h2>
+<p>The harness reads a handful of environment variables. The defaults are the product &mdash; reach for these only when you mean it:</p>
+<table>
+<tr><th>Variable</th><th>What it does</th></tr>
+<tr><td><code>GRIST_GATE=off</code></td><td>Turns the Jev gate off (not recommended) &mdash; runs pass through unrouted.</td></tr>
+<tr><td><code>GRIST_EFFORT=low|standard|high</code></td><td>Pins the effort dial instead of letting the gate dial it per task.</td></tr>
+<tr><td><code>GRIST_MECH=auto|efficiency|performance|off</code></td><td>SoL-Pi mechanism profile. <em>efficiency</em> turns every token cut on; <em>performance</em> keeps full tool output with fusion still on; <em>off</em> disables both.</td></tr>
+<tr><td><code>GRIST_WARM_SUBAGENTS=0</code></td><td>Disables warm subagent resume &mdash; repeat specialist calls start cold.</td></tr>
+<tr><td><code>GRIST_API_KEY</code></td><td>Supplies a <code>grist_sk_</code> key without an interactive login (the headless path for agents on a VM).</td></tr>
+<tr><td><code>GRIST_GATEWAY_URL</code></td><td>Points the CLI at a gateway other than <code>https://grist.lol</code>.</td></tr>
+</table>
+<nav class="pager"><a href="/docs/gateway">&larr; Gateway & keys</a><a href="/docs/desktop">Desktop &rarr;</a></nav>
   </main>
 </div>
 <footer><div class="wrap foot">
@@ -94,5 +106,6 @@
   <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
   <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
 </div></footer>
+<script src="/site.js" defer></script>
 </body>
 </html>

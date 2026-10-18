@@ -27,7 +27,7 @@
 <nav class="nav-links">
   <a href="/#concepts">Concepts</a>
   <a href="/docs">Docs</a>
-  <a href="https://github.com/grist-ai/grist">GitHub</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
   <a class="btn ghost" href="/login">Sign in</a>
   <a class="btn accent" href="/#get-started">Get started</a>
 </nav>
@@ -79,7 +79,17 @@
 <h2>What transits the gateway</h2>
 <p>Prompts transit the gateway on their way to your provider. Source code does not: tools run in your local working tree, and the gateway never receives your files. Grist does not train on your code.</p>
 <div class="callout"><p>The split is the design: the gateway is a control plane (accounts, keys, caps, routing). The data plane &mdash; your tree, your tools, your diffs &mdash; stays on your machine.</p></div>
-    <nav class="pager"><a href="/docs/codemap">&larr; Code map</a><a href="/docs/cli">CLI reference &rarr;</a></nav>
+    
+<h2>Attach a key over the API</h2>
+<p>The dashboard flow has an API equivalent. Attach your provider key with your Grist key:</p>
+<pre><code>curl -s -X POST https://grist.lol/v1/provider \
+  -H "X-Grist-Api-Key: grist_sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "openrouter", "api_key": "sk-or-..."}'</code></pre>
+<p><code>provider</code> is <code>openrouter</code>, <code>vercel</code>, or <code>custom</code>; <code>custom</code> also needs a <code>base_url</code>. Prefer an AI-gateway key: it reaches every model on every rung, while a direct provider key limits all rungs to that provider&rsquo;s models.</p>
+<h2>Check spend</h2>
+<p><code>GET /v1/usage</code> returns spend broken down by rung &mdash; <code>spent_usd</code>, <code>cap_usd</code>, <code>remaining_usd</code>, and <code>by_rung</code> &mdash; so you can see exactly where the money went. The dashboard shows the same numbers.</p>
+<nav class="pager"><a href="/docs/codemap">&larr; Code map</a><a href="/docs/cli">CLI reference &rarr;</a></nav>
   </main>
 </div>
 <footer><div class="wrap foot">
@@ -88,5 +98,6 @@
   <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
   <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
 </div></footer>
+<script src="/site.js" defer></script>
 </body>
 </html>

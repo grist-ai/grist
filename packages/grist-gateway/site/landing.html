@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/site.css">
-<script src="/landing.js" defer></script>
+<script src="/site.js" defer></script>
 </head>
 <body>
 <header class="nav"><div class="wrap nav-in">
@@ -29,7 +29,7 @@
 <nav class="nav-links">
   <a href="#concepts">Concepts</a>
   <a href="/docs">Docs</a>
-  <a href="https://github.com/grist-ai/grist">GitHub</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
   <a class="btn ghost" href="/login">Sign in</a>
   <a class="btn accent" href="#get-started">Get started</a>
 </nav>
@@ -79,6 +79,7 @@
   </div>
 </section>
 </div>
+<div class="strip" aria-hidden="true"><span>Learns your codebase</span><i>&middot;</i><span>Self-improves</span><i>&middot;</i><span>SoL-Pi inside</span><i>&middot;</i><span>Open beta</span></div>
 <div class="stats"><div class="wrap stats-in">
   <div class="stat"><b>4</b><span>cost-tiered rungs, cheapest first</span></div>
   <div class="stat"><b>0%</b><span>markup on your provider key</span></div>
@@ -92,11 +93,14 @@
     <h2>One prompt in. A verified diff out.</h2>
     <p class="lede">You never pick a model. The harness reads the task, prices it, and spends only what the difficulty earns.</p>
   </div>
-  <div class="steps reveal">
-    <div class="step"><span class="num">01</span><h3>You prompt</h3><p>From the CLI, the TUI, or the desktop app. You describe the task &mdash; never a vendor model.</p></div>
-    <div class="step"><span class="num">02</span><h3>The gate routes</h3><p>The Jev gate scores the task once and picks the cheapest rung that can handle it, with an effort budget to match.</p></div>
-    <div class="step"><span class="num">03</span><h3>The ladder resolves</h3><p>The rung becomes a model &mdash; the best in its cost band. Your dashboard can override any rung.</p></div>
-    <div class="step"><span class="num">04</span><h3>Specialists execute</h3><p>Named specialists explore, plan, edit, and verify in your working tree, on your key, under hard spend caps.</p></div>
+  <div class="moves reveal">
+    <div class="move"><span class="num">1</span><h3>You prompt</h3><p>CLI, TUI, or desktop. The client sends the task and names a rung &mdash; never a vendor model id.</p></div>
+    <div class="move"><span class="num">2</span><h3>Gateway admits</h3><p>Your <span class="mono">grist_sk_</span> key identifies the account. Spend caps are hard: over cap returns 402, not a bill.</p></div>
+    <div class="move"><span class="num">3</span><h3>Jev gate routes</h3><p>A confidence gate scores difficulty once per run, picks the cheapest rung that can handle it, and dials exploratory effort &mdash; trivial tasks get a tight budget, ambiguous ones get room to investigate.</p></div>
+    <div class="move"><span class="num">4</span><h3>Ladder resolves</h3><p>The rung becomes a model &mdash; the best in its cost band. Defaults are ours; your dashboard can override any rung.</p></div>
+    <div class="move"><span class="num">5</span><h3>Your key pays</h3><p>The provider call rides your BYOK key. Inference bills to your provider account; Grist never holds your budget.</p></div>
+    <div class="move"><span class="num">6</span><h3>Memory compounds</h3><p>Verified outcomes &mdash; tests passed, approved, corrected &mdash; are written to memory and the code map updates, so the next run starts briefed instead of blank.</p></div>
+    <div class="move"><span class="num">7</span><h3>Specialists delegate</h3><p>The gate hands work to named specialists &mdash; explore, plan, review, verify &mdash; each running inside the assigned rung. Repeat calls resume warm, so context compounds within the session too.</p></div>
   </div>
 </section>
 
@@ -227,6 +231,44 @@
     </article>
   </div>
 </section>
+<section id="local">
+  <div class="sec-head reveal">
+    <p class="kicker">[ local ]</p>
+    <h2>The repo never leaves the machine.</h2>
+    <p class="lede">Tools run in your working tree. The prompt goes out. The source does not. Your provider key stays yours. We never train on your code.</p>
+  </div>
+  <div class="local-grid reveal">
+    <div class="viz">
+      <div class="cap"><span>your disk</span><span>stays</span></div>
+      <div class="row"><span class="note">Source files</span><span class="cost">never sent</span></div>
+      <div class="row"><span class="note">Git history</span><span class="cost">never sent</span></div>
+      <div class="row"><span class="note">Tool execution</span><span class="cost">local</span></div>
+      <div class="row"><span class="note">Tests</span><span class="cost">local</span></div>
+    </div>
+    <div class="local-arrow">prompt only &rarr;</div>
+    <div class="viz">
+      <div class="cap"><span>gateway</span><span>sees</span></div>
+      <div class="row"><span class="note">Prompt tokens</span><span class="cost">sent</span></div>
+      <div class="row"><span class="note">ObservationPack</span><span class="cost">handle + excerpt</span></div>
+      <div class="row"><span class="note">Meter + cap</span><span class="cost">enforced</span></div>
+      <div class="row"><span class="note">Source ingest</span><span class="cost">none</span></div>
+    </div>
+  </div>
+  <p class="local-result mono">a finished run looks like: 3 files &middot; tests passed &middot; $0.012</p>
+</section>
+<section id="upstream">
+  <div class="sec-head reveal">
+    <p class="kicker">[ built on open source ]</p>
+    <h2>Rebuilt on OpenCode v2.</h2>
+    <p class="lede">Grist moved from a surgical fork to a first-class OpenCode plugin, tracking upstream v2.0.32. The gate, the ladder, and the doctrine are unchanged &mdash; everything around them got better.</p>
+  </div>
+  <div class="steps reveal">
+    <div class="step"><h3>Zero-config plugin</h3><p>The harness ships baked into the <span class="mono">grist</span> binary &mdash; every session loads the Jev gate, doctrine, and control plane with no setup. One additive upstream hook is the entire fork surface, so upstream releases land as plain tags.</p></div>
+    <div class="step"><h3>The full CLI, inherited</h3><p class="mono" style="font-size:13px">grist auth &middot; models &middot; debug &middot; service &middot; upgrade &middot; stats &middot; session &middot; mcp</p><p>v2&rsquo;s command surface arrives as upstream features, not Grist code to maintain.</p></div>
+    <div class="step"><h3>Managed background service</h3><p><span class="mono" style="font-size:13px">grist serve --service</span> elects a single server; <span class="mono" style="font-size:13px">grist run</span> is a thin client over it. No ad-hoc servers lingering after a reinstall.</p></div>
+    <div class="step"><h3>Grist identity</h3><p>Config discovery prefers <span class="mono" style="font-size:13px">grist.json</span> and <span class="mono" style="font-size:13px">.grist/</span>, and global state lives under <span class="mono" style="font-size:13px">~/.grist</span> &mdash; the harness has its own name on disk.</p></div>
+  </div>
+</section>
 <section id="enterprise">
   <div class="sec-head reveal">
     <p class="kicker">[ for teams ]</p>
@@ -247,11 +289,21 @@
     <div class="step"><span class="num">03</span><h3>Bring your key</h3><p>OpenRouter, Vercel AI Gateway, or any OpenAI-compatible endpoint &mdash; or use a dashboard <span class="mono">grist_sk_</span> key.</p></div>
     <div class="step"><span class="num">04</span><h3>Run</h3><p class="mono" style="font-size:13.5px">grist</p><p>Prompt. The gate handles the rest.</p></div>
   </div>
+  <p class="signin-note reveal">New here? <a href="/docs/quickstart">How sign-in works &rarr;</a></p>
   <div class="flow-card reveal" style="margin-top:20px">
     <p style="font-weight:600;margin-bottom:8px">Already working with an AI agent?</p>
     <p style="color:var(--ink-2);font-size:15px;margin-bottom:12px">Give it the Grist skill and it can delegate multi-step coding work to Grist itself:</p>
     <span class="install"><span><span class="dollar">$</span> npx skills add grist-ai/grist-skills</span><button class="copy-btn" data-copy="npx skills add grist-ai/grist-skills">copy</button></span>
     <p class="flow-cap" style="text-align:left">for Muse, OpenClaw, Hermes, or any agent with a shell &mdash; <a href="/docs/skills">how skills work</a></p>
+    <details class="prompt-block">
+      <summary>&#10022; Or paste this into your AI agent</summary>
+      <pre id="agent-prompt">Use Grist for my coding tasks from now on. Grist is an agentic coding-harness CLI.
+1. Install the Grist agent skill by running: npx skills add grist-ai/grist-skills (built for personal AI agents and agentic CLIs like Muse, OpenClaw, Hermes, and OpenCode). Read the installed skill file in full before doing anything else.
+2. Install the CLI if it is missing: npm install -g grist-ai.
+3. Ask me for my Grist API key if you do not have it (it starts with grist_sk_). Never print it, log it, or write it into any file &mdash; pass it via environment variable only.
+4. For multi-step coding work (features, bug fixes, refactors across files), delegate to Grist exactly as the skill describes. Report back what changed, the branch name, test results, and cost.</pre>
+      <button class="copy-btn" data-copy-target="agent-prompt" type="button">copy the prompt</button>
+    </details>
   </div>
 </section>
 <section id="faq">
