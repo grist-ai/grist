@@ -115,6 +115,38 @@ Open-PR is deliberately not here: it needs repo-remote policy (fork?
 upstream?) that belongs to a later phase; commit on the thread's
 branch (D2) is the terminal action for now.
 
+## D4 — automations + review queue
+
+- **Model** — `packages/grist-logic/src/automation.ts`: an automation
+  is a template (prompt, directory, schedule — interval / daily /
+  weekly — and a worktree flag) plus a store (templates, last-run
+  times, run history). Due logic is pure and deterministic; a missed
+  slot stays due (catch-up). The two built-ins are the R3/R4 operator
+  scripts as scheduled threads: the daily failure-mining digest and
+  the weekly Dreaming curation.
+- **Runner** — `script/grist-automations.ts` (`--list`,
+  `--seed-builtins <dir>`, `--run-due`, `--queue`) is the operator
+  surface, ticked by cron/launchd: it attaches to the elected local
+  service, starts each due template as a session titled with the
+  automation's name and labeled in session metadata
+  (`{ automation: <id> }`), in its own D2 worktree when configured.
+  It deliberately does not use `Service.ensure()` — that flow
+  version-gates the endpoint and respawns the CLI under its upstream
+  name; the runner uses the service already running.
+- **Review queue** — `reviewQueue` derives the Needs-review inbox from
+  thread summaries: pending approvals first (counts supplied by the
+  caller), then failed, interrupted, and finished-but-unviewed
+  threads, automation origin attached. Home renders it under the D1
+  sidebar (`packages/app/src/grist/review-queue.tsx`); the runner's
+  `--queue` prints the same derivation over the local database.
+  Nothing an automation produces merges itself — its threads land in
+  this queue like everything else.
+
+Deferred: a desktop-native scheduler (the runner is the tick for now),
+PR/CI status per thread (needs a GitHub integration policy, the same
+open question as D3's open-PR), and automation editing UI (templates
+are store JSON today).
+
 ## Ephemeral events
 
 Delta events (`session.text.delta`, `session.reasoning.delta`,
