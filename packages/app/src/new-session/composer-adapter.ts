@@ -13,6 +13,7 @@ import { useServerSDK } from "@/runtime/server/client"
 import { useTabs } from "@/shell/tabs/tabs"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { createWorktree } from "@/workspaces/create"
+import { threadBranchName } from "@grist-ai/logic"
 import { showToast } from "@/shell/notifications/toast"
 import { SessionRouteKey, SessionStateKey } from "@/runtime/server/scope"
 import { createSessionMessageHandoff } from "@/session/handoff"
@@ -67,6 +68,7 @@ export function createNewSessionComposerAdapter(props: {
         projectDirectory,
         worktree,
         branch,
+        branchSeed: { title: message.text, id },
         data,
         serverSDK,
         language,
@@ -199,6 +201,7 @@ async function resolveSessionDirectory(input: {
   projectDirectory: string
   worktree: string
   branch?: string
+  branchSeed: { title?: string; id: string }
   data: ReturnType<typeof useData>
   serverSDK: ReturnType<typeof useServerSDK>
   language: ReturnType<typeof useLanguage>
@@ -213,6 +216,10 @@ async function resolveSessionDirectory(input: {
     directory: input.projectDirectory,
     project: input.data.location.info({ directory: input.projectDirectory })?.project,
     branch: input.branch,
+    // Grist D2: a thread's worktree gets its own auto-named branch
+    // (grist/<prompt-slug>-<short id>) instead of a detached HEAD, so the
+    // thread's work is a branch that can be reviewed and merged.
+    newBranch: threadBranchName(input.branchSeed),
   }).catch((error) => {
     showToast({
       title: input.language.t("prompt.toast.worktreeCreateFailed.title"),

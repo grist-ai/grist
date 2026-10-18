@@ -222,6 +222,7 @@ const layer = Layer.effect(
           directory: worktreeDirectory,
           sourceDirectory,
           branch: input.branch,
+          newBranch: input.newBranch,
         })
         .pipe(Effect.mapError((error) => operationError(selected.id, "create", error)))
       const result = { directory: yield* canonical(fs, created.directory) }

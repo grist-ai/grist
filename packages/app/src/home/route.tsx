@@ -19,6 +19,7 @@ export function Home() {
   const search = createHomeSessionSearchController(home, sessions)
   const scroll = createHomeScrollController(sessions.data.groups)
   const threadSessions = createMemo(() => sessions.data.groups().flatMap((group) => group.sessions.map((record) => record.session)))
+  const threadWorktreeDirs = createMemo(() => [...new Set(sessions.data.records().flatMap((record) => record.project.sandboxes ?? []))])
   const openThread = (sessionID: string) => {
     const session = threadSessions().find((candidate) => candidate.id === sessionID)
     if (session) sessions.session.open(session)
@@ -53,7 +54,7 @@ export function Home() {
           <Show when={!mobile()}>
             <div class="flex min-h-0 flex-col gap-6">
               <HomeProjects projects={projects} scroll={scroll} />
-              <GristThreadSidebar sessions={threadSessions()} onOpen={openThread} />
+              <GristThreadSidebar sessions={threadSessions()} worktreeDirs={threadWorktreeDirs()} onOpen={openThread} />
             </div>
           </Show>
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />

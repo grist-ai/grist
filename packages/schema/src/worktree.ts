@@ -12,6 +12,10 @@ export const CreateInput = Schema.Struct({
   projectID: Project.ID,
   from: optional(AbsolutePath),
   branch: optional(Schema.Trim.pipe(Schema.check(Schema.isNonEmpty()))),
+  newBranch: optional(Schema.Trim.pipe(Schema.check(Schema.isNonEmpty()))).annotate({
+    description:
+      "Create this branch at the start ref (`branch`, or HEAD) and check it out in the new worktree. Without it, the worktree is created detached at the start ref.",
+  }),
   directory: optional(AbsolutePath).annotate({
     description:
       "Parent directory for the new worktree. Uses the project's canonical configuration, then defaults to the server's data directory under worktree/<first six project ID characters>.",
