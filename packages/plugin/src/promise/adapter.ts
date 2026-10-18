@@ -524,6 +524,8 @@ export function fromPromise(plugin: Plugin) {
             },
             status: adaptApiMethod(VcsEndpoints["vcs.status"], host.vcs.status),
             diff: adaptApiMethod(VcsEndpoints["vcs.diff"], host.vcs.diff),
+            apply: adaptApiMethod(VcsEndpoints["vcs.apply"], host.vcs.apply),
+            commit: adaptApiMethod(VcsEndpoints["vcs.commit"], host.vcs.commit),
             reload: () => run(host.vcs.reload()),
             transform: (callback) =>
               register(
@@ -532,6 +534,8 @@ export function fromPromise(plugin: Plugin) {
                     add: (definition) => {
                       const init = definition.init?.bind(definition)
                       const base = definition.base?.bind(definition)
+                      const apply = definition.apply?.bind(definition)
+                      const commit = definition.commit?.bind(definition)
                       editor.add({
                         id: definition.id,
                         name: definition.name,
@@ -541,6 +545,8 @@ export function fromPromise(plugin: Plugin) {
                         branches: (input) => attempt((signal) => definition.branches(input, { signal })),
                         status: (input) => attempt((signal) => definition.status(input, { signal })),
                         diff: (input) => attempt((signal) => definition.diff(input, { signal })),
+                        apply: apply ? (input) => attempt((signal) => apply(input, { signal })) : undefined,
+                        commit: commit ? (input) => attempt((signal) => commit(input, { signal })) : undefined,
                       })
                     },
                     default: editor.default,

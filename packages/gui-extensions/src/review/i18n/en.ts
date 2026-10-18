@@ -12,4 +12,11 @@ export default {
   noChanges: "No changes",
   "settings.wrapLines.title": "Wrap lines",
   "settings.wrapLines.description": "Wrap long lines in mobile diffs instead of scrolling horizontally",
+  "actions.title": "Chunks",
+  "actions.accept": "Accept",
+  "actions.revert": "Revert",
+  "actions.commit": "Commit",
+  "actions.message": "Commit message",
+  "actions.committed": "Committed",
+  "actions.failed": "Review action failed",
 }

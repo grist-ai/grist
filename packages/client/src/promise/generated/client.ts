@@ -257,6 +257,10 @@ import type {
   VcsBranchListOutput,
   VcsDiffInput,
   VcsDiffOutput,
+  VcsApplyInput,
+  VcsApplyOutput,
+  VcsCommitInput,
+  VcsCommitOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -2150,6 +2154,32 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/vcs/diff`,
             query: { location: input["location"], mode: input["mode"], base: input["base"], context: input["context"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      apply: (input: VcsApplyInput, requestOptions?: RequestOptions) =>
+        request<VcsApplyOutput>(
+          {
+            method: "POST",
+            path: `/api/vcs/apply`,
+            query: { location: input["location"] },
+            body: { patch: input["patch"], reverse: input["reverse"], cached: input["cached"] },
+            successStatus: 204,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: true,
+          },
+          requestOptions,
+        ),
+      commit: (input: VcsCommitInput, requestOptions?: RequestOptions) =>
+        request<VcsCommitOutput>(
+          {
+            method: "POST",
+            path: `/api/vcs/commit`,
+            query: { location: input["location"] },
+            body: { message: input["message"] },
             successStatus: 200,
             declaredStatuses: [400, 401, 404, 503],
             empty: false,

@@ -6844,6 +6844,22 @@ export type VcsDiffInput = {
 
 export type VcsDiffOutput = { location: LocationPublicRef; data: Array<FileDiffInfo> }
 
+export type VcsApplyInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly patch: { readonly patch: string; readonly reverse?: boolean; readonly cached?: boolean }["patch"]
+  readonly reverse?: { readonly patch: string; readonly reverse?: boolean; readonly cached?: boolean }["reverse"]
+  readonly cached?: { readonly patch: string; readonly reverse?: boolean; readonly cached?: boolean }["cached"]
+}
+
+export type VcsApplyOutput = void
+
+export type VcsCommitInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly message: { readonly message: string }["message"]
+}
+
+export type VcsCommitOutput = { hash: string }
+
 export type DebugLocationListOutput = Array<LocationPublicRef>
 
 export type DebugLocationEvictInput = {

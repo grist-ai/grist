@@ -31,6 +31,7 @@ import {
   type RenderDiff,
 } from "./kinds"
 import type { ReviewModel } from "./model"
+import { ReviewActions } from "./actions"
 import { ReviewPanelEmpty, ReviewTitle } from "./parts"
 
 type ReviewPanelState = {
@@ -42,6 +43,7 @@ type ReviewPanelState = {
 }
 
 type ReviewPanelProps = {
+  review: ReviewModel
   session: MountedSession
   /** The session screen, whose workspace the panel reads files from. */
   screen: SessionScreen
@@ -81,6 +83,7 @@ export default function ReviewPanelContent(props: {
 
   return (
     <ReviewPanel
+      review={props.review}
       session={props.session}
       screen={props.review.screen}
       title={<ReviewTitle review={props.review} />}
@@ -201,6 +204,7 @@ function ReviewPanel(props: ReviewPanelProps) {
         // Always mounted: the sidebar header hosts the changes-mode dropdown,
         // which must stay reachable when the current mode has zero diffs.
         <ReviewPanelSidebar
+          review={props.review}
           screen={props.screen}
           session={props.session}
           title={props.title}
@@ -253,6 +257,7 @@ function ReviewPanel(props: ReviewPanelProps) {
 }
 
 function ReviewPanelSidebar(props: {
+  review: ReviewModel
   screen: SessionScreen
   session: MountedSession
   title?: JSX.Element
@@ -361,6 +366,7 @@ function ReviewPanelSidebar(props: {
           </Show>
         </Show>
       </Show>
+      <ReviewActions review={props.review} />
     </SessionReviewV2Sidebar>
   )
 }

@@ -21,6 +21,10 @@ export class DiffError extends Schema.TaggedError<DiffError>()("Vcs.DiffError", 
   message: Schema.String,
 }) {}
 
+export class WriteError extends Schema.TaggedError<WriteError>()("Vcs.WriteError", {
+  message: Schema.String,
+}) {}
+
 export class InitializeError extends Schema.TaggedError<InitializeError>()("Vcs.InitializeError", {
   kind: Schema.Literals(["missing", "conflict", "unknown", "unsupported", "failed"]),
 }) {}
@@ -35,12 +39,24 @@ export interface BranchOptions {
   readonly limit?: number
 }
 
+export interface ApplyOptions {
+  readonly patch: string
+  readonly reverse?: boolean
+  readonly cached?: boolean
+}
+
+export interface CommitOptions {
+  readonly message: string
+}
+
 export interface Adapter {
   readonly info: () => Effect.Effect<Info>
   readonly base?: () => Effect.Effect<Base | null, DiffError>
   readonly branches: (options?: BranchOptions) => Effect.Effect<BranchList>
   readonly status: () => Effect.Effect<FileStatus[]>
   readonly diff: (mode: Mode, options?: DiffOptions) => Effect.Effect<FileDiff.Info[], DiffError>
+  readonly apply: (input: ApplyOptions) => Effect.Effect<void, WriteError>
+  readonly commit: (input: CommitOptions) => Effect.Effect<{ hash: string }, WriteError>
 }
 
 export interface Interface extends Adapter, State.Transformable<VcsEditor> {
@@ -249,6 +265,30 @@ const layer = Layer.effect(
           return row
         })
       }),
+      apply: Effect.fn("Vcs.apply")(function* (input: ApplyOptions) {
+        const provider = selected()
+        if (!provider?.apply)
+          return yield* new WriteError({ message: "VCS provider does not support applying patches" })
+        yield* provider.apply({ ...scope, ...input }).pipe(
+          Effect.catchCause((cause) =>
+            Cause.hasInterrupts(cause)
+              ? Effect.failCause(cause).pipe(Effect.orDie)
+              : Effect.fail(new WriteError({ message: writeFailure("apply", cause) })),
+          ),
+        )
+      }),
+      commit: Effect.fn("Vcs.commit")(function* (input: CommitOptions) {
+        const provider = selected()
+        if (!provider?.commit)
+          return yield* new WriteError({ message: "VCS provider does not support committing" })
+        return yield* provider.commit({ ...scope, ...input }).pipe(
+          Effect.catchCause((cause) =>
+            Cause.hasInterrupts(cause)
+              ? Effect.failCause(cause).pipe(Effect.orDie)
+              : Effect.fail(new WriteError({ message: writeFailure("commit", cause) })),
+          ),
+        )
+      }),
     })
   }),
 )
@@ -258,3 +298,8 @@ export const node = makeLocationNode({
   layer: layer,
   deps: [FSUtil.node, Location.node, Bus.node],
 })
+
+function writeFailure(operation: string, cause: Cause.Cause<unknown>): string {
+  const error = Cause.squash(cause)
+  return `VCS ${operation} failed: ${error instanceof Error ? error.message : String(error)}`
+}

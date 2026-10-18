@@ -22,6 +22,16 @@ export interface VcsDiffInput extends VcsScope {
   readonly maxOutputBytes: number
 }
 
+export interface VcsApplyInput extends VcsScope {
+  readonly patch: string
+  readonly reverse?: boolean
+  readonly cached?: boolean
+}
+
+export interface VcsCommitInput extends VcsScope {
+  readonly message: string
+}
+
 export interface VcsDefinition {
   readonly id: string
   readonly name: string
@@ -31,6 +41,8 @@ export interface VcsDefinition {
   readonly branches: (input: VcsBranchesInput, context: { readonly signal: AbortSignal }) => Promise<Vcs.BranchList>
   readonly status: (input: VcsScope, context: { readonly signal: AbortSignal }) => Promise<readonly Vcs.FileStatus[]>
   readonly diff: (input: VcsDiffInput, context: { readonly signal: AbortSignal }) => Promise<readonly FileDiff.Info[]>
+  readonly apply?: (input: VcsApplyInput, context: { readonly signal: AbortSignal }) => Promise<void>
+  readonly commit?: (input: VcsCommitInput, context: { readonly signal: AbortSignal }) => Promise<{ hash: string }>
 }
 
 export interface VcsDomain extends Omit<VcsApi, "init"> {
