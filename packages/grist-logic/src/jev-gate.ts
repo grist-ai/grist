@@ -402,6 +402,16 @@ async function routeViaGateway(
   gristLog(
     `[grist:gate] ${decision.rung} via gateway/${decision.provider} mode=${decision.mode} · ${decision.reasons.join(",")} · ${decision.latencyMs}ms`,
   )
+  // Burn-in (§8.6): gateway-routed decisions must be recorded too — before
+  // R3 only the local shadow path wrote rows, so the production path left
+  // no decisions for outcome joining / calibration mining.
+  void createBurnInLog()
+    .recordDecision({
+      decision,
+      sessionID: input.sessionID,
+      text: input.text,
+    })
+    .catch((error) => gristWarn("[grist:burn-in] record failed", error))
   return decision
 }
 

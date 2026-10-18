@@ -1,3 +1,4 @@
+import { homedir } from "node:os"
 import path from "node:path"
 import type { MechanismSet } from "./mechanisms.js"
 import type { OperatingMode } from "./mode.js"
@@ -118,8 +119,19 @@ export function meetsTierMixTargets(summary: BurnInSummary): {
   return { ok: reasons.length === 0, reasons }
 }
 
-export function burnInPath(cwd = process.cwd()) {
-  return process.env.GRIST_BURNIN_PATH ?? path.join(cwd, ".grist", "burn-in.jsonl")
+/**
+ * Default burn-in location: `~/.grist/burn-in.jsonl` (stable since R3).
+ * The v1/v2-early default was `<cwd>/.grist/burn-in.jsonl`, but in the v2
+ * service model the caller's cwd is wherever the background server was
+ * elected — decisions and outcomes for one session landed in different
+ * files and could never be joined for calibration mining. One global log;
+ * `GRIST_BURNIN_PATH` still overrides, and callers may pass an explicit
+ * cwd for a per-repo log.
+ */
+export function burnInPath(cwd?: string) {
+  if (process.env.GRIST_BURNIN_PATH) return process.env.GRIST_BURNIN_PATH
+  if (cwd) return path.join(cwd, ".grist", "burn-in.jsonl")
+  return path.join(homedir(), ".grist", "burn-in.jsonl")
 }
 
 export function createBurnInLog(input?: {
