@@ -9,6 +9,7 @@ import { createHomeScrollController } from "./scroll"
 import { createHomeSessionSearchController } from "./sessions/search"
 import { createHomeSessionsController } from "./sessions/controller"
 import { HomeSessions } from "./sessions/region"
+import { GristReviewQueue } from "@/grist/review-queue"
 import { GristThreadSidebar } from "@/grist/thread-sidebar"
 
 export function Home() {
@@ -55,6 +56,7 @@ export function Home() {
             <div class="flex min-h-0 flex-col gap-6">
               <HomeProjects projects={projects} scroll={scroll} />
               <GristThreadSidebar sessions={threadSessions()} worktreeDirs={threadWorktreeDirs()} onOpen={openThread} />
+              <GristReviewQueue sessions={threadSessions()} onOpen={openThread} />
             </div>
           </Show>
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />
