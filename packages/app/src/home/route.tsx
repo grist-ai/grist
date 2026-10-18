@@ -1,6 +1,6 @@
 import { ScrollView } from "@opencode/ui/scroll-view"
 import { createMediaQuery } from "@solid-primitives/media"
-import { Show } from "solid-js"
+import { createMemo, Show } from "solid-js"
 import { createHomeController } from "./model"
 import { createHomeProjectsController } from "./projects/controller"
 import { HomeUtilityNav } from "./projects/view"
@@ -9,6 +9,7 @@ import { createHomeScrollController } from "./scroll"
 import { createHomeSessionSearchController } from "./sessions/search"
 import { createHomeSessionsController } from "./sessions/controller"
 import { HomeSessions } from "./sessions/region"
+import { GristThreadSidebar } from "@/grist/thread-sidebar"
 
 export function Home() {
   const mobile = createMediaQuery("(max-width: 767px)")
@@ -17,6 +18,11 @@ export function Home() {
   const sessions = createHomeSessionsController(home)
   const search = createHomeSessionSearchController(home, sessions)
   const scroll = createHomeScrollController(sessions.data.groups)
+  const threadSessions = createMemo(() => sessions.data.groups().flatMap((group) => group.sessions.map((record) => record.session)))
+  const openThread = (sessionID: string) => {
+    const session = threadSessions().find((candidate) => candidate.id === sessionID)
+    if (session) sessions.session.open(session)
+  }
   return (
     <div
       class={`
@@ -44,7 +50,10 @@ export function Home() {
           `}
         >
           <Show when={!mobile()}>
-            <HomeProjects projects={projects} scroll={scroll} />
+            <div class="flex min-h-0 flex-col gap-6">
+              <HomeProjects projects={projects} scroll={scroll} />
+              <GristThreadSidebar sessions={threadSessions()} onOpen={openThread} />
+            </div>
           </Show>
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />
         </div>

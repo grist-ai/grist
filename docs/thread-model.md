@@ -29,11 +29,33 @@ do: `ThreadSummary` + `ThreadItem`.
 
 ## Approvals
 
-Approvals are requests a client answers, not log lines. The Jev gate's
-`ask_human` route maps to an `approval_request` item via
-`approvalItemFromGateDecision` — D1 renders it as a card in the thread;
-the permission system rides the tool item lifecycle (called →
-success/failed).
+Approvals are requests a client answers, not log lines. In today's
+runtime they take two forms, both already surfaced by the app: tool
+**permission asks** (control-plane `allow | ask`, rendered by the
+permission dock) and **question forms** (the `question` tool, rendered
+by the question dock). The thread model represents them as
+`approval_request` items; `approvalItemFromGateDecision` maps a gate
+decision carrying an `ask_human` route into that shape.
+
+Accuracy note (D1 audit, 2026-10-18): the current v2 gate does **not**
+emit `ask_human` — `GateDecision` has no such route, and the composed
+policy keeps underspecified tasks on the cheapest rung ("no ask-human
+rung", jev-gate.ts). The adapter is the model contract for if/when that
+route is wired; D1's attention badges are driven by the permission and
+question requests that exist today.
+
+## D1 — supervision sidebar
+
+`packages/grist-logic/src/sidebar.ts` computes the sidebar view from
+client `SessionInfo`: `summaryFromSessionInfo` (status from outcome /
+idle timestamp), `threadBadge` (unread = updated after viewed;
+needs-attention from pending request counts), and
+`groupThreadsByProject` (project groups by recency, threads ordered
+running-first). The app renders it via
+`packages/app/src/grist/thread-sidebar.tsx`, mounted on Home under the
+project list. Steering needs no new machinery: prompts to a busy
+session deliver through the session inbox as steers (verified live:
+a steer prompt sent mid-run was incorporated by the running session).
 
 ## Ephemeral events
 
