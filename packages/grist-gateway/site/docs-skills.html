@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills — Grist docs</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap nav-in">
+<a class="mark" href="/" aria-label="Grist">
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H141V36H135V12H120V6Z" />
+          </g>
+        </svg>
+      </a>
+<nav class="nav-links">
+  <a href="/#concepts">Concepts</a>
+  <a href="/docs">Docs</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a>
+  <a href="/login">Sign in</a>
+  <a class="btn accent" href="/#get-started">Get started</a>
+</nav>
+</div></header>
+<div class="wrap docs-layout">
+    <aside class="docs-side">
+    <a href="/docs">Docs home</a>
+    <b>[ start ]</b>
+    <a href="/docs/quickstart">Quickstart</a>
+    <b>[ concepts ]</b>
+    <a href="/docs/concepts">Concepts overview</a>
+    <a href="/docs/gate">The Jev gate</a>
+    <a href="/docs/ladder">The ladder</a>
+    <a href="/docs/specialists">Specialists</a>
+    <a href="/docs/solpi">SoL-Pi</a>
+    <a href="/docs/memory">Verified memory</a>
+    <a href="/docs/dreaming">Dreaming & calibration</a>
+    <a href="/docs/codemap">Code map</a>
+    <b>[ guides ]</b>
+    <a href="/docs/gateway">Gateway & keys</a>
+    <a href="/docs/cli">CLI reference</a>
+    <a href="/docs/desktop">Desktop</a>
+    <a href="/docs/enterprise">Enterprise</a>
+    <a href="/docs/skills" class="on">Skills</a>
+    <b>[ more ]</b>
+    <a href="/docs/releases">Release notes</a>
+    <a href="/docs/faq">FAQ</a>
+    </aside>
+  <main class="prose">
+<p class="kicker">[ docs &middot; guides ]</p>
+<h1>Skills</h1>
+<p class="lede">If another AI agent does work alongside you, the Grist skill is how it learns to hand the coding to Grist &mdash; and how to report back when it's done.</p>
+<h2>What agent skills are</h2>
+<p>Agent skills are small, versioned instruction packs that a host agent &mdash; a personal AI assistant or an agentic CLI &mdash; loads to learn a capability: when to use a tool, how to invoke it, and what the user expects back. Instead of every agent improvising its own way of delegating coding work, the skill pins the workflow down once, in writing, where it can be reviewed and improved.</p>
+<h2>Install the Grist skill</h2>
+<pre><code>npx skills add grist-ai/grist-skills</code></pre>
+<p>The skill file is also served directly from this site at <a href="/grist-skill.md">/grist-skill.md</a>, with a <code>.well-known</code> discovery index so agents that look for skills by convention can find it without being told.</p>
+<h2>What the skill teaches</h2>
+<ul>
+  <li><strong>Delegate the coding.</strong> Multi-step, multi-file work &mdash; features, bug fixes, refactors across a repo &mdash; goes to Grist via the <a href="/docs/cli">CLI</a>, not to the host agent's own ad-hoc edits.</li>
+  <li><strong>Report like an engineer.</strong> When a delegated run finishes, the agent reports what changed, the branch name, the test results, and the cost. No vibes, no summaries without evidence.</li>
+  <li><strong>Handle the key like a secret.</strong> The agent asks you for your Grist API key &mdash; it starts with <code>grist_sk_</code> &mdash; and passes it via environment variable only. The skill forbids printing it, logging it, or writing it into any file.</li>
+</ul>
+<h2>When to reach for Grist</h2>
+<p>Delegate when the task is real coding work: more than one file, more than one step, or anything you'd otherwise supervise turn by turn. A feature with tests to update. A bug whose cause isn't obvious yet. A refactor that has to stay consistent across a codebase. That is exactly the work the <a href="/docs/gate">gate</a> prices and the specialists are built for.</p>
+<h2>When not to</h2>
+<ul>
+  <li><strong>Single-file edits.</strong> A typo, a constant, a one-line fix &mdash; the host agent should just do it.</li>
+  <li><strong>Non-coding questions.</strong> Research, writing, and planning aren't Grist's job.</li>
+  <li><strong>Repos you may not modify.</strong> If the user isn't allowed to change it, no agent should &mdash; Grist included.</li>
+</ul>
+<div class="callout"><p>The rule of thumb the skill encodes: if the work deserves a branch and a test run, it deserves Grist. If it fits in one edit, it doesn't.</p></div>
+    <nav class="pager"><a href="/docs/enterprise">&larr; Enterprise</a><a href="/docs/releases">Release notes &rarr;</a></nav>
+  </main>
+</div>
+<footer><div class="wrap foot">
+  <nav><b>product</b><a href="/#concepts">Concepts</a><a href="/docs">Docs</a><a href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a><a href="https://github.com/grist-ai/grist">GitHub</a></nav>
+  <nav><b>docs</b><a href="/docs/quickstart">Quickstart</a><a href="/docs/gate">The Jev gate</a><a href="/docs/memory">Verified memory</a><a href="/docs/cli">CLI reference</a></nav>
+  <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
+  <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
+</div></footer>
+</body>
+</html>

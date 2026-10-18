@@ -445,8 +445,9 @@ describe("gateway HTTP", () => {
     expect(html).toContain("learns your codebase")
     expect(html).toContain("SoL-Pi")
     expect(html).toContain("context compounds")
-    // Claims guard (2026-10-18 scan fix): v2 has no memory/code-map feature
-    // and no `grist usage` command — the landing must not present them.
+    // Claims guard: memory and the code map shipped in 0.1.18, so the
+    // landing may describe them — but there is still no `grist usage`
+    // command and no bootstrap flow for the landing to promise.
     expect(html).not.toContain("institutional memory")
     expect(html).not.toContain("grist usage")
     expect(html).not.toContain("GRIST_MEMORY")
@@ -456,9 +457,10 @@ describe("gateway HTTP", () => {
     expect(html).toContain("/favicon.svg")
     expect(html).not.toContain("Apple Silicon")
     expect(html).not.toContain("Intel")
-    expect(html).toContain("view-docs")
-    expect(html).toContain("view-docs-skills")
-    expect(html).toContain("Create key")
+    // Redesign (2026-10-19): the landing is a static page on site.css,
+    // not an embedded SPA view — docs live at their own URLs now.
+    expect(html).toContain("/site.css")
+    expect(html).toContain('href="/docs"')
     expect(html).toContain("npx skills add grist-ai/grist-skills")
     expect(html).toContain("Read more")
     expect(html).not.toContain("Three steps")

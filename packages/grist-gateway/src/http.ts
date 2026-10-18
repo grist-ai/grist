@@ -56,10 +56,56 @@ const SITE_PAGES = new Set([
   "/acceptable-use",
   "/cookies",
 ])
+/**
+ * Static pages of the redesigned site (W1 landing + W2 docs, 2026-10-19).
+ * Consulted before the SITE_PAGES fallback: these paths serve their own
+ * files, while /login, /dashboard, /plans, /admin and the legal pages still
+ * serve the app shell (index.html).
+ */
+const PAGE_FILES: Record<string, string> = {
+  "/": "landing.html",
+  "/docs": "docs-home.html",
+  "/docs/quickstart": "docs-quickstart.html",
+  "/docs/concepts": "docs-concepts.html",
+  "/docs/gate": "docs-gate.html",
+  "/docs/ladder": "docs-ladder.html",
+  "/docs/specialists": "docs-specialists.html",
+  "/docs/solpi": "docs-solpi.html",
+  "/docs/memory": "docs-memory.html",
+  "/docs/dreaming": "docs-dreaming.html",
+  "/docs/codemap": "docs-codemap.html",
+  "/docs/gateway": "docs-gateway.html",
+  "/docs/cli": "docs-cli.html",
+  "/docs/desktop": "docs-desktop.html",
+  "/docs/enterprise": "docs-enterprise.html",
+  "/docs/skills": "docs-skills.html",
+  "/docs/release-notes": "docs-releases.html",
+  "/docs/faq": "docs-faq.html",
+}
 const SITE_FILES: Record<string, string> = {
   "index.html": "text/html; charset=utf-8",
   "styles.css": "text/css; charset=utf-8",
   "app.js": "text/javascript; charset=utf-8",
+  "landing.html": "text/html; charset=utf-8",
+  "site.css": "text/css; charset=utf-8",
+  "landing.js": "text/javascript; charset=utf-8",
+  "docs-home.html": "text/html; charset=utf-8",
+  "docs-quickstart.html": "text/html; charset=utf-8",
+  "docs-concepts.html": "text/html; charset=utf-8",
+  "docs-gate.html": "text/html; charset=utf-8",
+  "docs-ladder.html": "text/html; charset=utf-8",
+  "docs-specialists.html": "text/html; charset=utf-8",
+  "docs-solpi.html": "text/html; charset=utf-8",
+  "docs-memory.html": "text/html; charset=utf-8",
+  "docs-dreaming.html": "text/html; charset=utf-8",
+  "docs-codemap.html": "text/html; charset=utf-8",
+  "docs-gateway.html": "text/html; charset=utf-8",
+  "docs-cli.html": "text/html; charset=utf-8",
+  "docs-desktop.html": "text/html; charset=utf-8",
+  "docs-enterprise.html": "text/html; charset=utf-8",
+  "docs-skills.html": "text/html; charset=utf-8",
+  "docs-releases.html": "text/html; charset=utf-8",
+  "docs-faq.html": "text/html; charset=utf-8",
   "favicon.svg": "image/svg+xml",
   "favicon-32.png": "image/png",
   "apple-touch-icon.png": "image/png",
@@ -1395,7 +1441,7 @@ async function serveSite(root: string, pathname: string): Promise<Response> {
   if (skill) return skill
   const dmg = pathname.match(MAC_DMG)?.[1]
   if (dmg) return serveMacDmg(root, dmg)
-  const name = SITE_PAGES.has(pathname) ? "index.html" : pathname.replace(/^\//, "")
+  const name = PAGE_FILES[pathname] ?? (SITE_PAGES.has(pathname) ? "index.html" : pathname.replace(/^\//, ""))
   const type = SITE_FILES[name]
   if (!type) return json(404, { error: "not found" })
   const file = Bun.file(path.join(root, name))
