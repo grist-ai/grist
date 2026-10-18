@@ -1,0 +1,22 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    { "id": "file:auth.ts", "label": "auth.ts", "file_type": "code", "source_file": "src/auth.ts", "kind": "file" },
+    { "id": "fn:login", "label": "login", "file_type": "code", "source_file": "src/auth.ts", "kind": "function" },
+    { "id": "fn:verifyToken", "label": "verifyToken", "file_type": "code", "source_file": "src/auth.ts", "kind": "function" },
+    { "id": "file:session.ts", "label": "session.ts", "file_type": "code", "source_file": "src/session.ts", "kind": "file" },
+    { "id": "fn:createSession", "label": "createSession", "file_type": "code", "source_file": "src/session.ts", "kind": "function" },
+    { "id": "file:db.ts", "label": "db.ts", "file_type": "code", "source_file": "src/db.ts", "kind": "file" },
+    { "id": "fn:query", "label": "query", "file_type": "code", "source_file": "src/db.ts", "kind": "function" }
+  ],
+  "links": [
+    { "source": "fn:login", "target": "fn:verifyToken", "relation": "calls", "confidence": "EXTRACTED" },
+    { "source": "fn:login", "target": "fn:createSession", "relation": "calls", "confidence": "EXTRACTED" },
+    { "source": "fn:createSession", "target": "fn:query", "relation": "calls", "confidence": "EXTRACTED" },
+    { "source": "file:auth.ts", "target": "fn:login", "relation": "contains", "confidence": "EXTRACTED" },
+    { "source": "file:session.ts", "target": "fn:createSession", "relation": "contains", "confidence": "EXTRACTED" },
+    { "source": "file:db.ts", "target": "fn:query", "relation": "contains", "confidence": "EXTRACTED" }
+  ]
+}

@@ -3,8 +3,18 @@ import { Agent } from "@opencode/schema/agent"
 import { Model } from "@opencode/schema/model"
 import { Permission } from "@opencode/schema/permission"
 import { Provider } from "@opencode/schema/provider"
+import { existsSync } from "node:fs"
 import { Effect, Schema } from "effect"
-import { createMemoryStore, formatHits, gatewayAuthHeaders, loadInviteConfig, type OutcomeKind } from "@grist-ai/logic"
+import {
+  createProvider as createCodeMapProvider,
+  createMemoryStore,
+  formatHits,
+  formatSubgraph,
+  gatewayAuthHeaders,
+  loadInviteConfig,
+  type CodeMapProvider,
+  type OutcomeKind,
+} from "@grist-ai/logic"
 import { registerGristHooks } from "./hooks.js"
 import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "@grist-ai/logic"
 
@@ -234,6 +244,95 @@ export const Plugin = define({
         item.permissions.push(...READ_ONLY_PERMISSIONS)
       })
     })
+    // R2: code map (ported from v1; Graphify locked by the 2026-09-23
+    // bake-off). Reads graphify-out/graph.json; the `augment` action merges
+    // Express route registrations (@grist-ai/route-graph) into
+    // graph.aug.json, which then takes precedence — that closes the
+    // route-registration blind spot both bake-off tools shared.
+    const codeMapBase = `${ctx.location.directory}/graphify-out/graph.json`
+    const codeMapAug = `${ctx.location.directory}/graphify-out/graph.aug.json`
+    let codeMapProvider: CodeMapProvider | undefined = createCodeMapProvider({
+      cwd: ctx.location.directory,
+      graphPath:
+        process.env.GRIST_GRAPHIFY_PATH ?? (existsSync(codeMapAug) ? codeMapAug : codeMapBase),
+    })
+    if (codeMapProvider) {
+      yield* ctx.tool.transform((editor) => {
+        editor.add({
+          name: "code_map",
+          description:
+            "Structural code map for this repository (Graphify graph). Actions: 'status' (graph availability/size), 'search' (find nodes by label or file), 'subgraph' (blast-radius neighborhood of a seed file/symbol, ranked by connectedness — use for escalation context instead of reading the whole repo), 'augment' (merge Express route registrations into the graph so 'which endpoint reaches this code?' resolves; writes graph.aug.json). Requires graphify-out/graph.json (build with Graphify); status reports when it is missing.",
+          input: Schema.Struct({
+            action: Schema.Literals(["status", "search", "subgraph", "augment"]),
+            query: Schema.optional(Schema.String),
+            seed: Schema.optional(Schema.String),
+            hops: Schema.optional(Schema.Number),
+          }),
+          options: { codemode: false },
+          execute: (input) =>
+            Effect.promise(async () => {
+              const provider = codeMapProvider
+              if (!provider) return { content: "[grist:code-map] provider disabled" }
+              try {
+                if (input.action === "status") {
+                  const status = await provider.status()
+                  return {
+                    content: `[grist:code-map] provider=${status.id} available=${status.available} detail=${status.detail} graph=${status.graphPath ?? ""}`,
+                  }
+                }
+                if (input.action === "search") {
+                  const query = (input.query ?? "").trim()
+                  if (!query) return { content: "[grist:code-map] search requires a query" }
+                  const nodes = await provider.search(query, 20)
+                  if (nodes.length === 0) return { content: `[grist:code-map] no nodes match ${JSON.stringify(query)}` }
+                  return {
+                    content: nodes
+                      .map((n) => `- ${n.label}${n.kind ? ` (${n.kind})` : ""}${n.sourceFile ? ` @ ${n.sourceFile}` : ""} [${n.id}]`)
+                      .join("\n"),
+                  }
+                }
+                if (input.action === "subgraph") {
+                  const seed = (input.seed ?? "").trim()
+                  if (!seed) return { content: "[grist:code-map] subgraph requires a seed" }
+                  const sub = await provider.subgraph({ seed, hops: input.hops ?? 2 })
+                  if (!sub) return { content: `[grist:code-map] no subgraph for seed ${JSON.stringify(seed)} (graph missing or seed not found)` }
+                  return { content: formatSubgraph(sub) }
+                }
+                // augment: route registrations → graph.aug.json (non-destructive)
+                const mod = (await import("@grist-ai/route-graph")) as unknown as {
+                  augmentGraph: (opts: {
+                    graphPath: string
+                    repoDir: string
+                    outPath?: string
+                    write?: boolean
+                  }) => Promise<{
+                    registrations: number
+                    nodesAdded: number
+                    linksAdded: number
+                    resolved: number
+                    unresolved: number
+                  }>
+                }
+                const stats = await mod.augmentGraph({
+                  graphPath: codeMapBase,
+                  repoDir: ctx.location.directory,
+                  outPath: codeMapAug,
+                  write: true,
+                })
+                codeMapProvider = createCodeMapProvider({
+                  cwd: ctx.location.directory,
+                  graphPath: codeMapAug,
+                })
+                return {
+                  content: `[grist:code-map] augmented: registrations=${stats.registrations} nodesAdded=${stats.nodesAdded} linksAdded=${stats.linksAdded} resolved=${stats.resolved} unresolved=${stats.unresolved} → graphify-out/graph.aug.json now in use`,
+                }
+              } catch (error) {
+                return { content: `[grist:code-map] error: ${error instanceof Error ? error.message : String(error)}` }
+              }
+            }),
+        })
+      })
+    }
     const invite = loadInviteConfig()
     if (!invite) return
     yield* ctx.provider.transform((editor) => {
