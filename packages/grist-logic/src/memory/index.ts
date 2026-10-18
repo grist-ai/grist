@@ -74,3 +74,4 @@ export { createSupermemoryStore, shouldUseSupermemory } from "./supermemory-stor
 export { ensureSupermemoryLocal, resolveSupermemoryBinary } from "./ensure-local.js"
 export { formatHits } from "./format.js"
 export { renderMemoryRepo, parseMemoryRepo, type MemoryRepoFile, type ImportedMemory } from "./interchange.js"
+export { planDream, applyDream, type DreamPlan } from "./dreaming.js"
