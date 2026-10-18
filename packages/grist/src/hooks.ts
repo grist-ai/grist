@@ -16,9 +16,10 @@ import { SystemPart } from "@opencode/ai"
 import type { Context as PluginContext } from "@opencode/plugin/effect/plugin"
 import { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
-import { Effect, Scope } from "effect"
+import { Effect, Scope, Stream } from "effect"
 
 import { controlPlaneEnabled } from "@grist-ai/logic"
+import { createBurnInLog, outcomeForExecution, recordTaskUsage, taskUsageFromStepEnded } from "@grist-ai/logic"
 import { routeTask } from "@grist-ai/logic"
 import {
   decideContinue,
@@ -51,6 +52,38 @@ type ToolPartLike = {
 
 const toolHistory = new Map<string, ToolPartLike[]>()
 const primarySteps = new Map<string, number>()
+/** Last known model per gated session — joins step/usage events to a rung (R0). */
+const sessionModels = new Map<string, { providerID: string; modelID: string }>()
+
+/**
+ * R0 observability: translate durable session events into the records that
+ * close the learning loop — per-step usage (`recordTaskUsage`) and
+ * per-execution outcomes (burn-in `recordOutcome`). Both functions existed
+ * in v2 with zero callers; this subscription is the wiring. Only sessions
+ * the gate has seen are recorded.
+ */
+function handleSessionEvent(event: { type: string; data?: Record<string, unknown> }): void {
+  if (!controlPlaneEnabled()) return
+  const data = event.data ?? {}
+  const sessionID = typeof data.sessionID === "string" ? data.sessionID : undefined
+  if (!sessionID) return
+  if (event.type === "session.step.ended") {
+    const model = sessionModels.get(sessionID)
+    if (!model) return
+    const usage = taskUsageFromStepEnded(data, model)
+    if (usage) recordTaskUsage(usage)
+    return
+  }
+  const mapped = outcomeForExecution(event.type)
+  if (!mapped) return
+  const notes =
+    event.type === "session.execution.interrupted" && typeof data.reason === "string"
+      ? `interrupted:${data.reason}`
+      : undefined
+  void createBurnInLog()
+    .recordOutcome({ sessionID, outcome: mapped.outcome, notes })
+    .catch((error) => gristWarn("[grist:burn-in] outcome record failed", error))
+}
 
 function historyFor(sessionID: string): ToolPartLike[] {
   const existing = toolHistory.get(sessionID)
@@ -100,6 +133,9 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
         const sessionID = input.sessionID
         const info = await Effect.runPromise(ctx.session.get({ sessionID }).pipe(Effect.option))
         const ref = info._tag === "Some" ? info.value.model : undefined
+        if (ref && ref.providerID === GRIST_PROVIDER_ID) {
+          sessionModels.set(sessionID, { providerID: ref.providerID, modelID: ref.id })
+        }
         // Pinned = the user explicitly chose a non-grist model; never override it.
         const pinned = !!ref && ref.providerID !== GRIST_PROVIDER_ID && !publicRungFor(ref.id)
         const decision = await routeTask({
@@ -117,6 +153,7 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
             model: Model.Ref.parse(`${GRIST_PROVIDER_ID}/${decision.rung}`),
           }),
         )
+        sessionModels.set(sessionID, { providerID: GRIST_PROVIDER_ID, modelID: decision.rung })
         gristLog(`[grist:hooks] prompt gated session=${sessionID} rung=${decision.rung}`)
       }),
     )
@@ -159,6 +196,7 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
               model: Model.Ref.parse(`${GRIST_PROVIDER_ID}/${decision.rung}`),
             }),
           )
+          sessionModels.set(sessionID, { providerID: GRIST_PROVIDER_ID, modelID: decision.rung })
           gristLog(`[grist:hooks] escalated session=${sessionID} rung=${decision.rung}`)
         }
       }),
@@ -269,6 +307,28 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
         }
       }),
     )
+
+    // R0: subscribe to the durable session-event stream for usage + outcome
+    // records. Guarded end to end: if the stream is unavailable in this host
+    // context, hooks keep working and only the records are skipped.
+    yield* ctx.event
+      .subscribe()
+      .pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            try {
+              handleSessionEvent(event as { type: string; data?: Record<string, unknown> })
+            } catch (error) {
+              gristWarn("[grist:hooks] session event handling failed; continuing", error)
+            }
+          }),
+        ),
+        Effect.catch((error) => {
+          gristWarn("[grist:hooks] session event stream unavailable; usage/outcome records skipped", error)
+          return Effect.void
+        }),
+        Effect.forkScoped,
+      )
 
     yield* ctx.permission.hook("evaluate", (input) =>
       guarded("permission.evaluate", async () => {
