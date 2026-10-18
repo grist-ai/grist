@@ -4,14 +4,16 @@ import type { PromptFileAttachment } from "@opencode/client/promise"
 
 export function attached(file: PromptFileAttachment) {
   if (file.mention) return false
+
   if (file.source.type === "inline") return true
-  return file.source.uri.startsWith("data:")
+
+  return file.source.uri.startsWith("data:") || file.source.uri.startsWith("blob:")
 }
 
 // language metadata only; grammars stay behind shiki's lazy imports
 const LANGUAGE_NAMES = new Map<string, string>(
   bundledLanguagesInfo.flatMap((info) =>
-    [info.id, ...(info.aliases ?? [])].map((alias) => [alias, info.name] as [string, string]),
+    [info.id, ...(info.aliases ?? [])].map((alias): [string, string] => [alias, info.name]),
   ),
 )
 
@@ -23,6 +25,8 @@ export function typeLabel(filename: string, mime: string, fallback: string) {
   // idx 0 is a dotfile like .gitignore, not an extension
   const idx = base.lastIndexOf(".")
   const suffix = idx <= 0 ? "" : base.slice(idx + 1).toLowerCase()
+
   if (!suffix) return fallback
+
   return LANGUAGE_NAMES.get(suffix) ?? suffix.toUpperCase()
 }

@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { Rpc, RpcGroup } from "effect/unstable/rpc"
+import { Rpc, RpcGroup } from "effect/rpc"
 
 // Machine-readable error codes; the renderer maps them to i18n copy.
 export const GristAuthError = Schema.String

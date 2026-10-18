@@ -44,7 +44,6 @@ describe("experimental Evaluation recorded", () => {
   typesafe.effect("evaluates choice score and boolean questions", () =>
     assertEvaluation(
       TypeSafeAI.configure({ apiKey: process.env.TYPESAFE_API_KEY ?? "fixture" }).experimental.evaluation("jev-latest"),
-      "typesafe",
     ),
   )
 
@@ -53,7 +52,6 @@ describe("experimental Evaluation recorded", () => {
       OpenRouter.configure({ apiKey: process.env.OPENROUTER_API_KEY ?? "fixture" }).experimental.evaluation(
         "typesafe/jev-1.13",
       ),
-      "openrouter",
     ),
   )
 })
@@ -75,5 +73,6 @@ const assertEvaluation = <Options extends EvaluationOptions>(
     expect(response.answers.refund.probability).toBeGreaterThan(0.5)
     expect(response.usage?.inputTokens).toBeGreaterThan(0)
     expect(response.usage?.outputTokens).toBeGreaterThan(0)
-    expect(response.providerMetadata?.[metadataKey]?.confidence).toBeDefined()
+    expect(response.answers.department.confidence).toBeGreaterThan(0)
+    expect(response.answers.urgency.confidence).toBeGreaterThan(0)
   })

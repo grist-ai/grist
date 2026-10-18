@@ -1,3 +1,5 @@
+import { existsSync } from "fs"
+import path from "path"
 import { render, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { Effect, Latch } from "effect"
@@ -5,7 +7,7 @@ import { Service, type Endpoint } from "@opencode/client/effect/service"
 import { OpenCode, type SessionInfo } from "@opencode/client"
 import { Global } from "@opencode/util/global"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
-import { LogProvider, useLog, type LogSink } from "./context/log"
+import { LogProvider, type LogSink } from "./context/log"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
 import { Selection } from "./util/selection"
@@ -37,6 +39,7 @@ import {
   TuiStartupProvider,
   TuiTerminalEnvironmentProvider,
   useTuiApp,
+  useTuiPaths,
   useTuiStartup,
   useTuiTerminalEnvironment,
   type TuiApp,
@@ -64,6 +67,8 @@ import { DialogStatus } from "./component/dialog-status"
 import { DialogConfig } from "./component/dialog-config"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogPair } from "./component/dialog-pair"
+import { DialogHighlights } from "./component/dialog-highlights"
+import { claim } from "./util/highlights"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
@@ -73,6 +78,7 @@ import { SessionTabs } from "./component/session-tabs"
 import { clampSessionTabsWidth, sessionTabsFitVertically, SESSION_SIDEBAR_WIDTH } from "./ui/layout"
 import { createPaneResize } from "./ui/pane-resize"
 import { PaneResizeHandle } from "./ui/pane-resize-handle"
+import { clickedLink } from "./ui/link"
 import { ThemeErrorToast } from "./component/theme-error-toast"
 import { createThemeSource, ThemeProvider, useTheme, useThemes } from "./context/theme"
 import { Home } from "./routes/home"
@@ -329,12 +335,6 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                             <TuiTerminalEnvironmentProvider
                               value={{
                                 platform: process.platform,
-                                multiplexer: process.env.TMUX ? "tmux" : process.env.STY ? "screen" : undefined,
-                                displayServer: process.env.WAYLAND_DISPLAY
-                                  ? "wayland"
-                                  : process.env.DISPLAY
-                                    ? "x11"
-                                    : undefined,
                                 variables: input.environment,
                               }}
                             >
@@ -457,7 +457,6 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
 })
 
 function App() {
-  const log = useLog({ component: "app" })
   const app = useTuiApp()
   const startup = useTuiStartup()
   const config = useConfig()
@@ -688,6 +687,30 @@ function App() {
     void client.api.session
       .fork({ sessionID: args.sessionID })
       .then((result) => route.navigate({ type: "session", sessionID: result.id, prompt: startupPrompt }))
+      .catch(toast.error)
+  })
+
+  // Opens the release highlights once after an update, but only into an idle home screen during startup.
+  const storage = useStorage()
+  const paths = useTuiPaths()
+  let highlighted = false
+  createEffect(() => {
+    if (highlighted || !plugins.ready() || client.connection.status() !== "connected") return
+    highlighted = true
+    const items = app.highlights ?? []
+    if (config.data.highlights === false) return
+    if (route.data.type !== "home" || dialog.stack.length > 0 || promptRef.current?.current.text) return
+    if (args.prompt || args.continue || args.sessionID || args.newSessionID) return
+    if (process.env.OPENCODE_DRIVE || process.env.OPENCODE_STORY || process.env.OPENCODE_ROUTE) return
+    void claim(storage, {
+      version: app.version,
+      count: items.length,
+      history: existsSync(path.join(paths.state, "prompt-history.jsonl")),
+    })
+      .then((show) => {
+        if (show && dialog.stack.length === 0)
+          dialog.replace(() => <DialogHighlights version={app.version} items={items} />)
+      })
       .catch(toast.error)
   })
 
@@ -963,6 +986,17 @@ function App() {
         },
         category: "Integration",
       },
+      ...(app.highlights?.length
+        ? [
+            {
+              name: "opencode.highlights",
+              title: "Show release highlights",
+              slash: { name: "highlights" },
+              run: () => dialog.replace(() => <DialogHighlights version={app.version} items={app.highlights ?? []} />),
+              category: "System",
+            },
+          ]
+        : []),
       {
         name: "opencode.settings",
         title: "Open settings",
@@ -1338,9 +1372,11 @@ function App() {
         evt.preventDefault()
         evt.stopPropagation()
       }}
-      onMouseUp={
-        copyOnSelectEnabled() ? (event) => Selection.copyOnSelectRelease(event, renderer, toast, clipboard) : undefined
-      }
+      onMouseUp={(event) => {
+        const url = clickedLink(renderer, event)
+        if (url) return void openUrl(url).catch(toast.error)
+        if (copyOnSelectEnabled()) Selection.copyOnSelectRelease(event, renderer, toast, clipboard)
+      }}
     >
       <box
         flexGrow={1}

@@ -37,7 +37,7 @@ const stats: SessionStatsInfo = {
 describe("stats rendering", () => {
   test("keeps the default card shareable", () => {
     const output = renderStats(stats, options())
-    expect(output).toContain("opencode stats · 2026 so far · all projects")
+    expect(output).toContain("grist stats · 2026 so far · all projects")
     expect(output).toContain("activity")
     expect(output).toMatch(/Mo .*(?:\r?\n){2}Tu/)
     expect(output).toMatch(/Su .*(?:\r?\n){2}   less/)

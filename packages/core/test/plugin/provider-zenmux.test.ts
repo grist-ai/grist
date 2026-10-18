@@ -37,7 +37,7 @@ describe("ZenmuxPlugin", () => {
       })
       yield* addPlugin()
       const result = required(yield* catalog.get(Provider.ID.make("zenmux")))
-      expect(result.headers).toEqual({ "HTTP-Referer": "https://opencode.ai/", "X-Title": "opencode" })
+      expect(result.headers).toEqual({ "HTTP-Referer": "https://github.com/grist-ai/grist", "X-Title": "grist" })
       expect(Object.keys(required(result.headers)).sort()).toEqual(["HTTP-Referer", "X-Title"])
     }),
   )
@@ -56,8 +56,8 @@ describe("ZenmuxPlugin", () => {
 
       expect(required(yield* catalog.get(Provider.ID.make("zenmux"))).headers).toEqual({
         Existing: "value",
-        "HTTP-Referer": "https://opencode.ai/",
-        "X-Title": "opencode",
+        "HTTP-Referer": "https://github.com/grist-ai/grist",
+        "X-Title": "grist",
       })
     }),
   )

@@ -2,12 +2,12 @@ import { expect, test } from "bun:test"
 import { EmbeddedTerminalRenderable } from "@opentui/core"
 import { createTestRenderer } from "@opentui/core/testing"
 import { Effect, FileSystem } from "effect"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { Global } from "@opencode/util/global"
 import path from "node:path"
 import { createEventStream, createFetch, directory, json } from "./fixture/tui-client"
 import { tmpdir } from "./fixture/fixture"
 import { createAppFixture } from "./fixture/app"
+import { waitForHighlightedFrame } from "./fixture/frame"
 import type { PluginInfo } from "@opencode/client"
 
 test.each([100, 44])("Ctrl-O is immediate, dismissible, and prunes cached deletions at width %s", async (width) => {
@@ -216,6 +216,7 @@ test.each(["dismissed", "refreshing"])(
 )
 
 test("SIGHUP clears title and disposes scoped resources once", async () => {
+  await using state = await tmpdir()
   const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
   const titles: string[] = []
   let started!: () => void
@@ -243,7 +244,7 @@ test("SIGHUP clears title and disposes scoped resources once", async () => {
         terminalHandoff: async () => ({ renderer: setup.renderer, mode: "dark", complete: () => {} }),
         args: {},
         log: () => {},
-      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node)), Effect.provide(FileSystem.layerNoop({}))),
+      }).pipe(Effect.provide(Global.layerWith({ state: state.path })), Effect.provide(FileSystem.layerNoop({}))),
     )
     await ready
     process.emit("SIGHUP")
@@ -259,6 +260,7 @@ test("SIGHUP clears title and disposes scoped resources once", async () => {
 })
 
 test("session lifecycle updates the terminal title and prints the epilogue after cleanup", async () => {
+  await using state = await tmpdir()
   const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
   let initialTitle!: () => void
   const initialTitleSet = new Promise<void>((resolve) => {
@@ -319,7 +321,7 @@ test("session lifecycle updates the terminal title and prints the epilogue after
         terminalHandoff: async () => ({ renderer: setup.renderer, mode: "dark", complete: () => {} }),
         args: { sessionID: "dummy" },
         log: () => {},
-      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node)), Effect.provide(FileSystem.layerNoop({}))),
+      }).pipe(Effect.provide(Global.layerWith({ state: state.path })), Effect.provide(FileSystem.layerNoop({}))),
     )
 
     await initialTitleSet
@@ -345,6 +347,7 @@ test("session lifecycle updates the terminal title and prints the epilogue after
 })
 
 test("session title generated while an untitled session is loading remains visible", async () => {
+  await using state = await tmpdir()
   const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
   const titles: string[] = []
   const setTitle = setup.renderer.setTerminalTitle.bind(setup.renderer)
@@ -393,7 +396,7 @@ test("session title generated while an untitled session is loading remains visib
         terminalHandoff: async () => ({ renderer: setup.renderer, mode: "dark", complete: () => {} }),
         args: { sessionID: "dummy" },
         log: () => {},
-      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node)), Effect.provide(FileSystem.layerNoop({}))),
+      }).pipe(Effect.provide(Global.layerWith({ state: state.path })), Effect.provide(FileSystem.layerNoop({}))),
     )
 
     await sessionRequested.promise
@@ -620,7 +623,8 @@ test.each([80, 120])("completes custom Markdown and ordinary fences in a session
       return undefined
     },
   })
-  const streaming = await setup.waitForFrame(
+  const streaming = await waitForHighlightedFrame(
+    setup,
     (frame) =>
       frame.includes("initial") &&
       frame.includes("DiagramStart") &&
@@ -658,7 +662,8 @@ test.each([80, 120])("completes custom Markdown and ordinary fences in a session
       tokens: session.tokens,
     },
   })
-  const frame = await setup.waitForFrame(
+  const frame = await waitForHighlightedFrame(
+    setup,
     (frame) => frame.includes("MARKDOWN_END") && frame.includes("initial final") && frame.includes("2ms"),
   )
   expect(frame).toContain("DiagramStart")
@@ -752,13 +757,17 @@ test("keeps assistant footer metrics current after prepend, same-length refresh,
     },
   })
 
-  const initial = await setup.waitForFrame((frame) => frame.includes("Original answer") && frame.includes("20.0 tok/s"))
+  const initial = await waitForHighlightedFrame(
+    setup,
+    (frame) => frame.includes("Original answer") && frame.includes("20.0 tok/s"),
+  )
   expect(initial).toContain("Current input")
   expect(initial).toContain("4.0s \u00b7 20.0 tok/s")
   expect(initial).not.toContain("Prepended input")
 
   setup.mockInput.pressKey("g", { ctrl: true })
-  const prepended = await setup.waitForFrame(
+  const prepended = await waitForHighlightedFrame(
+    setup,
     (frame) =>
       frame.includes("Prepended input") &&
       frame.includes("Prepended instructions") &&
@@ -773,7 +782,8 @@ test("keeps assistant footer metrics current after prepend, same-length refresh,
   // Refresh the latest page: length stays four, but the retained assistant moves from index three to one.
   refresh = true
   setup.events.disconnect()
-  const refreshed = await setup.waitForFrame(
+  const refreshed = await waitForHighlightedFrame(
+    setup,
     (frame) =>
       frame.includes("Later input") &&
       frame.includes("Later answer") &&
@@ -793,7 +803,8 @@ test("keeps assistant footer metrics current after prepend, same-length refresh,
     durable: { aggregateID: session.id, seq: 1, version: 1 },
     data: { sessionID: session.id, to: "msg_0004" },
   })
-  const reverted = await setup.waitForFrame(
+  const reverted = await waitForHighlightedFrame(
+    setup,
     (frame) => frame.includes("Original answer") && !frame.includes("Later input") && !frame.includes("Later answer"),
   )
   expect(reverted).toContain("Current input")
@@ -802,6 +813,7 @@ test("keeps assistant footer metrics current after prepend, same-length refresh,
 })
 
 test("session startup prompt is submitted exactly once", async () => {
+  await using state = await tmpdir()
   const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
   const events = createEventStream()
   const cwd = process.cwd()
@@ -855,7 +867,7 @@ test("session startup prompt is submitted exactly once", async () => {
         terminalHandoff: async () => ({ renderer: setup.renderer, mode: "dark", complete: () => {} }),
         args: { sessionID: "dummy", prompt: "RESUME_READY" },
         log: () => {},
-      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node)), Effect.provide(FileSystem.layerNoop({}))),
+      }).pipe(Effect.provide(Global.layerWith({ state: state.path })), Effect.provide(FileSystem.layerNoop({}))),
     )
 
     await Promise.race([
@@ -874,6 +886,61 @@ test("session startup prompt is submitted exactly once", async () => {
     if (!setup.renderer.isDestroyed) setup.renderer.destroy()
     await server.stop()
   }
+})
+
+test("home startup prompt is submitted exactly once", async () => {
+  await using state = await tmpdir()
+  const cwd = process.cwd()
+  const location = { directory: cwd, project: { id: "project", directory: cwd, canonical: cwd } }
+  const bodies: unknown[] = []
+  const submitted = Promise.withResolvers<void>()
+  let session: unknown
+  await using setup = await createAppFixture({
+    state: state.path,
+    args: { prompt: "HOME_READY" },
+    config: { animations: false, tabs: { mode: "off" } },
+    fetch: async (url, request) => {
+      if (url.pathname === "/api/location") return json(location)
+      if (url.pathname === "/api/fs/list") return json({ location, data: [] })
+      if (url.pathname === "/api/agent")
+        return json({ location, data: [{ id: "build", mode: "primary", hidden: false, permissions: [] }] })
+      if (url.pathname === "/api/model")
+        return json({ location, data: [{ id: "model", providerID: "provider", name: "Model", variants: [] }] })
+      if (url.pathname === "/api/provider") return json({ location, data: [{ id: "provider", name: "Provider" }] })
+      if (url.pathname === "/api/session" && request.method === "POST") {
+        const input: unknown = await request.json()
+        if (typeof input !== "object" || input === null) throw new Error("Expected a session input")
+        session = {
+          ...input,
+          projectID: "project",
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          time: { created: 0, updated: 0 },
+        }
+        return json({ data: session })
+      }
+      if (/^\/api\/session\/[^/]+\/prompt$/.test(url.pathname)) {
+        bodies.push(await request.json())
+        submitted.resolve()
+        return json({ data: {} })
+      }
+      if (/^\/api\/session\/[^/]+\/(message|inbox|permission)$/.test(url.pathname))
+        return json({ data: [], cursor: {} })
+      if (session && /^\/api\/session\/[^/]+$/.test(url.pathname)) return json({ data: session })
+      return undefined
+    },
+  })
+
+  await setup.ready
+  await Promise.race([
+    submitted.promise,
+    Bun.sleep(2000).then(() => {
+      throw new Error("startup prompt was not submitted")
+    }),
+  ])
+  await Bun.sleep(20)
+  expect(bodies).toHaveLength(1)
+  expect(bodies[0]).toMatchObject({ text: "HOME_READY" })
 })
 
 test.each([false, true])("uses the resolved launch directory for new prompts (fallback: %s)", async (fallback) => {
@@ -976,18 +1043,18 @@ test("error investigations repeatedly seed editable home drafts without creating
   setup.mockInput.pressKey("F6")
   await setup.waitForFrame((frame) => frame.includes("MCP servers") && frame.includes("alpha"))
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Alpha connection refused") && frame.includes("i investigate"))
+  await setup.waitForFrame((frame) => frame.includes("Alpha connection refused") && frame.includes("investigate i"))
   setup.mockInput.pressKey("i")
-  await setup.waitForFrame((frame) => frame.includes("Alpha connection refused") && !frame.includes("i investigate"))
+  await setup.waitForFrame((frame) => frame.includes("Alpha connection refused") && !frame.includes("investigate i"))
 
   setup.mockInput.pressKey("F6")
   await setup.waitForFrame((frame) => frame.includes("MCP servers"))
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Beta initialization failed") && frame.includes("i investigate"))
+  await setup.waitForFrame((frame) => frame.includes("Beta initialization failed") && frame.includes("investigate i"))
   setup.mockInput.pressKey("i")
   const draft = await setup.waitForFrame(
-    (frame) => frame.includes("Beta initialization failed") && !frame.includes("i investigate"),
+    (frame) => frame.includes("Beta initialization failed") && !frame.includes("investigate i"),
   )
 
   expect(draft).not.toContain("Alpha connection refused")
@@ -1289,6 +1356,7 @@ test("ctrl+c dismisses autocomplete and shell mode before exiting", async () => 
 test.skipIf(process.platform === "win32").each(["manual", "select"] as const)(
   "selection copy and pane management respect %s mode in the prompt and terminal pane",
   async (copy) => {
+    await using state = await tmpdir()
     const setup = await createTestRenderer({ width: 100, height: 30, useThread: false, kittyKeyboard: true })
     setup.renderer.start()
     const ready = Promise.withResolvers<void>()
@@ -1371,7 +1439,7 @@ test.skipIf(process.platform === "win32").each(["manual", "select"] as const)(
           args: { sessionID: session.id },
           terminalHandoff: async () => ({ renderer: setup.renderer, mode: "dark", complete: ready.resolve }),
           log: () => {},
-        }).pipe(Effect.provide(AppNodeBuilder.build(Global.node)), Effect.provide(FileSystem.layerNoop({}))),
+        }).pipe(Effect.provide(Global.layerWith({ state: state.path })), Effect.provide(FileSystem.layerNoop({}))),
       )
 
       await ready.promise

@@ -1,9 +1,10 @@
 import { createTestRenderer } from "@opentui/core/testing"
 import { Effect, FileSystem } from "effect"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
+import path from "node:path"
 import { Global } from "@opencode/util/global"
 import type { TuiInput } from "../../src/app"
 import type { Config } from "../../src/config"
+import { tmpdir } from "./fixture"
 import { createEventStream, createFetch, type FetchHandler } from "./tui-client"
 
 export async function createAppFixture(
@@ -17,6 +18,7 @@ export async function createAppFixture(
   } = {},
 ) {
   const { run } = await import("../../src/app")
+  const root = await tmpdir()
   const setup = await createTestRenderer({
     width: input.width ?? 100,
     height: input.height ?? 30,
@@ -27,24 +29,47 @@ export async function createAppFixture(
   const ready = Promise.withResolvers<void>()
   const events = createEventStream()
   const calls = createFetch(input.fetch, events)
+  // Updates apply to a copy, as a config file would, so preference writes persist for the rest of the test.
+  let config: Config.Info = structuredClone(input.config ?? { animations: false })
   const server = Bun.serve({ port: 0, fetch: (request) => calls.fetch(request) })
   const task = Effect.runPromise(
     run({
       app: { name: "test", version: "test", channel: "test" },
       server: { endpoint: { url: server.url.toString() } },
-      config: { get: async () => input.config ?? { animations: false }, update: async () => ({}) },
+      config: {
+        get: async () => config,
+        update: async (mutate) => {
+          const next = structuredClone(config)
+          mutate(next)
+          config = next
+          return next
+        },
+      },
       packages: { prepare: async () => ({ directory: "" }) },
       terminalHandoff: async () => ({ renderer: setup.renderer, mode: "dark", complete: ready.resolve }),
       args: input.args ?? {},
       log: () => {},
     }).pipe(
-      Effect.provide(input.state ? Global.layerWith({ state: input.state }) : AppNodeBuilder.build(Global.node)),
+      Effect.provide(
+        Global.layerWith({
+          home: path.join(root.path, "home"),
+          data: path.join(root.path, "data"),
+          cache: path.join(root.path, "cache"),
+          config: path.join(root.path, "config"),
+          state: input.state ?? path.join(root.path, "state"),
+          bin: path.join(root.path, "cache", "bin"),
+          log: path.join(root.path, "data", "log"),
+          repos: path.join(root.path, "data", "repos"),
+          tmp: path.join(root.path, "tmp"),
+        }),
+      ),
       Effect.provide(FileSystem.layerNoop({})),
     ),
   )
   return {
     ...setup,
     events,
+    config: () => config,
     ready: ready.promise,
     async [Symbol.asyncDispose]() {
       try {
@@ -52,6 +77,7 @@ export async function createAppFixture(
         await task
       } finally {
         await server.stop()
+        await root[Symbol.asyncDispose]()
       }
     },
   }

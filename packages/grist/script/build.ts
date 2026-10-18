@@ -24,6 +24,7 @@ import path from "node:path"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 import type { BunPlugin } from "bun"
 import { resolveOpencodePty } from "../../cli/script/opencode-pty"
+import { discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@opencode/plugin/runtime-modules"
 import pkg from "../package.json"
 
 const root = path.resolve(import.meta.dirname, "..", "..", "..")
@@ -102,10 +103,39 @@ async function buildOne(opts: {
     },
   }
 
+  // The plugin runtime resolves host packages (effect, @opencode/plugin) from the
+  // filesystem at runtime; inside a compiled binary there is no node_modules, so —
+  // exactly as upstream's build does — swap runtime-modules.ts for a generated
+  // module whose loaders were resolved here, at build time.
+  const pluginRuntimeEntries = discoverPluginRuntimeSpecifiers()
+  const pluginRuntimeModulesSource = [
+    "export const resolveHostPackageRoots = () => []",
+    "const modules = {",
+    ...[...pluginRuntimeEntries.keys()].map(
+      (specifier) => `  ${JSON.stringify(specifier)}: ${pluginRuntimeLoaderCode(specifier, pluginRuntimeEntries)},`,
+    ),
+    "}",
+    "export const loadRuntimeModules = () => modules",
+  ].join("\n")
+  const pluginRuntimePlugin: BunPlugin = {
+    name: "grist-plugin-runtime",
+    setup(build) {
+      build.onLoad({ filter: /plugin[/\\]src[/\\]runtime-modules\.ts$/ }, () => ({
+        contents: pluginRuntimeModulesSource,
+        loader: "ts",
+      }))
+      build.onLoad({ filter: /[/\\]internal[/\\]httpApi(?:Scalar|Swagger)\.js$/ }, () => ({
+        contents:
+          'export const css = ""; export const javascript = \'document.body.textContent = "Scalar/Swagger UI assets are not bundled in Grist"\'',
+        loader: "js",
+      }))
+    },
+  }
+
   const result = await Bun.build({
     entrypoints: ["./packages/cli/src/index.ts"],
     tsconfig: "./packages/cli/tsconfig.json",
-    plugins: [appAssetsStub, createSolidTransformPlugin(), opencodePtyPlugin],
+    plugins: [appAssetsStub, createSolidTransformPlugin(), opencodePtyPlugin, pluginRuntimePlugin],
     external: ["node-gyp"],
     format: "esm",
     minify: true,

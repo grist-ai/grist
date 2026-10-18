@@ -12,6 +12,7 @@ import { MarkedProvider } from "@opencode/ui/context/marked"
 import { ThemeProvider, useTheme, type ColorScheme } from "@opencode/ui/theme"
 import { Font } from "@opencode/ui/font"
 import { LanguageProvider, UiI18nBridge, useLanguage } from "@/runtime/i18n/language"
+import { ExtensionStory } from "./extension"
 
 function resolveScheme(value: unknown): ColorScheme {
   if (value === "light" || value === "dark" || value === "system") return value
@@ -78,13 +79,17 @@ const frame = createJSXDecorator((Story, context) => {
               <MarkedProvider>
                 <div
                   style={{
-                    "min-height": "100vh",
+                    // Outside fullscreen Storybook adds 1rem of padding around the story. A full-viewport frame inside it
+                    // makes every story page scroll by 32px, so an incidental scroll can move the story under a test.
+                    "min-height": fullscreen ? "100vh" : "calc(100vh - 2rem)",
                     padding: fullscreen ? "0" : "24px",
                     "background-color": "var(--background-base)",
                     color: "var(--text-base)",
                   }}
                 >
-                  <Story />
+                  <ExtensionStory file={context.parameters?.fileName}>
+                    <Story />
+                  </ExtensionStory>
                 </div>
               </MarkedProvider>
             </DialogProvider>

@@ -14,6 +14,7 @@ let probe: Promise<Endpoint | undefined> | undefined
 export function startSidecarProbe() {
   if (!app.isPackaged) return
   const version = bundledVersion()
+
   if (!version) return
   probe = import("@opencode/client/service")
     // Look where the CLI actually registers; the client's default file still

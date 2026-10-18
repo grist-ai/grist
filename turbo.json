@@ -5,7 +5,8 @@
     "bunfig.toml",
     ".npmrc",
     ".github/actions/setup-bun/**",
-    ".github/workflows/test.yml"
+    ".github/workflows/test.yml",
+    "package.json"
   ],
   "globalEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
   "globalPassThroughEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
@@ -17,9 +18,6 @@
     "test:components": {
       "outputs": [],
       "cache": false
-    },
-    "@opencode/enterprise#typecheck": {
-      "dependsOn": ["@opencode/core#typecheck"]
     },
     "@opencode/sdk#typecheck": {
       "dependsOn": ["@opencode/core#typecheck"]
@@ -34,58 +32,23 @@
       "dependsOn": ["@opencode/core#typecheck"]
     },
     "build": {
-      "dependsOn": [],
+      "dependsOn": ["transit"],
       "outputs": ["dist/**"]
     },
-    "@opencode/ai#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
+    // Workspace packages export their sources, so tests never wait for a dependency's build; the build job in
+    // test.yml checks the library builds. No package has a transit script: it runs nothing and only folds every
+    // workspace dependency into the test hash.
+    "transit": {
+      "dependsOn": ["^transit"]
     },
-    "@opencode/codemode#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/core#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/function#test": {
+    // Every package with a test script runs here, so a new suite cannot be left out of CI.
+    "test": {
+      "dependsOn": ["transit"],
       "outputs": []
     },
     "@opencode/desktop#test": {
       "outputs": [],
       "cache": false
-    },
-    "@opencode/httpapi-codegen#test": {
-      "outputs": []
-    },
-    "@opencode/server#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/cli#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/tui#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/latex#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/app#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/ui#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@opencode/session-ui#test": {
-      "dependsOn": ["^build"],
-      "outputs": []
     },
     "@opencode/sdk#verify:package": {
       "outputs": []

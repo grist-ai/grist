@@ -2,8 +2,9 @@ import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
 import { Tabs } from "@opencode/ui/tabs"
-import { For, Show, type ComponentProps, type JSX } from "solid-js"
+import { createEffect, ErrorBoundary, For, on, Show, type ComponentProps, type JSX } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
+import { ErrorPage } from "@/shell/errors/error"
 import { useSettingsSurface } from "./surface"
 import { SettingsSearch } from "./search"
 import "./search.css"
@@ -34,13 +35,17 @@ export function SettingsNavigation(props: {
   const surface = useSettingsSurface()
   const searchable = () => surface.view().type === "root"
   const language = useLanguage()
+
   const back = () => {
     if (!searchable() && surface.search.back()) return
     props.onBack()
   }
+
   const backLabel = () =>
     !searchable() && surface.search.state.selected ? language.t("settings.backToSettings") : props.backLabel
+
   const current = () => props.groups.flatMap((group) => group.items).find((item) => item.value === props.value)
+
   const change = (value: string) => {
     surface.search.clear()
     props.onChange(value)
@@ -138,7 +143,18 @@ export function SettingsNavigation(props: {
           </Show>
         </div>
       </aside>
-      <div class="settings-content">{props.children}</div>
+      <div class="settings-content">
+        <ErrorBoundary
+          fallback={(error, reset) => {
+            // Keep a failed page inside the content area; choosing another page renders it again.
+            createEffect(on(() => props.value, reset, { defer: true }))
+
+            return <ErrorPage error={error} />
+          }}
+        >
+          {props.children}
+        </ErrorBoundary>
+      </div>
     </Tabs>
   )
 }

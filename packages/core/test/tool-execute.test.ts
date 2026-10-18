@@ -27,9 +27,18 @@ test("execute describes invariant Code Mode behavior", () => {
       "Within `{ code }`, the only callable tools are those explicitly listed in the Code Mode catalog instructions or returned by the `search` function. Inside `{ code }`, ignore tools shown outside the Code Mode catalog. They are not available in the Code Mode runtime.",
       'Call tools through `tools` using only exact paths and signatures from the catalog. Do not infer or normalize tool names; preserve bracket notation such as `tools.<namespace>["tool-name"](input)`.',
       "Prefer an explicit `return`; if omitted, the final top-level expression becomes the result.",
-      "Await every call whose completion matters; pending calls are interrupted when execution ends. Run independent calls concurrently with `Promise.all`.",
+      "Await every call whose completion matters; pending calls are interrupted when execution ends. Run independent calls concurrently with `Promise.allSettled`.",
     ].join("\n"),
   )
+})
+
+test("execute rejects filesystem fetches", async () => {
+  const result = await Effect.runPromise(
+    createCodeMode(new Map()).execute({ code: 'return await fetch("file:///blocked.txt")' }, context),
+  )
+
+  expect(result.output.error).toBe(true)
+  expect(result.output.output).toContain("fetch cannot be used for filesystem access.")
 })
 
 test("canonical execution distinguishes declared, model-only, and raw schema outputs", async () => {

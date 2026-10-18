@@ -14,7 +14,6 @@ import { publicModelRef, type ModelRef, type Rung } from "./rung.js"
 import { loadOperatingMode, applyModeCap } from "./mode.js"
 import {
   askSystemOne,
-  clamp01,
   controlPlaneEnabled,
   noul01,
   score01,
