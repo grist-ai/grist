@@ -56,6 +56,9 @@ export type ThreadSummary = {
   forkedFrom?: string
   status: ThreadStatus
   viewed?: boolean
+  updatedAt?: number
+  viewedAt?: number
+  archivedAt?: number
   totalCost: number
   stepCount: number
   itemCount: number

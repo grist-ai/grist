@@ -30,7 +30,7 @@ do not block harness work on an external codebase.
 | Memory | verified-outcomes file / Supermemory + `memory` tool — **ported to v2 2026-10-18** (personal scope; team namespaces spec-only) |
 | Burn-in | JSONL (decisions + outcomes, stable `~/.grist` path) + thresholds + report; failure mining (`script/grist-failure-mining.ts`) + negative-memory distiller (R3); Dreaming curation (`script/grist-dream.ts`) + calibration suggestions (`script/grist-calibrate.ts`) (R4) |
 | Eval | `bun scripts/grist-eval.ts` — gate battery + threshold suggestions |
-| Desktop thread model | sessions projected to threads (summary + items + approval requests) from live events or stored rows — `packages/grist-logic/src/thread-model.ts`, `docs/thread-model.md`, `script/grist-threads.ts` (D0) |
+| Desktop thread model | sessions projected to threads (summary + items + approval requests) from live events or stored rows — `packages/grist-logic/src/thread-model.ts`, `docs/thread-model.md`, `script/grist-threads.ts` (D0); supervision sidebar view-model (`sidebar.ts`) + Home thread panel (D1) |
 
 ## Run Grist (no pilot repo)
 
