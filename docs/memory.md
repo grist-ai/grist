@@ -1,10 +1,12 @@
 # Memory (Phase 5)
 
-> **Status (2026-10-18):** the implementation described below is the
-> **v1 tree** (`packages/opencode/src/grist/memory/`, branch
-> `v1-archive`). Verified-outcome memory is **not in v2 `main`** yet —
-> the port is pending, and no v2 surface (CLI, plugin, doctrine, site)
-> may present memory as a current feature until it lands.
+> **Status (2026-10-18):** **ported to v2** — the module lives at
+> `packages/grist-logic/src/memory/` and the `memory` tool is registered
+> by the v2 plugin (`packages/grist`), with the Agent Memory Repo
+> interchange (§15) in `memory/interchange.ts`. Personal/single-repo
+> scope; team namespaces remain spec-only. The v1 tree
+> (`packages/opencode/src/grist/memory/`, branch `v1-archive`) is the
+> historical reference.
 
 Verified-outcomes-only institutional memory (pre-POC §6).
 

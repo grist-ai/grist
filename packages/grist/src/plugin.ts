@@ -3,8 +3,8 @@ import { Agent } from "@opencode/schema/agent"
 import { Model } from "@opencode/schema/model"
 import { Permission } from "@opencode/schema/permission"
 import { Provider } from "@opencode/schema/provider"
-import { Effect } from "effect"
-import { gatewayAuthHeaders, loadInviteConfig } from "@grist-ai/logic"
+import { Effect, Schema } from "effect"
+import { createMemoryStore, formatHits, gatewayAuthHeaders, loadInviteConfig, type OutcomeKind } from "@grist-ai/logic"
 import { registerGristHooks } from "./hooks.js"
 import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "@grist-ai/logic"
 
@@ -127,6 +127,72 @@ export const Plugin = define({
   id: "grist-ai.plugin",
   effect: Effect.fn(function* (ctx) {
     yield* registerGristHooks(ctx)
+    // R1: verified-outcomes memory (ported from v1). Registered whenever a
+    // store resolves (GRIST_MEMORY=off disables it). The store enforces the
+    // verified-outcomes gate itself — unverified writes are refused there,
+    // never silently accepted here.
+    const memoryStore = createMemoryStore({ cwd: ctx.location.directory })
+    if (memoryStore) {
+      const defaultContainer =
+        ctx.location.directory.split("/").filter(Boolean).pop() ?? "default"
+      yield* ctx.tool.transform((editor) => {
+        editor.add({
+          name: "memory",
+          description:
+            "Verified-outcomes memory for this codebase. Actions: 'recall' (search prior verified learnings by query before assuming ownership or conventions), 'remember' (persist a learning ONLY with a verified outcome: tests_passed, user_approved, or user_corrected — anything else is refused), 'status' (backend health). Container defaults to this repository.",
+          input: Schema.Struct({
+            action: Schema.Literals(["recall", "remember", "status"]),
+            query: Schema.optional(Schema.String),
+            content: Schema.optional(Schema.String),
+            outcome: Schema.optional(Schema.Literals(["tests_passed", "user_approved", "user_corrected"])),
+            container: Schema.optional(Schema.String),
+          }),
+          options: { codemode: false },
+          execute: (input, toolCtx) =>
+            Effect.promise(async () => {
+              const container = input.container ?? defaultContainer
+              try {
+                if (input.action === "status") {
+                  const status = await memoryStore.status()
+                  return {
+                    content: `[grist:memory] backend=${status.backend} available=${status.available} detail=${status.detail}`,
+                  }
+                }
+                if (input.action === "recall") {
+                  const query = (input.query ?? "").trim()
+                  if (!query) return { content: "[grist:memory] recall requires a query" }
+                  const status = await memoryStore.status()
+                  const hits = await memoryStore.recall({ query, container, limit: 8 })
+                  return { content: formatHits({ query, hits, backend: status.backend }) }
+                }
+                const content = (input.content ?? "").trim()
+                const outcome = input.outcome as OutcomeKind | undefined
+                if (!content || !outcome) {
+                  return {
+                    content:
+                      "[grist:memory] remember requires content and a verified outcome (tests_passed | user_approved | user_corrected)",
+                  }
+                }
+                const record = await memoryStore.remember({
+                  content,
+                  container,
+                  outcome,
+                  sessionID: String(toolCtx.sessionID),
+                })
+                if (!record) {
+                  return {
+                    content:
+                      "[grist:memory] not stored — only verified outcomes are persisted (tests_passed, user_approved, user_corrected)",
+                  }
+                }
+                return { content: `[grist:memory] stored id=${record.id} outcome=${record.outcome} container=${record.container}` }
+              } catch (error) {
+                return { content: `[grist:memory] error: ${error instanceof Error ? error.message : String(error)}` }
+              }
+            }),
+        })
+      })
+    }
     yield* ctx.agent.transform((editor) => {
       editor.update(Agent.ID.make("grist-explore"), (item) => {
         item.name = Agent.Name.make("Grist Explore")
