@@ -103,6 +103,8 @@ const vcsLayer = Layer.succeed(
     branches: () => Effect.succeed([]),
     status: () => Effect.succeed([]),
     diff: () => Effect.succeed([]),
+    apply: () => Effect.fail(new Vcs.WriteError({ message: "VCS writes are unavailable in the workerd profile" })),
+    commit: () => Effect.fail(new Vcs.WriteError({ message: "VCS writes are unavailable in the workerd profile" })),
   }),
 )
 
