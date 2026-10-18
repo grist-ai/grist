@@ -31,6 +31,16 @@ const DiffQuery = Schema.Struct({
   context: Schema.NumberFromString.pipe(Schema.decodeTo(NonNegativeInt), Schema.optional),
 })
 
+const ApplyPayload = Schema.Struct({
+  patch: Schema.String,
+  reverse: optional(Schema.Boolean),
+  cached: optional(Schema.Boolean),
+})
+
+const CommitPayload = Schema.Struct({
+  message: Schema.String,
+})
+
 export const VcsGroup = HttpApiGroup.make("server.vcs")
   .add(
     HttpApiEndpoint.post("vcs.init", "/api/vcs/init", {
@@ -119,6 +129,40 @@ export const VcsGroup = HttpApiGroup.make("server.vcs")
           summary: "VCS diff",
           description:
             "Diff HEAD to the working copy (working), the base merge-base to the working copy (branch), or the base merge-base to HEAD (committed). Omitting base preserves repository-default comparison; supplying it overrides the comparison without saving it.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("vcs.apply", "/api/vcs/apply", {
+      query: LocationQuery,
+      payload: ApplyPayload,
+      success: HttpApiSchema.NoContent,
+      error: [InvalidRequestError, ServiceUnavailableError],
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "vcs.apply",
+          summary: "Apply a patch",
+          description:
+            "Apply a unified-diff patch at the requested location: to the working tree by default, to the index with `cached`, and in reverse with `reverse`. This is the write primitive behind review chunk actions — staging one hunk accepts it; reverse-applying one hunk to the working tree reverts it.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("vcs.commit", "/api/vcs/commit", {
+      query: LocationQuery,
+      payload: CommitPayload,
+      success: Schema.Struct({ hash: Schema.String }),
+      error: [InvalidRequestError, ServiceUnavailableError],
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "vcs.commit",
+          summary: "Commit staged changes",
+          description:
+            "Commit the index at the requested location with the given message and return the new commit hash. Fails when nothing is staged.",
         }),
       ),
   )

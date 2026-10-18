@@ -1,4 +1,5 @@
 import type { FileDiffInfo } from "@opencode/client/promise"
+import { hunkPatch, parseFilePatch } from "@grist-ai/logic"
 import type { SessionReviewLineComment } from "@opencode/session-ui/session-review"
 import { previewSelectedLines } from "@opencode/session-ui/pierre/selection-bridge"
 import { artifactMime } from "@opencode/util/artifact"
@@ -566,10 +567,61 @@ export function createReviewModel(input: {
   const deferRender = () => !rendered()
   const panelRendered = createMemo<boolean>((previous) => previous || !deferRender(), false)
 
+  // Grist D3 — review actions over the working-tree diff: accept stages one
+  // hunk in the index, revert reverse-applies it to the working tree, and
+  // commit lands whatever is staged. Hunk identity and patch surgery live
+  // in @grist-ai/logic (review.ts); these call the vcs.apply/vcs.commit
+  // endpoints and refresh the panel's diffs. Chunks come from a bounded-
+  // context (3-line) diff: the panel's own diff is whole-file context by
+  // design, which would collapse every change into a single hunk.
+  const chunksFor = async (file: string) => {
+    const result = await view().server.client.vcs.diff({
+      location: { directory: directory() },
+      mode: "working",
+      context: 3,
+    })
+    const diff = result.data.find((item) => item.file === file)
+    return diff ? parseFilePatch(diff.file, diff.patch) : undefined
+  }
+  const hunkFor = async (file: string, hunkID: string) => {
+    const parsed = await chunksFor(file)
+    const hunk = parsed?.hunks.find((item) => item.id === hunkID)
+    return parsed && hunk ? { parsed, hunk } : undefined
+  }
+  const actions = {
+    chunks: chunksFor,
+    acceptHunk: async (file: string, hunkID: string) => {
+      const found = await hunkFor(file, hunkID)
+      if (!found) return
+      await view().server.client.vcs.apply({
+        location: { directory: directory() },
+        patch: hunkPatch(found.parsed, found.hunk),
+        cached: true,
+      })
+      refresh()
+    },
+    revertHunk: async (file: string, hunkID: string) => {
+      const found = await hunkFor(file, hunkID)
+      if (!found) return
+      await view().server.client.vcs.apply({
+        location: { directory: directory() },
+        patch: hunkPatch(found.parsed, found.hunk),
+        reverse: true,
+      })
+      refresh()
+    },
+    commit: async (message: string) => {
+      const result = await view().server.client.vcs.commit({ location: { directory: directory() }, message })
+      refresh()
+      return result
+    },
+  }
+
   return {
     screen,
     view,
     activeFile,
+    actions,
     // The mode picker waits for the stored mode.
     canReview: () => !!view().project && !!stored(),
     comments: {

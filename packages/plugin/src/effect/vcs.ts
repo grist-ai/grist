@@ -23,6 +23,16 @@ export interface VcsDiffInput extends VcsScope {
   readonly maxOutputBytes: number
 }
 
+export interface VcsApplyInput extends VcsScope {
+  readonly patch: string
+  readonly reverse?: boolean
+  readonly cached?: boolean
+}
+
+export interface VcsCommitInput extends VcsScope {
+  readonly message: string
+}
+
 export interface VcsDefinition {
   readonly id: string
   readonly name: string
@@ -32,6 +42,8 @@ export interface VcsDefinition {
   readonly branches: (input: VcsBranchesInput) => Effect.Effect<Vcs.BranchList, unknown>
   readonly status: (input: VcsScope) => Effect.Effect<readonly Vcs.FileStatus[], unknown>
   readonly diff: (input: VcsDiffInput) => Effect.Effect<readonly FileDiff.Info[], unknown>
+  readonly apply?: (input: VcsApplyInput) => Effect.Effect<void, unknown>
+  readonly commit?: (input: VcsCommitInput) => Effect.Effect<{ hash: string }, unknown>
 }
 
 export interface VcsDomain extends Omit<VcsApi<unknown>, "init"> {

@@ -259,6 +259,10 @@ import type {
   VcsBranchListOutput,
   VcsDiffInput,
   VcsDiffOutput,
+  VcsApplyInput,
+  VcsApplyOutput,
+  VcsCommitInput,
+  VcsCommitOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -1559,6 +1563,21 @@ const EndpointVcsDiff = (raw: RawClient["server.vcs"]) => (input: VcsDiffInput) 
     }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointVcsApply = (raw: RawClient["server.vcs"]) => (input: VcsApplyInput) =>
+  preserveEffect<VcsApplyOutput>()(
+    raw["vcs.apply"]({
+      query: { location: input["location"] },
+      payload: { patch: input["patch"], reverse: input["reverse"], cached: input["cached"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointVcsCommit = (raw: RawClient["server.vcs"]) => (input: VcsCommitInput) =>
+  preserveEffect<VcsCommitOutput>()(
+    raw["vcs.commit"]({ query: { location: input["location"] }, payload: { message: input["message"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
 const adaptGroupVcs = (raw: RawClient["server.vcs"]) => ({
   init: EndpointVcsInit(raw),
   get: EndpointVcsGet(raw),
@@ -1566,6 +1585,8 @@ const adaptGroupVcs = (raw: RawClient["server.vcs"]) => ({
   status: EndpointVcsStatus(raw),
   branch: { list: EndpointVcsBranchList(raw) },
   diff: EndpointVcsDiff(raw),
+  apply: EndpointVcsApply(raw),
+  commit: EndpointVcsCommit(raw),
 })
 
 const EndpointDebugLocationList = (raw: RawClient["server.debug"]) => () =>

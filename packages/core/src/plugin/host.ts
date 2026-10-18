@@ -493,6 +493,8 @@ export const make = Effect.fn("PluginHost.make")(function* (
       },
       status: () => response(vcs.status()),
       diff: (input) => response(vcs.diff(input.mode, { context: input.context, base: input.base })),
+      apply: (input) => vcs.apply({ patch: input.patch, reverse: input.reverse, cached: input.cached }),
+      commit: (input) => vcs.commit({ message: input.message }),
       transform: vcs.transform,
       reload: vcs.reload,
     },

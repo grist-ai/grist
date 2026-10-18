@@ -88,6 +88,33 @@ same file concurrently with no interference; merging one thread's
 branch left the other's worktree intact; cleanup removed only the
 archived thread's worktree.
 
+## D3 — review actions
+
+Upstream's review panel renders diffs and turns line comments into
+composer chips (comment → steer already works), but it could not ACT on
+a review. D3 adds the write primitives and the chunk model:
+
+- **Endpoints** — `POST /api/vcs/apply` (a unified-diff patch to the
+  working tree, to the index with `cached`, in reverse with `reverse`)
+  and `POST /api/vcs/commit` (commit the index, returns the hash; fails
+  when nothing is staged). They ride the VCS provider contract: the git
+  provider implements both (`git apply` via a temp patch file, the
+  provider's existing pattern); Mercurial reports unsupported.
+- **Chunk model** — `packages/grist-logic/src/review.ts` parses a file
+  patch into hunks with line-anchored identities (`<file>#<oldStart>`)
+  and reassembles any single hunk as a standalone patch. Accept =
+  `hunkPatch` + apply `cached`; revert = the same patch + apply
+  `reverse`. One artifact, direction carried by the call.
+- **Panel** — the review extension's sidebar gains a Chunks section for
+  the active file (working-tree mode only): per-hunk Accept/Revert and
+  a commit box. Chunks come from a bounded-context (3-line) diff — the
+  panel's own diff is whole-file context by design, which would
+  collapse a file's changes into one hunk.
+
+Open-PR is deliberately not here: it needs repo-remote policy (fork?
+upstream?) that belongs to a later phase; commit on the thread's
+branch (D2) is the terminal action for now.
+
 ## Ephemeral events
 
 Delta events (`session.text.delta`, `session.reasoning.delta`,

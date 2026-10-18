@@ -27,6 +27,7 @@
     "@dnd-kit/solid": "0.5.0",
     "@effect/platform-node": "catalog:",
     "@kobalte/core": "catalog:",
+    "@grist-ai/logic": "workspace:*",
     "@opencode/client": "workspace:*",
     "@opencode/plugin-browser": "workspace:*",
     "@opencode/schema": "workspace:*",

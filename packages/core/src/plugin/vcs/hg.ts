@@ -9,8 +9,8 @@ import { FileStatus, Info, Mode } from "@opencode/schema/vcs"
 import { FSUtil } from "@opencode/util/fs-util"
 import { AppProcess } from "@opencode/util/process"
 import { Location } from "../../location.js"
-import type { Adapter, DiffOptions } from "../../vcs.js"
-import { DiffError } from "../../vcs.js"
+import type { Adapter, ApplyOptions, CommitOptions, DiffOptions } from "../../vcs.js"
+import { DiffError, WriteError } from "../../vcs.js"
 import {
   addPatch,
   chunksByFile,
@@ -56,6 +56,8 @@ export const Plugin = define({
         branches: (input) => adapter.branches({ search: input.search, limit: input.limit }),
         status: () => adapter.status(),
         diff: (input) => adapter.diff(input.mode, { context: input.context, base: input.base }),
+        apply: (input) => adapter.apply({ patch: input.patch, reverse: input.reverse, cached: input.cached }),
+        commit: (input) => adapter.commit({ message: input.message }),
       })
     })
   }),
@@ -145,6 +147,12 @@ function make(
       const ancestor = yield* hg.ancestor()
       if (!ancestor) return []
       return yield* diffAgainst(ancestor, options)
+    }),
+    apply: Effect.fn("VcsHg.apply")(function* (_input: ApplyOptions) {
+      return yield* new WriteError({ message: "The Mercurial provider does not support applying patches" })
+    }),
+    commit: Effect.fn("VcsHg.commit")(function* (_input: CommitOptions) {
+      return yield* new WriteError({ message: "The Mercurial provider does not support committing" })
     }),
   }
 }

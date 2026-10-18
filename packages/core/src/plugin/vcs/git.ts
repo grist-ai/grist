@@ -11,8 +11,8 @@ import { FileDiff } from "@opencode/schema/file-diff"
 import { Base, BranchList, FileStatus, Info, Mode } from "@opencode/schema/vcs"
 import { AppProcess } from "@opencode/util/process"
 import { Location } from "../../location.js"
-import type { Adapter, BranchOptions, DiffOptions } from "../../vcs.js"
-import { DiffError } from "../../vcs.js"
+import type { Adapter, ApplyOptions, BranchOptions, CommitOptions, DiffOptions } from "../../vcs.js"
+import { DiffError, WriteError } from "../../vcs.js"
 import { gitExecutable } from "../../util/git-executable.js"
 import {
   chunksByFile,
@@ -53,6 +53,8 @@ export const Plugin = define({
         branches: (input) => adapter.branches({ search: input.search, limit: input.limit }),
         status: () => adapter.status(),
         diff: (input) => adapter.diff(input.mode, { context: input.context, base: input.base }),
+        apply: (input) => adapter.apply({ patch: input.patch, reverse: input.reverse, cached: input.cached }),
+        commit: (input) => adapter.commit({ message: input.message }),
       })
     })
   }),
@@ -126,6 +128,17 @@ function make(proc: AppProcess.Interface, input: { directory: string; worktree: 
         })
       }
       return yield* diffAgainstRef(ctx, ref, { ...options, target: mode === "committed" ? "HEAD" : undefined })
+    }),
+    apply: Effect.fn("VcsGit.apply")(function* (input: ApplyOptions) {
+      // Patches carry repo-root-relative paths, so apply at the worktree root.
+      yield* ctx.git
+        .applyPatch(ctx.worktree, input.patch, { reverse: input.reverse, cached: input.cached })
+        .pipe(Effect.mapError((error) => new WriteError({ message: error instanceof Error ? error.message : String(error) })))
+    }),
+    commit: Effect.fn("VcsGit.commit")(function* (input: CommitOptions) {
+      return yield* ctx.git
+        .commit(ctx.worktree, input.message)
+        .pipe(Effect.mapError((error) => new WriteError({ message: error instanceof Error ? error.message : String(error) })))
     }),
   } satisfies Adapter
 }
@@ -506,6 +519,55 @@ function makeGit(proc: AppProcess.Interface, env?: Record<string, string>) {
     return { text: result.text(), truncated: result.truncated } satisfies Patch
   })
 
+  const applyPatch = Effect.fn("VcsGit.applyPatch")(function* (
+    cwd: string,
+    patchText: string,
+    options?: { reverse?: boolean; cached?: boolean },
+  ) {
+    const file = path.join(os.tmpdir(), `grist-apply-${randomUUID()}.patch`)
+    yield* Effect.acquireUseRelease(
+      Effect.promise(() => fs.writeFile(file, patchText)),
+      () =>
+        Effect.gen(function* () {
+          const result = yield* proc.run(
+            ChildProcess.make(
+              gitExecutable,
+              [
+                ...cfg,
+                "apply",
+                ...(options?.cached ? ["--cached"] : []),
+                ...(options?.reverse ? ["--reverse"] : []),
+                file,
+              ],
+              { cwd, env, extendEnv: true, stdin: "ignore" },
+            ),
+          )
+          if (result.exitCode !== 0) {
+            const detail = result.stderr.toString("utf8").trim() || result.stdout.toString("utf8").trim()
+            return yield* Effect.fail(new Error(detail || `git apply failed (exit ${result.exitCode})`))
+          }
+        }),
+      () => Effect.promise(() => fs.rm(file, { force: true })),
+    )
+  })
+
+  const commit = Effect.fn("VcsGit.commit")(function* (cwd: string, message: string) {
+    const result = yield* proc.run(
+      ChildProcess.make(gitExecutable, [...cfg, "commit", "-m", message], {
+        cwd,
+        env,
+        extendEnv: true,
+        stdin: "ignore",
+      }),
+    )
+    if (result.exitCode !== 0) {
+      const detail = result.stderr.toString("utf8").trim() || result.stdout.toString("utf8").trim()
+      return yield* Effect.fail(new Error(detail || `git commit failed (exit ${result.exitCode})`))
+    }
+    const head = yield* run(["rev-parse", "HEAD"], { cwd })
+    return { hash: head.text().trim() }
+  })
+
   return {
     branch,
     branches,
@@ -523,6 +585,8 @@ function makeGit(proc: AppProcess.Interface, env?: Record<string, string>) {
     intentToAdd,
     worktreeStats,
     worktreePatch,
+    applyPatch,
+    commit,
   }
 }
 

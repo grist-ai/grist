@@ -98,5 +98,22 @@ export const VcsHandler = HttpApiBuilder.group(Api, "server.vcs", (handlers) =>
           }),
         ),
       )
+      .handle("vcs.apply", (ctx) =>
+        Effect.gen(function* () {
+          const vcs = yield* Vcs.Service
+          yield* vcs
+            .apply({ patch: ctx.payload.patch, reverse: ctx.payload.reverse, cached: ctx.payload.cached })
+            .pipe(Effect.mapError((error) => new InvalidRequestError({ message: error.message, field: "patch" })))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle("vcs.commit", (ctx) =>
+        Effect.gen(function* () {
+          const vcs = yield* Vcs.Service
+          return yield* vcs
+            .commit({ message: ctx.payload.message })
+            .pipe(Effect.mapError((error) => new InvalidRequestError({ message: error.message, field: "message" })))
+        }),
+      )
   }),
 )
