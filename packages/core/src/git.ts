@@ -134,6 +134,7 @@ export interface Interface {
       repository: Repository
       directory: AbsolutePath
       ref?: string
+      newBranch?: string
     }) => Effect.Effect<Repository, WorktreeError>
     readonly remove: (input: {
       repository: Repository
@@ -1247,11 +1248,14 @@ const layer = Layer.effect(
       repository: Repository
       directory: AbsolutePath
       ref?: string
+      newBranch?: string
     }) {
       yield* worktreeRun(
         "create",
         input.repository,
-        ["worktree", "add", "--detach", "--", input.directory, input.ref ?? "HEAD"],
+        input.newBranch
+          ? ["worktree", "add", "-b", input.newBranch, "--", input.directory, input.ref ?? "HEAD"]
+          : ["worktree", "add", "--detach", "--", input.directory, input.ref ?? "HEAD"],
         input.directory,
       )
       const repository = yield* discover(input.directory)

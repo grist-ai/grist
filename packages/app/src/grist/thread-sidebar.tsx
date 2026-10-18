@@ -1,4 +1,10 @@
-import { groupThreadsByProject, summaryFromSessionInfo, threadBadge, type ThreadStatus } from "@grist-ai/logic"
+import {
+  groupThreadsByProject,
+  isWorktreeDirectory,
+  summaryFromSessionInfo,
+  threadBadge,
+  type ThreadStatus,
+} from "@grist-ai/logic"
 import type { SessionInfo } from "@opencode/client/promise"
 import { createMemo, For, Show } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -25,6 +31,8 @@ const STATUS_COLOR: Record<ThreadStatus, string> = {
 export function GristThreadSidebar(props: {
   sessions: SessionInfo[]
   pending?: Record<string, number>
+  /** Directories that are project worktrees (sandboxes); threads running in one get a marker. */
+  worktreeDirs?: readonly string[]
   onOpen?: (sessionID: string) => void
 }) {
   const language = useLanguage()
@@ -84,6 +92,15 @@ export function GristThreadSidebar(props: {
                     >
                       {thread.title ?? language.t("grist.threads.untitled")}
                     </span>
+                    <Show when={isWorktreeDirectory(thread.directory, props.worktreeDirs ?? [])}>
+                      <span
+                        class="rounded-full px-1.5 text-[11px] [line-height:var(--line-height-compact)]"
+                        style={{ background: "var(--v2-background-bg-layer-02, #e5e7eb)", color: "var(--v2-text-text-muted, #6b7280)" }}
+                        title={language.t("grist.threads.worktree")}
+                      >
+                        {language.t("grist.threads.worktree")}
+                      </span>
+                    </Show>
                     <Show when={badge.pendingRequests > 0}>
                       <span
                         class="rounded-full px-1.5 text-[11px] [line-height:var(--line-height-compact)]"

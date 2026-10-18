@@ -1497,6 +1497,7 @@ const EndpointWorktreeCreate = (raw: RawClient["server.worktree"]) => (input: Wo
         projectID: input["projectID"],
         from: input["from"],
         branch: input["branch"],
+        newBranch: input["newBranch"],
         directory: input["directory"],
         name: input["name"],
       },

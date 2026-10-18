@@ -2046,6 +2046,7 @@ export function make(options: ClientOptions) {
               projectID: input["projectID"],
               from: input["from"],
               branch: input["branch"],
+              newBranch: input["newBranch"],
               directory: input["directory"],
               name: input["name"],
             },

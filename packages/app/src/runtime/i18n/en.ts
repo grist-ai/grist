@@ -1084,6 +1084,7 @@ export const dict = {
   "grist.threads.pending": "Waiting for you",
   "grist.threads.unread": "Unread",
   "grist.threads.untitled": "Untitled thread",
+  "grist.threads.worktree": "Worktree",
   "sidebar.gettingStarted.line1": "Grist includes free models so you can start immediately.",
   "app.name.desktop": "Grist Desktop",
   "settings.desktop.wsl.description": "Run the Grist server inside WSL on Windows.",

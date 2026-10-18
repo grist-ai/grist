@@ -61,12 +61,14 @@ describe("worktree creation", () => {
             directory: input.directory,
             project: input.cached ? project : undefined,
             branch: "clone-only",
+            newBranch: "grist/clone-only",
           }),
         ).toBe("/created")
         expect(await requests.find((request) => request.method === "POST")?.json()).toEqual({
           projectID: project.id,
           from: input.canonical,
           branch: "clone-only",
+          newBranch: "grist/clone-only",
         })
         expect(requests.find((request) => request.method === "POST")?.url).toBe("http://localhost:3000/api/worktree")
         expect(

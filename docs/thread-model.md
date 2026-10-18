@@ -57,6 +57,37 @@ project list. Steering needs no new machinery: prompts to a busy
 session deliver through the session inbox as steers (verified live:
 a steer prompt sent mid-run was incorporated by the running session).
 
+## D2 — worktree-per-thread
+
+The runtime's worktree engine (protocol `server.worktree`, core
+`Worktree` service, per-project inventory with strategy ownership) is
+adopted as-is; Grist adds the thread layer in
+`packages/grist-logic/src/worktree.ts`:
+
+- **Auto-named branches.** Upstream creation was detached-HEAD only
+  (the schema's `branch` input is a start ref). `Worktree.CreateInput`
+  gained `newBranch`: the git strategy creates that branch at the start
+  ref and checks it out in the worktree. The new-session flow passes
+  `threadBranchName(...)` — `grist/<prompt-slug>-<short session id>` —
+  so every worktree thread's work is a real, mergeable branch.
+- **Cleanup planning.** `planWorktreeCleanup` marks a worktree stale
+  when every thread that ran in it is archived. Only inventory rows
+  with a recorded strategy (engine-created) can be planned, so cleanup
+  never removes a foreign checkout; orphans require an explicit opt-in
+  (a just-created worktree has no session yet). The v2 client cannot
+  archive sessions yet (the app action is stubbed upstream), so today
+  cleanup runs as an operator tool: `bun script/grist-worktrees.ts`
+  (dry-run plan; `--apply` removes via `git worktree remove`, never
+  forced). When the client archive API lands, the same plan drives the
+  archive action.
+- **Sidebar marker.** Threads whose directory is one of the project's
+  sandboxes get a "Worktree" chip in the D1 sidebar.
+
+Verified live (2026-10-18): two threads in two worktrees edited the
+same file concurrently with no interference; merging one thread's
+branch left the other's worktree intact; cleanup removed only the
+archived thread's worktree.
+
 ## Ephemeral events
 
 Delta events (`session.text.delta`, `session.reasoning.delta`,
