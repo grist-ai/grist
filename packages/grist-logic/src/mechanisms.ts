@@ -4,7 +4,7 @@
  * Per-task set of harness mechanisms, routable via the gate:
  * - ObservationPack — pack large tool outputs
  * - ObservationPack compressor — run exploration in a subagent, return a digest
- * - Action Fusion — prefer edit_verify over edit→bash
+ * - Action Fusion — bundle an edit with its check instead of a separate edit→bash round-trip
  *
  * Profiles mirror SoL-Pi [Efficiency] vs [Performance]:
  * - efficiency — all on (token cuts, incl. exploration compressor)

@@ -444,7 +444,13 @@ describe("gateway HTTP", () => {
     expect(html).toContain("Cookie Policy")
     expect(html).toContain("learns your codebase")
     expect(html).toContain("SoL-Pi")
-    expect(html).toContain("self-improves")
+    expect(html).toContain("context compounds")
+    // Claims guard (2026-10-18 scan fix): v2 has no memory/code-map feature
+    // and no `grist usage` command — the landing must not present them.
+    expect(html).not.toContain("institutional memory")
+    expect(html).not.toContain("grist usage")
+    expect(html).not.toContain("GRIST_MEMORY")
+    expect(html).not.toContain("grist bootstrap")
     expect(html).toContain('aria-label="Grist"')
     expect(html).toContain("M0 6H24V12H6V30H24V36H0V6")
     expect(html).toContain("/favicon.svg")

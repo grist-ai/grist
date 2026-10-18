@@ -81,8 +81,10 @@ const EXPLORATORY = new Set(["grep", "glob", "list", "search", "webfetch", "webs
 const EDIT_TOOLS = new Set(["edit", "write", "apply_patch"])
 
 /**
- * Shell commands that count as verification. `edit_verify` is handled
- * separately because it combines an edit and a check in one tool call.
+ * Shell commands that count as verification. The legacy v1 `edit_verify`
+ * tool name is handled separately in the history scan (it combined an edit
+ * and a check in one tool call); no such tool is registered in v2, and no
+ * agent-facing text may reference it.
  */
 const VERIFY_COMMAND =
   /\b(bun\s+(test|typecheck)|bun\s+run\s+[^\s;&|]*(test|lint|typecheck|check|build)|tsc\b|vitest|jest|pytest|cargo\s+test|go\s+test|npm\s+(test|run\s+[^\s;&|]*(test|lint|typecheck|check|build))|yarn\s+(test|run\s+\S+)|pnpm\s+(test|run\s+\S+)|eslint|ruff|biome|oxlint|make\s+test)\b/i
@@ -538,7 +540,7 @@ export function shadowVerify(input: {
       provider: "shadow",
       reasons: ["sensitive_edit"],
       message:
-        "[grist:verify] Sensitive edit — run a focused check (typecheck/tests) or use edit_verify for the next change before claiming done.",
+        "[grist:verify] Sensitive edit — run a focused check (typecheck/tests) before claiming done.",
       latencyMs: Date.now() - started,
     }
   }
@@ -548,7 +550,7 @@ export function shadowVerify(input: {
       provider: "shadow",
       reasons: ["post_edit_nudge"],
       message:
-        "[grist:verify] Prefer a quick verify (bun typecheck / targeted test) or edit_verify on the next related change.",
+        "[grist:verify] Prefer a quick verify (bun typecheck / targeted test) on the next related change.",
       latencyMs: Date.now() - started,
     }
   }
@@ -602,9 +604,9 @@ export async function decideVerify(input: {
         choice === "nudge" || choice === "require" || choice === "skip" ? choice : "nudge"
       const message =
         action === "require"
-          ? "[grist:verify] Verification required — run a focused check or use edit_verify before claiming done."
+          ? "[grist:verify] Verification required — run a focused check before claiming done."
           : action === "nudge"
-            ? "[grist:verify] Prefer a quick verify or edit_verify on the next related change."
+            ? "[grist:verify] Prefer a quick verify on the next related change."
             : undefined
       const decision: VerifyDecision = {
         action,
@@ -660,7 +662,7 @@ export function shadowToolBudget(input: {
       provider: "shadow",
       reasons: ["explore_cap"],
       count: input.exploratory,
-      message: `[grist:ctrl] Exploratory tool budget reached (${input.exploratory}/${input.cap}). Stop searching — edit the known target files or use edit_verify.`,
+      message: `[grist:ctrl] Exploratory tool budget reached (${input.exploratory}/${input.cap}). Stop searching — edit the known target files.`,
       latencyMs: Date.now() - started,
     }
   }
@@ -747,7 +749,7 @@ export async function decideToolBudget(input: {
           reasons: ["jev_enough_explore"],
           count: control.exploratory,
           message:
-            "[grist:ctrl] Exploration looks sufficient — edit the target files (prefer edit_verify) instead of more search.",
+            "[grist:ctrl] Exploration looks sufficient — edit the target files instead of more search.",
           latencyMs: Date.now() - started,
         }
         gristLog(`[grist:ctrl:budget] block via jev · ${input.toolID} · n=${control.exploratory}`)

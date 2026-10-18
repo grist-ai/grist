@@ -1,5 +1,11 @@
 # Memory (Phase 5)
 
+> **Status (2026-10-18):** the implementation described below is the
+> **v1 tree** (`packages/opencode/src/grist/memory/`, branch
+> `v1-archive`). Verified-outcome memory is **not in v2 `main`** yet —
+> the port is pending, and no v2 surface (CLI, plugin, doctrine, site)
+> may present memory as a current feature until it lands.
+
 Verified-outcomes-only institutional memory (pre-POC §6).
 
 ## Is Supermemory open source?

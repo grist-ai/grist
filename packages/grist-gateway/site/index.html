@@ -6,7 +6,7 @@
     <title>Grist — a complete coding-agent harness</title>
     <meta
       name="description"
-      content="Grist is a complete coding-agent harness: confidence-gated model routing, institutional memory, and BYOK economics. Open to everyone."
+      content="Grist is a complete coding-agent harness: confidence-gated model routing, specialist subagents, and BYOK economics. Open to everyone."
     />
     <link rel="canonical" href="https://grist.lol/" />
     <script type="application/ld+json">
@@ -17,7 +17,7 @@
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "macOS, Linux, Windows",
         "url": "https://grist.lol/",
-        "description": "Grist is a complete coding-agent harness: confidence-gated model routing, institutional memory, and BYOK economics. Open to everyone.",
+        "description": "Grist is a complete coding-agent harness: confidence-gated model routing, specialist subagents, and BYOK economics. Open to everyone.",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "author": { "@type": "Organization", "name": "Grist", "url": "https://grist.lol/" }
       }
@@ -79,10 +79,10 @@
           <p class="eyebrow">[ coding-agent harness ]</p>
           <h1>A complete coding-agent<br />harness.</h1>
           <p class="lede">
-            Confidence-gated model routing, institutional memory, and BYOK
+            Confidence-gated model routing, specialist subagents, and BYOK
             economics. Grist writes and edits code in your working tree —
-            every task routed to the cheapest capable rung, every verified
-            change remembered, inference billed to your own provider key.
+            every task routed to the cheapest capable rung, inference
+            billed to your own provider key.
           </p>
           <div class="hero-install">
             <div class="diagram-bar">
@@ -246,19 +246,20 @@ grist</pre>
             </g>
             <g class="fig-loop-n fig-loop-n4">
               <rect class="fig-card" x="28" y="216" width="120" height="56" rx="4" />
-              <text class="fig-label" x="88" y="240" text-anchor="middle">MEMORY</text>
-              <text class="fig-cap" x="88" y="256" text-anchor="middle">corpus</text>
+              <text class="fig-label" x="88" y="240" text-anchor="middle">CONTEXT</text>
+              <text class="fig-cap" x="88" y="256" text-anchor="middle">warm</text>
             </g>
             <text class="fig-loop-core" x="220" y="156" text-anchor="middle">cheaper · faster · right</text>
           </svg>
         </figure>
         <div>
-          <p class="eyebrow">[ self-improves ]</p>
-          <h2>Every verified win makes the next task sharper.</h2>
+          <p class="eyebrow">[ context compounds ]</p>
+          <h2>Context compounds while the work runs.</h2>
           <p class="lede">
-            Grist only remembers what you approved or what tests proved. The
-            gate calibrates to your repo. Unreviewed noise never becomes
-            knowledge.
+            Repeat subagent calls resume warm instead of starting cold, and
+            the gate dials effort from what it has seen in the session.
+            Verified-outcome memory across sessions is on the roadmap — it
+            is not in the current release.
           </p>
         </div>
       </section>
@@ -269,7 +270,7 @@ grist</pre>
           <h2>Same quality. Fewer tokens. That’s SoL-Pi.</h2>
           <p class="lede">
             SoL-Pi sits in the harness, not in a cheaper model. Huge tool
-            output gets packed. Edit and verify fuse into one move. Spend goes
+            output gets packed. An edit runs its check in the same move. Spend goes
             to judgment, not log spam.
           </p>
           <div class="pair">
@@ -417,8 +418,8 @@ grist</pre>
           </li>
           <li>
             <span class="arch-n">6</span>
-            <h3>Memory compounds</h3>
-            <p>Approved diffs and proven changes become memory — code map, ownership, Supermemory. The next run starts briefed.</p>
+            <h3>Memory compounds (roadmap)</h3>
+            <p>Verified-outcome team memory — code map, ownership, verified diffs — shipped in v1 and is being ported to v2. It is not in the current release.</p>
           </li>
           <li>
             <span class="arch-n">7</span>
@@ -570,14 +571,11 @@ grist auth login --provider grist --api-key grist_sk_…</pre>
         <h2 id="repo">Start in a repo</h2>
         <p>Run Grist in the project you want changed. Tools execute on your machine.</p>
         <pre>cd /path/to/your-repo
-grist init
-grist bootstrap
-grist</pre>
+grist run "Add a retry with backoff to the webhook sender, with tests."</pre>
         <p>
-          <code>grist init</code> scaffolds local state. <code>grist bootstrap</code>
-          mines history (ownership, map) so the next session is not cold.
-          Review <code>.grist/bootstrap/ownership.jsonl</code> before anything
-          is persisted to memory. <code>grist init --bootstrap</code> runs both.
+          There is no setup step inside the repo: sign in once with
+          <code>grist auth login --provider grist</code>, then run from the
+          checkout — the run inherits the working directory.
         </p>
 
         <h2 id="the-gate">The gate</h2>
@@ -611,22 +609,21 @@ grist</pre>
           session; <code>GRIST_WARM_SUBAGENTS=0</code> to disable).
         </p>
 
-        <h2 id="memory">Memory</h2>
+        <h2 id="memory">Memory (roadmap)</h2>
         <p>
-          Grist persists only verified outcomes: tests that passed, a change you
-          approved, or a correction you made. Unreviewed generations are not
-          stored. Recall is retrieval from your own history — not a weight update.
-        </p>
-        <p>
-          Default backend is a local memory sidecar. File fallback:
-          <code>GRIST_MEMORY=file</code>. Off: <code>GRIST_MEMORY=off</code>.
+          Verified-outcome memory — persisting only what tests passed, you
+          approved, or you corrected, and recalling it in later sessions —
+          shipped in Grist v1 and is being ported to v2. It is
+          <strong>not in the current release</strong>: v2 sessions do not
+          persist or recall memory between runs.
         </p>
 
         <h2 id="sol-pi">SoL-Pi</h2>
         <p>
           SoL-Pi is a harness-layer set of token cuts. ObservationPack replaces
           huge tool output with a handle plus a short excerpt (full text still
-          on disk). Action Fusion edits and verifies in one call. Profiles:
+          on disk). Action Fusion runs an edit's check in the same step as the
+          edit. Profiles:
         </p>
         <pre>GRIST_MECH=auto          # default
 GRIST_MECH=efficiency    # pack + fuse
@@ -641,8 +638,8 @@ GRIST_OBS_PACK=off       # pack only</pre>
           prices, with zero markup from us. Attach one key, and prefer an AI
           gateway key: it reaches every model on every rung, while a direct
           provider key limits all rungs to that provider's models.
-          <code>grist usage</code> and the
-          dashboard show spend broken down by rung, so you can see exactly
+          The dashboard and <code>GET /v1/usage</code>
+          show spend broken down by rung, so you can see exactly
           where the money went.
         </p>
         <p>
@@ -834,20 +831,22 @@ grist run "write fib.py printing the first 10 fibonacci numbers, run it, and sho
         </p>
         <pre>export GRIST_GATEWAY_URL=https://grist.lol
 export GRIST_API_KEY   # injected from the vault — do not echo it
-grist usage            # confirms auth without printing the key</pre>
+curl -s -H "X-Grist-Api-Key: $GRIST_API_KEY" "$GRIST_GATEWAY_URL/v1/usage"  # 200 = key is good; never prints the key</pre>
         <p>
           Mint the key on the <a href="/dashboard/api">API keys</a> tab. Store it
           in the vault the agent already uses. If <code>grist</code> is missing
-          or <code>grist usage</code> fails, the agent stops and tells you.
+          or the <code>/v1/usage</code> check fails, the agent stops and tells you.
         </p>
 
         <h2 id="invoke">How to invoke</h2>
         <p>
-          Headless, one shot, JSON on stdout. Point <code>--dir</code> at the
-          git checkout. <code>--auto</code> is required so tool permissions are
-          not rejected.
+          Headless, one shot, JSON on stdout. <code>cd</code> into the git
+          checkout first — there is no <code>--dir</code> flag; the run
+          inherits the working directory. <code>--auto</code> is required so
+          tool permissions are not rejected.
         </p>
-        <pre>grist run --format json --auto --dir /path/to/repo "Precise task: what to change, where, and how to verify."</pre>
+        <pre>cd /path/to/repo
+grist run --format json --auto "Precise task: what to change, where, and how to verify." &lt; /dev/null</pre>
         <p>Each stdout line is one JSON event:</p>
         <ul>
           <li><code>sessionID</code> — capture this from the first event</li>
@@ -857,8 +856,8 @@ grist usage            # confirms auth without printing the key</pre>
           <li>process exit — Grist is done; inspect the tree (<code>git status</code>, <code>git diff</code>)</li>
         </ul>
         <p>Resume the same session:</p>
-        <pre>grist run --format json --auto --dir /path/to/repo -c "Continue: address the test failure in …"
-grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: …"</pre>
+        <pre>grist run --format json --auto -c "Continue: address the test failure in …" &lt; /dev/null
+grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</pre>
         <p>
           Do not use the interactive TUI. On a headless VM, set
           <code>GRIST_API_KEY</code> (or run
@@ -889,7 +888,7 @@ grist run --format json --auto --dir /path/to/repo -s "$SESSION_ID" "Continue: �
           <li>What changed (files and behavior)</li>
           <li>The branch name</li>
           <li>Test results</li>
-          <li>Roughly what it cost (<code>grist usage</code> before and after, or remaining USD)</li>
+          <li>Roughly what it cost (<code>/v1/usage</code> before and after, or remaining USD)</li>
         </ul>
       </article>
     </main>

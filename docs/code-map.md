@@ -1,5 +1,13 @@
 # Code map bake-off (Phase 4)
 
+> **Status (2026-10-18):** bake-off **completed 2026-09-23** on Prosh —
+> Graphify locked (see `~/workspace/grist-work/codegraph-bakeoff/results.md`
+> in the founder workspace). The implementation described below is the
+> **v1 tree** (`packages/opencode/src/grist/code-map/`, branch
+> `v1-archive`); the code map is **not in v2 `main`** yet — the port is
+> pending, and the v2 control plane's code-map context ranking is
+> explicitly deferred until it lands.
+
 Lock the knowledge-layer code map by measuring **Graphify** vs
 **code-review-graph (CRG)** on Prosh (pre-POC §6 / §9).
 
