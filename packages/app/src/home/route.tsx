@@ -9,6 +9,8 @@ import { createHomeScrollController } from "./scroll"
 import { createHomeSessionSearchController } from "./sessions/search"
 import { createHomeSessionsController } from "./sessions/controller"
 import { HomeSessions } from "./sessions/region"
+import { GristCodeMapCard } from "@/grist/code-map-card"
+import { GristMemoryBrowser } from "@/grist/memory-browser"
 import { GristReviewQueue } from "@/grist/review-queue"
 import { GristThreadSidebar } from "@/grist/thread-sidebar"
 
@@ -21,6 +23,13 @@ export function Home() {
   const scroll = createHomeScrollController(sessions.data.groups)
   const threadSessions = createMemo(() => sessions.data.groups().flatMap((group) => group.sessions.map((record) => record.session)))
   const threadWorktreeDirs = createMemo(() => [...new Set(sessions.data.records().flatMap((record) => record.project.sandboxes ?? []))])
+  // D5 surfaces scope: the most recently active thread's project directory.
+  const gristSurface = createMemo(() => {
+    const latest = threadSessions().toSorted((a, b) => b.time.updated - a.time.updated)[0]
+    if (!latest) return undefined
+    const directory = latest.location.directory
+    return { directory, label: directory.split("/").filter(Boolean).at(-1) ?? directory }
+  })
   const openThread = (sessionID: string) => {
     const session = threadSessions().find((candidate) => candidate.id === sessionID)
     if (session) sessions.session.open(session)
@@ -57,6 +66,8 @@ export function Home() {
               <HomeProjects projects={projects} scroll={scroll} />
               <GristThreadSidebar sessions={threadSessions()} worktreeDirs={threadWorktreeDirs()} onOpen={openThread} />
               <GristReviewQueue sessions={threadSessions()} onOpen={openThread} />
+              <GristMemoryBrowser directory={gristSurface()?.directory} label={gristSurface()?.label} />
+              <GristCodeMapCard directory={gristSurface()?.directory} label={gristSurface()?.label} />
             </div>
           </Show>
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />

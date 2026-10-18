@@ -160,3 +160,19 @@ export function rankContextNodes(graph: LoadedGraph, ids: string[]): string[] {
     .toSorted((a, b) => b.degree - a.degree || a.index - b.index)
     .map((row) => row.id)
 }
+
+export type GraphSummary = {
+  nodes: number
+  edges: number
+  /** Most-connected nodes first — the map's landmarks. */
+  top: { id: string; label: string; degree: number }[]
+}
+
+/** Whole-graph summary for the D5 code-map panel: counts + landmark nodes. */
+export function summarizeGraph(graph: LoadedGraph, limit = 8): GraphSummary {
+  const top = [...graph.nodes.values()]
+    .map((node) => ({ id: node.id, label: node.label, degree: graph.adj.get(node.id)?.size ?? 0 }))
+    .toSorted((a, b) => b.degree - a.degree || a.label.localeCompare(b.label))
+    .slice(0, limit)
+  return { nodes: graph.nodes.size, edges: graph.edges.length, top }
+}

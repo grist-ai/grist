@@ -1,4 +1,5 @@
 import {
+  formatThreadCost,
   groupThreadsByProject,
   isWorktreeDirectory,
   summaryFromSessionInfo,
@@ -108,6 +109,14 @@ export function GristThreadSidebar(props: {
                         title={language.t("grist.threads.pending")}
                       >
                         {badge.pendingRequests}
+                      </span>
+                    </Show>
+                    <Show when={thread.totalCost > 0}>
+                      <span
+                        class="text-[11px] [line-height:var(--line-height-compact)] text-v2-text-text-muted"
+                        title={language.t("grist.threads.cost")}
+                      >
+                        {formatThreadCost(thread.totalCost)}
                       </span>
                     </Show>
                   </button>

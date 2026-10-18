@@ -107,5 +107,16 @@ export function createFileStore(input?: {
         outcome: row.r.outcome,
       }))
     },
+    async list(): Promise<MemoryRecord[]> {
+      const shape = await load()
+      return [...shape.records].toSorted((a, b) => b.createdAt - a.createdAt)
+    },
+    async forget(id: string): Promise<boolean> {
+      const shape = await load()
+      const next = shape.records.filter((r) => r.id !== id)
+      if (next.length === shape.records.length) return false
+      await save({ records: next })
+      return true
+    },
   }
 }

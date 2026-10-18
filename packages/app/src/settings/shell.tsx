@@ -65,11 +65,12 @@ const rootClientTabs = [
   { value: "shortcuts", icon: pageIcons.shortcuts, label: "settings.tab.shortcuts" },
 ] as const
 
+// Grist (D5 settings pass): no Providers or Models tabs — the Jev gate
+// picks the model, and sign-in is the Grist account on the Account tab.
+// The pages stay routed for deep links and BYOK plumbing.
 const serverTabs = [
   { value: "projects", icon: pageIcons.projects, label: "settings.tab.projects" },
   { value: "workspaces", icon: pageIcons.workspaces, label: "settings.tab.workspaces" },
-  { value: "providers", icon: pageIcons.providers, label: "settings.providers.title" },
-  { value: "models", icon: pageIcons.models, label: "settings.models.title" },
   { value: "extensions", icon: pageIcons.extensions, label: "settings.tab.extensions" },
 ] as const
 

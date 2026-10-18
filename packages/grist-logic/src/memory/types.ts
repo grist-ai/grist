@@ -50,4 +50,8 @@ export interface MemoryStore {
   remember(input: RememberInput): Promise<MemoryRecord | undefined>
   recall(input: RecallInput): Promise<MemoryHit[]>
   status(): Promise<{ available: boolean; backend: string; detail: string }>
+  /** All records, newest first (D5 memory browser). Optional: remote backends may not offer it. */
+  list?(): Promise<MemoryRecord[]>
+  /** Remove one record by id; true when it existed (D5 "forget this"). */
+  forget?(id: string): Promise<boolean>
 }
