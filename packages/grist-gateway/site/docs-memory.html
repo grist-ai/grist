@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verified-outcome memory — Grist docs</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap nav-in">
+<a class="mark" href="/" aria-label="Grist">
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H141V36H135V12H120V6Z" />
+          </g>
+        </svg>
+      </a>
+<nav class="nav-links">
+  <a href="/#concepts">Concepts</a>
+  <a href="/docs">Docs</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
+  <a class="btn ghost" href="/login">Sign in</a>
+  <a class="btn accent" href="/#get-started">Get started</a>
+</nav>
+</div></header>
+<div class="wrap docs-layout">
+    <aside class="docs-side">
+    <a href="/docs">Docs home</a>
+    <b>[ start ]</b>
+    <a href="/docs/quickstart">Quickstart</a>
+    <b>[ concepts ]</b>
+    <a href="/docs/concepts">Concepts overview</a>
+    <a href="/docs/gate">The Jev gate</a>
+    <a href="/docs/ladder">The ladder</a>
+    <a href="/docs/specialists">Specialists</a>
+    <a href="/docs/solpi">SoL-Pi</a>
+    <a href="/docs/memory" class="on">Verified memory</a>
+    <a href="/docs/dreaming">Dreaming & calibration</a>
+    <a href="/docs/codemap">Code map</a>
+    <b>[ guides ]</b>
+    <a href="/docs/gateway">Gateway & keys</a>
+    <a href="/docs/cli">CLI reference</a>
+    <a href="/docs/desktop">Desktop</a>
+    <a href="/docs/enterprise">Enterprise</a>
+    <a href="/docs/skills">Skills</a>
+    <b>[ more ]</b>
+    <a href="/docs/releases">Release notes</a>
+    <a href="/docs/faq">FAQ</a>
+    </aside>
+  <main class="prose">
+<p class="kicker">[ docs &middot; concepts ]</p>
+<h1>Verified-outcome memory</h1>
+<p class="lede">Grist remembers &mdash; but only what was proven. A lesson enters memory when its outcome is verified: the tests passed, you approved the work, or you corrected it. Everything else is forgotten on purpose.</p>
+<h2>Why verified only</h2>
+<p>An agent that remembers everything remembers its mistakes with the same confidence as its wins, and poisons future sessions with confident nonsense. Grist's rule is stricter: <strong>memory is a record of verified outcomes, not a transcript.</strong> What a session merely <em>claimed</em> is never stored. What it <em>proved</em> is.</p>
+<figure class="diagram">
+  <svg viewBox="0 0 760 190" role="img" aria-label="The memory loop: a run produces an outcome, verification admits it to memory, memory briefs the next run; failed checks are mined into cautionary memories">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c7431a"/></marker></defs>
+    <g font-family="ui-monospace, monospace" font-size="12.5" fill="#17120e">
+      <rect x="10" y="60" width="120" height="52" rx="9" fill="#fff" stroke="#d9cec2"/><text x="36" y="91">A run</text>
+      <rect x="190" y="60" width="140" height="52" rx="9" fill="#fdeee7" stroke="#ec5b2b"/><text x="212" y="91">Verified?</text>
+      <rect x="390" y="60" width="130" height="52" rx="9" fill="#fff" stroke="#d9cec2"/><text x="416" y="91">Memory</text>
+      <rect x="580" y="60" width="150" height="52" rx="9" fill="#fff" stroke="#d9cec2"/><text x="600" y="91">Next run,</text><text x="600" y="108" fill="#857a6f" font-size="10.5">briefed</text>
+      <path d="M130 86 H182 M330 86 H382 M520 86 H572" stroke="#c7431a" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <path d="M260 112 V150 H70 V120" stroke="#c7431a" stroke-width="1.5" fill="none" marker-end="url(#arr2)"/>
+      <text x="330" y="168" fill="#857a6f" font-size="10.5">unverified work is not stored</text>
+    </g>
+  </svg>
+  <figcaption>admission is the whole trick: proof in, everything else out</figcaption>
+</figure>
+<h2>The outcome kinds</h2>
+<table>
+  <tr><th>Outcome</th><th>Meaning</th></tr>
+  <tr><td><code>tests_passed</code></td><td>The change was verified by the project's own checks.</td></tr>
+  <tr><td><code>user_approved</code></td><td>You reviewed the work and approved it.</td></tr>
+  <tr><td><code>user_corrected</code></td><td>You fixed the agent's work &mdash; the correction itself is the lesson, and it's weighted heavily.</td></tr>
+  <tr><td><code>check_failed</code></td><td>A cautionary record: this approach failed its check, so the next run doesn't repeat it.</td></tr>
+</table>
+<h2>How it behaves</h2>
+<ul>
+  <li><strong>Failures are mined, not just logged.</strong> Repeated failure signatures and terminal check failures are distilled into cautionary memories automatically.</li>
+  <li><strong>Recall is scoped.</strong> A session is briefed from its project's memory &mdash; your repos don't leak lessons into each other.</li>
+  <li><strong>Memories decay.</strong> Older, weaker records fade unless re-verified; fresh proof outweighs stale habit.</li>
+  <li><strong>Curated mechanically.</strong> The <a href="/docs/dreaming">Dreaming</a> pass merges duplicates, archives the stale, and retires traps that newer successes have disproven. There is no human curation queue &mdash; the policy is mechanical, and every change lands in a Git-auditable memory repo, so a person can audit the trail after the fact.</li>
+  <li><strong>A restricted tier is walled off.</strong> Records marked restricted are never auto-curated, merged, or archived &mdash; the curation loop cannot touch them.</li>
+</ul>
+<h2>Where it lives</h2>
+<p>By default, memory is a file in the project (<code>.grist/memory.json</code>) &mdash; plain JSON you can read, diff, and commit. Teams can run the shared store so a whole team's verified outcomes brief every member's sessions. The desktop app ships a memory browser: search what Grist remembers about a project, and forget any record with one click.</p>
+<div class="callout"><p>Memory never updates model weights. It is retrieval plus feedback &mdash; which is exactly why you can inspect it, correct it, and delete it.</p></div>
+    <nav class="pager"><a href="/docs/solpi">&larr; SoL-Pi</a><a href="/docs/dreaming">Dreaming & calibration &rarr;</a></nav>
+  </main>
+</div>
+<footer><div class="wrap foot">
+  <nav><b>product</b><a href="/#concepts">Concepts</a><a href="/docs">Docs</a><a href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a><a href="https://github.com/grist-ai/grist">GitHub</a></nav>
+  <nav><b>docs</b><a href="/docs/quickstart">Quickstart</a><a href="/docs/gate">The Jev gate</a><a href="/docs/memory">Verified memory</a><a href="/docs/cli">CLI reference</a></nav>
+  <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
+  <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
+</div></footer>
+<script src="/site.js" defer></script>
+</body>
+</html>

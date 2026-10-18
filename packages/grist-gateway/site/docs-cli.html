@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLI reference — Grist docs</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap nav-in">
+<a class="mark" href="/" aria-label="Grist">
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H141V36H135V12H120V6Z" />
+          </g>
+        </svg>
+      </a>
+<nav class="nav-links">
+  <a href="/#concepts">Concepts</a>
+  <a href="/docs">Docs</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
+  <a class="btn ghost" href="/login">Sign in</a>
+  <a class="btn accent" href="/#get-started">Get started</a>
+</nav>
+</div></header>
+<div class="wrap docs-layout">
+    <aside class="docs-side">
+    <a href="/docs">Docs home</a>
+    <b>[ start ]</b>
+    <a href="/docs/quickstart">Quickstart</a>
+    <b>[ concepts ]</b>
+    <a href="/docs/concepts">Concepts overview</a>
+    <a href="/docs/gate">The Jev gate</a>
+    <a href="/docs/ladder">The ladder</a>
+    <a href="/docs/specialists">Specialists</a>
+    <a href="/docs/solpi">SoL-Pi</a>
+    <a href="/docs/memory">Verified memory</a>
+    <a href="/docs/dreaming">Dreaming & calibration</a>
+    <a href="/docs/codemap">Code map</a>
+    <b>[ guides ]</b>
+    <a href="/docs/gateway">Gateway & keys</a>
+    <a href="/docs/cli" class="on">CLI reference</a>
+    <a href="/docs/desktop">Desktop</a>
+    <a href="/docs/enterprise">Enterprise</a>
+    <a href="/docs/skills">Skills</a>
+    <b>[ more ]</b>
+    <a href="/docs/releases">Release notes</a>
+    <a href="/docs/faq">FAQ</a>
+    </aside>
+  <main class="prose">
+<p class="kicker">[ docs &middot; guides ]</p>
+<h1>CLI reference</h1>
+<p class="lede">The whole surface is small: one interactive session, one headless runner, and a handful of supporting commands. This page is all of them.</p>
+<h2>Commands</h2>
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td><code>grist</code></td><td>Open the interactive TUI in the current directory.</td></tr>
+  <tr><td><code>grist run</code></td><td>Run a task headlessly and print the result &mdash; the scripting and agent-delegation entry point.</td></tr>
+  <tr><td><code>grist auth login</code></td><td>Sign in to your Grist account, or paste an API key, and attach provider keys.</td></tr>
+  <tr><td><code>grist doctor</code></td><td>No-spend health check: sign-in, gateway reachability, and gate mode.</td></tr>
+  <tr><td><code>grist upgrade</code></td><td>Update the CLI to the latest release. <code>grist update</code> works too &mdash; same command.</td></tr>
+  <tr><td><code>grist models</code></td><td>Show the ladder: the rungs and the model currently behind each one.</td></tr>
+  <tr><td><code>grist stats</code></td><td>Session and spend statistics for work done through your account.</td></tr>
+  <tr><td><code>grist session</code></td><td>List and inspect past sessions, so you can pick one up again.</td></tr>
+  <tr><td><code>grist mcp</code></td><td>Manage the MCP servers Grist can call as tools.</td></tr>
+  <tr><td><code>grist debug</code></td><td>Print diagnostic detail &mdash; config, paths, and environment &mdash; for support and debugging.</td></tr>
+  <tr><td><code>grist serve --service</code></td><td>Run Grist as a managed background service. The TUI and <code>grist run</code> talk to it when one is elected.</td></tr>
+</table>
+<h2><code>grist run</code> flags</h2>
+<table>
+  <tr><th>Flag</th><th>Effect</th></tr>
+  <tr><td><code>-m grist/&lt;rung&gt;</code></td><td>Pin a rung for this run &mdash; <code>grist/cheapest</code>, <code>grist/medium</code>, <code>grist/frontier</code>, or <code>grist/premium</code>. The default is to let <a href="/docs/gate">the gate</a> decide, and that default is usually right.</td></tr>
+  <tr><td><code>--format json</code></td><td>Emit machine-readable output, including the session id &mdash; what scripts and delegating agents parse.</td></tr>
+  <tr><td><code>--session &lt;id&gt;</code></td><td>Resume an existing session instead of starting a new one.</td></tr>
+</table>
+<h2>Resuming work</h2>
+<p>There is deliberately no <code>grist resume</code> command. A session already knows where it lives: resume it with <code>grist run --session &lt;id&gt; "next instruction"</code> and it restores its own directory and history. Find ids with <code>grist session</code>, or read them from <code>--format json</code> output at creation time.</p>
+<div class="callout"><p>When something looks wrong, run <code>grist doctor</code> first. It spends nothing, and it separates the three failure classes that matter &mdash; sign-in, gateway reachability, and gate mode &mdash; in one pass.</p></div>
+    
+<h2>Environment knobs</h2>
+<p>The harness reads a handful of environment variables. The defaults are the product &mdash; reach for these only when you mean it:</p>
+<table>
+<tr><th>Variable</th><th>What it does</th></tr>
+<tr><td><code>GRIST_GATE=off</code></td><td>Turns the Jev gate off (not recommended) &mdash; runs pass through unrouted.</td></tr>
+<tr><td><code>GRIST_EFFORT=low|standard|high</code></td><td>Pins the effort dial instead of letting the gate dial it per task.</td></tr>
+<tr><td><code>GRIST_MECH=auto|efficiency|performance|off</code></td><td>SoL-Pi mechanism profile. <em>efficiency</em> turns every token cut on; <em>performance</em> keeps full tool output with fusion still on; <em>off</em> disables both.</td></tr>
+<tr><td><code>GRIST_WARM_SUBAGENTS=0</code></td><td>Disables warm subagent resume &mdash; repeat specialist calls start cold.</td></tr>
+<tr><td><code>GRIST_API_KEY</code></td><td>Supplies a <code>grist_sk_</code> key without an interactive login (the headless path for agents on a VM).</td></tr>
+<tr><td><code>GRIST_GATEWAY_URL</code></td><td>Points the CLI at a gateway other than <code>https://grist.lol</code>.</td></tr>
+</table>
+<nav class="pager"><a href="/docs/gateway">&larr; Gateway & keys</a><a href="/docs/desktop">Desktop &rarr;</a></nav>
+  </main>
+</div>
+<footer><div class="wrap foot">
+  <nav><b>product</b><a href="/#concepts">Concepts</a><a href="/docs">Docs</a><a href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a><a href="https://github.com/grist-ai/grist">GitHub</a></nav>
+  <nav><b>docs</b><a href="/docs/quickstart">Quickstart</a><a href="/docs/gate">The Jev gate</a><a href="/docs/memory">Verified memory</a><a href="/docs/cli">CLI reference</a></nav>
+  <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
+  <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
+</div></footer>
+<script src="/site.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dreaming & calibration — Grist docs</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap nav-in">
+<a class="mark" href="/" aria-label="Grist">
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H141V36H135V12H120V6Z" />
+          </g>
+        </svg>
+      </a>
+<nav class="nav-links">
+  <a href="/#concepts">Concepts</a>
+  <a href="/docs">Docs</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
+  <a class="btn ghost" href="/login">Sign in</a>
+  <a class="btn accent" href="/#get-started">Get started</a>
+</nav>
+</div></header>
+<div class="wrap docs-layout">
+    <aside class="docs-side">
+    <a href="/docs">Docs home</a>
+    <b>[ start ]</b>
+    <a href="/docs/quickstart">Quickstart</a>
+    <b>[ concepts ]</b>
+    <a href="/docs/concepts">Concepts overview</a>
+    <a href="/docs/gate">The Jev gate</a>
+    <a href="/docs/ladder">The ladder</a>
+    <a href="/docs/specialists">Specialists</a>
+    <a href="/docs/solpi">SoL-Pi</a>
+    <a href="/docs/memory">Verified memory</a>
+    <a href="/docs/dreaming" class="on">Dreaming & calibration</a>
+    <a href="/docs/codemap">Code map</a>
+    <b>[ guides ]</b>
+    <a href="/docs/gateway">Gateway & keys</a>
+    <a href="/docs/cli">CLI reference</a>
+    <a href="/docs/desktop">Desktop</a>
+    <a href="/docs/enterprise">Enterprise</a>
+    <a href="/docs/skills">Skills</a>
+    <b>[ more ]</b>
+    <a href="/docs/releases">Release notes</a>
+    <a href="/docs/faq">FAQ</a>
+    </aside>
+  <main class="prose">
+<p class="kicker">[ docs &middot; concepts ]</p>
+<h1>Dreaming &amp; calibration</h1>
+<p class="lede">Memory that is never cleaned becomes a junk drawer. Dreaming is the nightly loop that curates Grist's verified memory &mdash; mechanically, in the open &mdash; and calibration is its sibling loop for the gate's thresholds.</p>
+<h2>Dreaming: curation without a curator</h2>
+<p>There is no human curation queue, and no person approves edits one by one. The policy is mechanical and runs on a schedule. Every change Dreaming makes is a Git commit to the memory repo, authored by the Dreaming identity &mdash; so a human doesn't gate the trail, they <em>audit</em> it after the fact, commit by commit.</p>
+<figure class="diagram">
+  <svg viewBox="0 0 760 190" role="img" aria-label="The Dreaming cycle: verified memory is curated overnight into cleaner memory, which briefs the next run better; a side box shows calibration adjusting gate thresholds from joined outcomes">
+    <defs><marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c7431a"/></marker></defs>
+    <g font-family="ui-monospace, monospace" font-size="12.5" fill="#17120e">
+      <rect x="10" y="40" width="140" height="52" rx="9" fill="#fff" stroke="#d9cec2"/><text x="30" y="63">Verified</text><text x="30" y="80">memory</text>
+      <rect x="210" y="40" width="130" height="52" rx="9" fill="#fdeee7" stroke="#ec5b2b"/><text x="232" y="63">Dreaming</text><text x="232" y="80" fill="#857a6f" font-size="10.5">nightly pass</text>
+      <rect x="400" y="40" width="140" height="52" rx="9" fill="#fff" stroke="#d9cec2"/><text x="420" y="63">Curated</text><text x="420" y="80">memory</text>
+      <path d="M150 66 H202 M340 66 H392" stroke="#c7431a" stroke-width="1.5" marker-end="url(#arrD)"/>
+      <path d="M470 92 V128 H80 V100" stroke="#c7431a" stroke-width="1.5" fill="none" marker-end="url(#arrD)"/>
+      <text x="200" y="146" fill="#857a6f" font-size="10.5">better recall briefs the next run &mdash; which writes better memory</text>
+      <rect x="580" y="40" width="170" height="110" rx="9" fill="#fff" stroke="#d9cec2"/><text x="598" y="63">Calibration</text><text x="598" y="84" fill="#857a6f" font-size="10.5">decisions joined</text><text x="598" y="100" fill="#857a6f" font-size="10.5">to outcomes;</text><text x="598" y="116" fill="#857a6f" font-size="10.5">one threshold,</text><text x="598" y="132" fill="#857a6f" font-size="10.5">one small step</text>
+    </g>
+  </svg>
+  <figcaption>curation on a loop, tuning on a leash</figcaption>
+</figure>
+<h2>What the nightly pass does</h2>
+<ul>
+  <li><strong>Merges near-duplicates.</strong> The same lesson learned five times becomes one record, not five competing ones.</li>
+  <li><strong>Archives the stale.</strong> Records whose decayed score has faded past usefulness leave the active set.</li>
+  <li><strong>Supersedes retired traps.</strong> A cautionary failure record is retired when a newer verified success proves the trap is gone &mdash; old warnings don't haunt fixed code forever.</li>
+  <li><strong>Flags contradictions, keeps both.</strong> When records disagree, Dreaming marks the conflict instead of silently picking a winner. Both sides stay until evidence settles it.</li>
+  <li><strong>Synthesizes patterns.</strong> The same failure appearing in three or more records across two or more sessions is distilled into a single, stronger memory &mdash; a recurring trap becomes a standing warning.</li>
+</ul>
+<p>Failure mining feeds the loop: repeated failure signatures and failed checks are distilled into the cautionary memories that Dreaming then curates, retires, or promotes into patterns.</p>
+<div class="callout"><p>Records in the <strong>restricted tier</strong> are never touched &mdash; not merged, not archived, not superseded. It is a hard wall, enforced in code and pinned by tests.</p></div>
+<h2>Calibration: tuning with an evidence bar</h2>
+<p>The <a href="/docs/gate">gate's</a> thresholds are tuned the same way memory is curated: mechanically, and only on evidence. Calibration joins routing decisions to their verified outcomes, then asks whether a threshold deserves to move.</p>
+<ul>
+  <li><strong>Evidence first.</strong> Nothing is suggested until there are at least 15 joined runs overall and 8 per rung. Below that, the honest answer is "not enough data."</li>
+  <li><strong>One bounded step.</strong> A single threshold moves by a single small step (0.05) at a time &mdash; no sweeping re-tunes, no oscillation.</li>
+  <li><strong>Configuration, not weights.</strong> Adjustments land as configuration overrides you can read and revert. Calibration never silently updates model weights.</li>
+</ul>
+<p>Both loops share one design rule with <a href="/docs/memory">memory</a> itself: the system learns in the open, in artifacts you can diff &mdash; or it doesn't learn at all.</p>
+    <nav class="pager"><a href="/docs/memory">&larr; Verified memory</a><a href="/docs/codemap">Code map &rarr;</a></nav>
+  </main>
+</div>
+<footer><div class="wrap foot">
+  <nav><b>product</b><a href="/#concepts">Concepts</a><a href="/docs">Docs</a><a href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a><a href="https://github.com/grist-ai/grist">GitHub</a></nav>
+  <nav><b>docs</b><a href="/docs/quickstart">Quickstart</a><a href="/docs/gate">The Jev gate</a><a href="/docs/memory">Verified memory</a><a href="/docs/cli">CLI reference</a></nav>
+  <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
+  <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
+</div></footer>
+<script src="/site.js" defer></script>
+</body>
+</html>

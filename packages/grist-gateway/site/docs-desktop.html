@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The desktop app — Grist docs</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap nav-in">
+<a class="mark" href="/" aria-label="Grist">
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H141V36H135V12H120V6Z" />
+          </g>
+        </svg>
+      </a>
+<nav class="nav-links">
+  <a href="/#concepts">Concepts</a>
+  <a href="/docs">Docs</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
+  <a class="btn ghost" href="/login">Sign in</a>
+  <a class="btn accent" href="/#get-started">Get started</a>
+</nav>
+</div></header>
+<div class="wrap docs-layout">
+    <aside class="docs-side">
+    <a href="/docs">Docs home</a>
+    <b>[ start ]</b>
+    <a href="/docs/quickstart">Quickstart</a>
+    <b>[ concepts ]</b>
+    <a href="/docs/concepts">Concepts overview</a>
+    <a href="/docs/gate">The Jev gate</a>
+    <a href="/docs/ladder">The ladder</a>
+    <a href="/docs/specialists">Specialists</a>
+    <a href="/docs/solpi">SoL-Pi</a>
+    <a href="/docs/memory">Verified memory</a>
+    <a href="/docs/dreaming">Dreaming & calibration</a>
+    <a href="/docs/codemap">Code map</a>
+    <b>[ guides ]</b>
+    <a href="/docs/gateway">Gateway & keys</a>
+    <a href="/docs/cli">CLI reference</a>
+    <a href="/docs/desktop" class="on">Desktop</a>
+    <a href="/docs/enterprise">Enterprise</a>
+    <a href="/docs/skills">Skills</a>
+    <b>[ more ]</b>
+    <a href="/docs/releases">Release notes</a>
+    <a href="/docs/faq">FAQ</a>
+    </aside>
+  <main class="prose">
+<p class="kicker">[ docs &middot; guides ]</p>
+<h1>The desktop app</h1>
+<p class="lede">The desktop app is the supervision surface for Grist: every thread you run, in one window &mdash; what it's doing, what it changed, what it cost, and what it needs from you. Download it for macOS from the landing page; it updates itself after that.</p>
+<h2>Threads sidebar</h2>
+<p>Sessions are threads, grouped by project, newest activity first. Each row shows the thread's status &mdash; running, succeeded, failed, interrupted &mdash; with an unread marker when a thread finished while you were looking elsewhere, a badge when it's waiting on you, a marker for threads running in a worktree, and the thread's total cost. Running threads sort to the top, so the work that needs eyes finds you.</p>
+<h2>Worktree per thread</h2>
+<p>A new thread can run in its own git worktree, on a branch named for the task (<code>grist/&lt;task-slug&gt;-&lt;id&gt;</code>). Parallel threads then edit in parallel without fighting over the same files, and merging one branch leaves the others untouched. When every thread in a worktree has been archived, the worktree is cleaned up &mdash; but a dirty worktree is never force-removed; it's reported and left for you.</p>
+<h2>Review pane</h2>
+<p>Every change is reviewable before it lands. The pane shows diffs three ways &mdash; working tree, branch, or a single turn &mdash; and turns line comments into steering messages the thread acts on. Accept or revert individual hunks, then commit from the pane when the change reads right.</p>
+<h2>Automations</h2>
+<p>Recurring work runs as scheduled threads. Two ship built in: a daily failure-mining digest and a weekly memory-curation run. Automations behave like any other thread &mdash; same worktree isolation, same cost tracking &mdash; with one rule that has no exceptions: <strong>nothing an automation produces merges itself.</strong> Its output lands in the review queue for a human to accept.</p>
+<h2>Review queue &mdash; &ldquo;Needs review&rdquo;</h2>
+<p>Under the sidebar sits the queue: threads waiting on an approval, threads that failed, threads that were interrupted, and threads that simply finished unreviewed &mdash; in that order. Automation runs are labeled with the automation that spawned them, so machine-started work is never mistaken for yours.</p>
+<h2>Memory and code map, on Home</h2>
+<p>Home also carries the two Grist surfaces: a <a href="/docs/memory">memory browser</a> &mdash; search what Grist remembers about the current project and forget any record &mdash; and a <a href="/docs/codemap">code-map card</a> showing the project's graph size and its most-connected landmarks.</p>
+<h2>Settings, deliberately small</h2>
+<p>Settings offers Grist account sign-in &mdash; the website device flow, or paste an API key &mdash; and that's the whole account surface. There are no provider pickers and no model pickers: the <a href="/docs/gate">gate</a> decides the rung, and your provider key is attached once, at the <a href="/docs/gateway">gateway</a>.</p>
+<div class="callout"><p>The app runs the same local server as the CLI &mdash; install the <a href="/download/grist-desktop-mac-arm64.dmg">macOS build</a> and your existing threads, memory, and config are already there.</p></div>
+    <nav class="pager"><a href="/docs/cli">&larr; CLI reference</a><a href="/docs/enterprise">Enterprise &rarr;</a></nav>
+  </main>
+</div>
+<footer><div class="wrap foot">
+  <nav><b>product</b><a href="/#concepts">Concepts</a><a href="/docs">Docs</a><a href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a><a href="https://github.com/grist-ai/grist">GitHub</a></nav>
+  <nav><b>docs</b><a href="/docs/quickstart">Quickstart</a><a href="/docs/gate">The Jev gate</a><a href="/docs/memory">Verified memory</a><a href="/docs/cli">CLI reference</a></nav>
+  <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
+  <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
+</div></footer>
+<script src="/site.js" defer></script>
+</body>
+</html>

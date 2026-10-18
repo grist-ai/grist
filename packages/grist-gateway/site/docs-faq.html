@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frequently asked questions — Grist docs</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap nav-in">
+<a class="mark" href="/" aria-label="Grist">
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H141V36H135V12H120V6Z" />
+          </g>
+        </svg>
+      </a>
+<nav class="nav-links">
+  <a href="/#concepts">Concepts</a>
+  <a href="/docs">Docs</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
+  <a class="btn ghost" href="/login">Sign in</a>
+  <a class="btn accent" href="/#get-started">Get started</a>
+</nav>
+</div></header>
+<div class="wrap docs-layout">
+    <aside class="docs-side">
+    <a href="/docs">Docs home</a>
+    <b>[ start ]</b>
+    <a href="/docs/quickstart">Quickstart</a>
+    <b>[ concepts ]</b>
+    <a href="/docs/concepts">Concepts overview</a>
+    <a href="/docs/gate">The Jev gate</a>
+    <a href="/docs/ladder">The ladder</a>
+    <a href="/docs/specialists">Specialists</a>
+    <a href="/docs/solpi">SoL-Pi</a>
+    <a href="/docs/memory">Verified memory</a>
+    <a href="/docs/dreaming">Dreaming & calibration</a>
+    <a href="/docs/codemap">Code map</a>
+    <b>[ guides ]</b>
+    <a href="/docs/gateway">Gateway & keys</a>
+    <a href="/docs/cli">CLI reference</a>
+    <a href="/docs/desktop">Desktop</a>
+    <a href="/docs/enterprise">Enterprise</a>
+    <a href="/docs/skills">Skills</a>
+    <b>[ more ]</b>
+    <a href="/docs/releases">Release notes</a>
+    <a href="/docs/faq" class="on">FAQ</a>
+    </aside>
+  <main class="prose">
+<p class="kicker">[ docs &middot; more ]</p>
+<h1>Frequently asked questions</h1>
+<p class="lede">The short answers. The long ones live in the concept pages linked from each answer.</p>
+<div class="faq">
+<details><summary>Does my code leave my machine?</summary><p>No. Grist executes in your local working tree &mdash; the prompt goes out to the model, the source does not. Tools run locally, diffs are produced locally, and Grist does not train on your code. The <a href="/docs/gateway">gateway</a> handles accounts, keys, and routing; it never receives your files.</p></details>
+<details><summary>What does Grist cost?</summary><p>The harness itself is open source and free. Inference runs on your own provider key, billed by your provider at provider prices, with zero markup from Grist. Every key carries a hard spend cap: a request that would exceed it returns a <code>402</code> instead of a bill. Teams and enterprise deployments are arranged directly &mdash; see <a href="/docs/enterprise">enterprise</a>.</p></details>
+<details><summary>Which models does it use?</summary><p>The client never names vendor models. It names a rung &mdash; cheapest, medium, frontier, premium &mdash; and the <a href="/docs/gate">gate</a> picks the cheapest rung that can handle the task. Each rung resolves to a model at the gateway, and you can override what a rung points to in your dashboard without changing any client.</p></details>
+<details><summary>How is this different from a plain agent CLI?</summary><p>A plain CLI bills every task like it's hard, starts every session from zero, and leaves spend to chance. Grist prices per task (the gate routes each run to the cheapest capable rung), remembers what was verified across sessions, navigates by a code map, delegates to named specialists, and enforces hard spend caps &mdash; the harness around the agent loop is the product.</p></details>
+<details><summary>What is verified memory &mdash; and can I delete it?</summary><p>Memory stores only proven outcomes: tests passed, work you approved, corrections you made, checks that failed. Claims an agent merely made are never stored. Yes, you can delete it: the <a href="/docs/desktop">desktop app</a> has a memory browser with a forget button per record, and by default memory is a plain JSON file in the project (<code>.grist/memory.json</code>) that you can read, diff, or delete yourself. See <a href="/docs/memory">verified-outcome memory</a>.</p></details>
+<details><summary>Can my team use it?</summary><p>Yes. The enterprise deployment runs the harness inside your VPC on your own provider key, with shared team memory, a team code map, and per-key usage attribution. The fastest start is a measured concierge pilot with one team. Details on the <a href="/docs/enterprise">enterprise page</a>.</p></details>
+<details><summary>Is Grist open source?</summary><p>Yes &mdash; the code is at <a href="https://github.com/grist-ai/grist">github.com/grist-ai/grist</a>. The agent loop builds on an MIT-licensed open-source core; Grist's gate, ladder, memory, and code map live in the open.</p></details>
+<details><summary>What platforms does it run on?</summary><p>The CLI installs via npm (<code>npm install -g grist-ai</code>) and runs on macOS and Linux. The desktop app is macOS today, and it auto-updates once installed. Run <code>grist doctor</code> any time to check your setup.</p></details>
+</div>
+    <nav class="pager"><a href="/docs/releases">&larr; Release notes</a></nav>
+  </main>
+</div>
+<footer><div class="wrap foot">
+  <nav><b>product</b><a href="/#concepts">Concepts</a><a href="/docs">Docs</a><a href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a><a href="https://github.com/grist-ai/grist">GitHub</a></nav>
+  <nav><b>docs</b><a href="/docs/quickstart">Quickstart</a><a href="/docs/gate">The Jev gate</a><a href="/docs/memory">Verified memory</a><a href="/docs/cli">CLI reference</a></nav>
+  <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
+  <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a></p>
+</div></footer>
+<script src="/site.js" defer></script>
+</body>
+</html>

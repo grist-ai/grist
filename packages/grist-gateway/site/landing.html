@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grist — a complete coding-agent harness</title>
+<meta name="description" content="Grist is a complete coding-agent harness: confidence-gated model routing, verified memory, a code map, and specialist subagents — billed to your own provider key, running in your own tree.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;520;560;650;680&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<script src="/site.js" defer></script>
+</head>
+<body>
+<header class="nav"><div class="wrap nav-in">
+<a class="mark" href="/" aria-label="Grist">
+        <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 42" fill="none" aria-hidden="true">
+          <g fill="currentColor">
+            <path d="M0 6H24V12H6V30H24V36H0V6ZM18 18H24V24H12V18H18Z" />
+            <path d="M36 6H54V12H42V18H54V24H48V18H42V36H36V6ZM48 24H54V36H48V24Z" />
+            <path d="M66 6H72V36H66V6Z" />
+            <path d="M84 6H108V12H90V18H108V36H84V30H102V24H84V6Z" />
+            <path d="M120 6H156V12H141V36H135V12H120V6Z" />
+          </g>
+        </svg>
+      </a>
+<nav class="nav-links">
+  <a href="#concepts">Concepts</a>
+  <a href="/docs">Docs</a>
+  <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
+  <a class="btn ghost" href="/login">Sign in</a>
+  <a class="btn accent" href="#get-started">Get started</a>
+</nav>
+</div></header>
+<main>
+<div class="wrap">
+<section class="hero">
+  <p class="kicker">[ coding-agent harness ]</p>
+  <h1>Frontier when it has to be. <span class="hl">Cents when it doesn&rsquo;t.</span></h1>
+  <p class="lede">Grist is a complete coding-agent harness. A confidence gate routes every task to the cheapest capable rung, verified memory and a code map brief it on your codebase, and specialists do the work in your tree &mdash; inference billed to your own provider key.</p>
+  <div class="hero-ctas">
+    <span class="install"><span><span class="dollar">$</span> npm install -g grist-ai</span><button class="copy-btn" data-copy="npm install -g grist-ai">copy</button></span>
+    <a class="btn" href="/login">Sign in with Google</a>
+    <a class="btn ghost" href="/download/grist-desktop-mac-arm64.dmg"><svg class="apple" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>Download for macOS</a>
+  </div>
+  <div class="flow-card reveal">
+    <svg class="flow" viewBox="0 0 1040 132" role="img" aria-label="How a prompt becomes a diff: you prompt, the Jev gate routes, the ladder resolves, specialists execute, a diff lands in your tree">
+      <path class="wire" d="M192 66 H232 M404 66 H444 M616 66 H656 M828 66 H868"/>
+      <g>
+        <rect class="node" x="20" y="38" width="172" height="56" rx="10"/>
+        <text class="lbl" x="40" y="64">You prompt</text>
+        <text class="sub" x="40" y="82">CLI &middot; TUI &middot; desktop</text>
+      </g>
+      <g>
+        <rect class="node-accent" x="232" y="38" width="172" height="56" rx="10"/>
+        <text class="lbl" x="252" y="64">Jev gate routes</text>
+        <text class="sub" x="252" y="82">confidence &rarr; rung</text>
+      </g>
+      <g>
+        <rect class="node" x="444" y="38" width="172" height="56" rx="10"/>
+        <text class="lbl" x="464" y="64">Ladder resolves</text>
+        <text class="sub" x="464" y="82">rung &rarr; model</text>
+      </g>
+      <g>
+        <rect class="node" x="656" y="38" width="172" height="56" rx="10"/>
+        <text class="lbl" x="676" y="64">Specialists run</text>
+        <text class="sub" x="676" y="82">in your tree</text>
+      </g>
+      <g>
+        <rect class="node" x="868" y="38" width="152" height="56" rx="10"/>
+        <text class="lbl" x="888" y="64">Diff lands</text>
+        <text class="sub" x="888" y="82">tests &middot; $0.012</text>
+      </g>
+      <circle class="pulse" r="5" style="offset-path: path('M 106 66 H 934')"/>
+    </svg>
+    <p class="flow-cap">one request, five moves &mdash; your key pays for inference, your source never leaves the machine</p>
+  </div>
+</section>
+</div>
+<div class="strip" aria-hidden="true"><span>Learns your codebase</span><i>&middot;</i><span>Self-improves</span><i>&middot;</i><span>SoL-Pi inside</span><i>&middot;</i><span>Open beta</span></div>
+<div class="stats"><div class="wrap stats-in">
+  <div class="stat"><b>4</b><span>cost-tiered rungs, cheapest first</span></div>
+  <div class="stat"><b>0%</b><span>markup on your provider key</span></div>
+  <div class="stat"><b>100%</b><span>of your source stays on your machine</span></div>
+  <div class="stat"><b>402</b><span>is what an over-cap request gets &mdash; never a surprise bill</span></div>
+</div></div>
+<div class="wrap">
+<section id="how">
+  <div class="sec-head reveal">
+    <p class="kicker">[ how it works ]</p>
+    <h2>One prompt in. A verified diff out.</h2>
+    <p class="lede">You never pick a model. The harness reads the task, prices it, and spends only what the difficulty earns.</p>
+  </div>
+  <div class="moves reveal">
+    <div class="move"><span class="num">1</span><h3>You prompt</h3><p>CLI, TUI, or desktop. The client sends the task and names a rung &mdash; never a vendor model id.</p></div>
+    <div class="move"><span class="num">2</span><h3>Gateway admits</h3><p>Your <span class="mono">grist_sk_</span> key identifies the account. Spend caps are hard: over cap returns 402, not a bill.</p></div>
+    <div class="move"><span class="num">3</span><h3>Jev gate routes</h3><p>A confidence gate scores difficulty once per run, picks the cheapest rung that can handle it, and dials exploratory effort &mdash; trivial tasks get a tight budget, ambiguous ones get room to investigate.</p></div>
+    <div class="move"><span class="num">4</span><h3>Ladder resolves</h3><p>The rung becomes a model &mdash; the best in its cost band. Defaults are ours; your dashboard can override any rung.</p></div>
+    <div class="move"><span class="num">5</span><h3>Your key pays</h3><p>The provider call rides your BYOK key. Inference bills to your provider account; Grist never holds your budget.</p></div>
+    <div class="move"><span class="num">6</span><h3>Memory compounds</h3><p>Verified outcomes &mdash; tests passed, approved, corrected &mdash; are written to memory and the code map updates, so the next run starts briefed instead of blank.</p></div>
+    <div class="move"><span class="num">7</span><h3>Specialists delegate</h3><p>The gate hands work to named specialists &mdash; explore, plan, review, verify &mdash; each running inside the assigned rung. Repeat calls resume warm, so context compounds within the session too.</p></div>
+  </div>
+</section>
+
+<section id="concepts">
+  <div class="sec-head reveal">
+    <p class="kicker">[ the concepts ]</p>
+    <h2>Everything in the harness, explained.</h2>
+    <p class="lede">Ten ideas do the heavy lifting. Each one has a full page in the docs &mdash; what it is, why it exists, and how it behaves.</p>
+  </div>
+  <div class="concepts">
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="task">&ldquo;rename getCwd &rarr; getRoot&rdquo;</span><span class="arrow">&rarr;</span><span class="rung-chip">cheapest</span></div>
+        <div class="row"><span class="task">&ldquo;add retry with backoff to the worker&rdquo;</span><span class="arrow">&rarr;</span><span class="rung-chip">medium</span></div>
+        <div class="row"><span class="task">&ldquo;redesign the sync engine&rdquo;</span><span class="arrow">&rarr;</span><span class="rung-chip hot">frontier</span></div>
+      </div>
+      <h3>The Jev gate</h3>
+      <p>A confidence gate that reads each task once and routes it to the cheapest rung that can actually do it &mdash; and dials the effort budget to match the ambiguity.</p>
+      <a class="more" href="/docs/gate">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <h3>The ladder</h3>
+      <div class="ladder" aria-hidden="true">
+        <div class="rung"><span>cheapest</span><small>routine edits &middot; lowest band</small></div>
+        <div class="rung"><span>medium</span><small>everyday features</small></div>
+        <div class="rung"><span>frontier</span><small>hard problems only</small></div>
+        <div class="rung hot"><span>premium</span><small>exceptional cases</small></div>
+      </div>
+      <p>Four cost-tiered rungs, each holding the best model in its band. You see rung names &mdash; never vendor model ids.</p>
+      <a class="more" href="/docs/ladder">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="rung-chip">explore</span><span class="note">maps the code before anyone commits</span></div>
+        <div class="row"><span class="rung-chip">plan</span><span class="note">breaks the task into steps</span></div>
+        <div class="row"><span class="rung-chip">review</span><span class="note">reads the diff like a skeptic</span></div>
+        <div class="row"><span class="rung-chip">verify</span><span class="note">runs the checks, reports honestly</span></div>
+      </div>
+      <h3>Specialists</h3>
+      <p>Four named roles the gate can delegate to. Every sub-task re-gates with the parent&rsquo;s rung as a ceiling &mdash; decomposed work can only get cheaper, never pricier.</p>
+      <a class="more" href="/docs/specialists">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="kind ok">&#10003; tests passed</span><span class="note">worker retries use exponential backoff</span></div>
+        <div class="row"><span class="kind ok">&#10003; you approved</span><span class="note">prefer small diffs, one concern per change</span></div>
+        <div class="row"><span class="kind bad">&#10007; check failed</span><span class="note">never hand-edit generated client files</span></div>
+      </div>
+      <h3>Memory that learns your codebase</h3>
+      <p>Grist remembers only what was verified &mdash; tests passed, you approved, you corrected. A nightly Dreaming pass curates it, so the next session starts briefed instead of blank.</p>
+      <a class="more" href="/docs/memory">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="kind ok">merged</span><span class="note">2 near-duplicate records</span></div>
+        <div class="row"><span class="kind ok">archived</span><span class="note">3 decayed records</span></div>
+        <div class="row"><span class="kind bad">superseded</span><span class="note">1 trap retired by a newer success</span></div>
+        <div class="row"><span class="kind">audit</span><span class="note">every change a git commit</span></div>
+      </div>
+      <h3>Dreaming &amp; calibration</h3>
+      <p>Memory curates itself mechanically &mdash; no human in the loop, every change a Git commit on an audit trail. Calibration tunes the gate&rsquo;s thresholds from real outcomes, one bounded step at a time.</p>
+      <a class="more" href="/docs/dreaming">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <svg viewBox="0 0 320 116" role="img" aria-label="A hub file, session.ts, linked to routes, a worker, a store, and the gateway">
+          <line class="edge" x1="160" y1="58" x2="52" y2="24"/>
+          <line class="edge" x1="160" y1="58" x2="268" y2="24"/>
+          <line class="edge" x1="160" y1="58" x2="52" y2="94"/>
+          <line class="edge" x1="160" y1="58" x2="268" y2="94"/>
+          <rect class="cm" x="6" y="8" width="92" height="30" rx="7"/>
+          <text class="cm-lbl" x="52" y="27" text-anchor="middle">routes.ts</text>
+          <rect class="cm" x="222" y="8" width="92" height="30" rx="7"/>
+          <text class="cm-lbl" x="268" y="27" text-anchor="middle">worker.ts</text>
+          <rect class="cm" x="6" y="78" width="92" height="30" rx="7"/>
+          <text class="cm-lbl" x="52" y="97" text-anchor="middle">store.ts</text>
+          <rect class="cm" x="222" y="78" width="92" height="30" rx="7"/>
+          <text class="cm-lbl" x="268" y="97" text-anchor="middle">gateway.ts</text>
+          <rect class="cm-hub" x="112" y="42" width="96" height="32" rx="7"/>
+          <text class="cm-lbl" x="160" y="57" text-anchor="middle">session.ts</text>
+          <text class="cm-sub" x="160" y="69" text-anchor="middle">degree 4 · hub</text>
+        </svg>
+      </div>
+      <h3>The code map</h3>
+      <p>A graph of your repository &mdash; files, symbols, routes, and how they connect &mdash; so the agent navigates by structure instead of grepping blind.</p>
+      <a class="more" href="/docs/codemap">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="cap"><span>build output, raw</span><span>10,482 tokens</span></div>
+        <div class="bar full"></div>
+        <div class="cap"><span>packed: handle + excerpt</span><span>~300 tokens</span></div>
+        <div class="bar packed"></div>
+      </div>
+      <h3>SoL-Pi: same quality, fewer tokens</h3>
+      <p>Huge tool output gets packed to a handle plus an excerpt; an edit and its check fuse into one move. Spend goes to judgment, not log spam &mdash; and context compounds across a session instead of resetting.</p>
+      <a class="more" href="/docs/solpi">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="dot run"></span><span class="note">Sidebar supervision pass</span><span class="cost">running · $0.041</span></div>
+        <div class="row"><span class="dot review"></span><span class="note">Fix flaky upload test</span><span class="cost">needs review · $0.013</span></div>
+        <div class="row"><span class="dot"></span><span class="note">Nightly failure digest</span><span class="cost">automation · 09:00</span></div>
+      </div>
+      <h3>The desktop app</h3>
+      <p>Supervise every thread from one window: a worktree per thread, per-hunk review, automations, and a review queue for anything that needs your eyes.</p>
+      <a class="more" href="/docs/desktop">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="note">grist_sk_&hellip;prod</span><span class="cost">cap $25 · $6.20 spent</span></div>
+        <div class="row"><span class="note">your provider key</span><span class="cost">billed direct · 0% markup</span></div>
+        <div class="row"><span class="note">over the cap</span><span class="cost">402 · never a surprise bill</span></div>
+      </div>
+      <h3>Gateway &amp; keys</h3>
+      <p>One account, named keys you can revoke independently, per-key spend caps and attribution. Bring your own provider key &mdash; inference bills to it directly, and your source never leaves your machine.</p>
+      <a class="more" href="/docs/gateway">Read more &rarr;</a>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="dot run"></span><span class="note">Failure-mining digest</span><span class="cost">daily 09:00</span></div>
+        <div class="row"><span class="dot run"></span><span class="note">Dreaming curation</span><span class="cost">Mon 09:00</span></div>
+        <div class="row"><span class="dot review"></span><span class="note">Every run lands in the review queue</span><span class="cost">nothing self-merges</span></div>
+      </div>
+      <h3>Automations</h3>
+      <p>Recurring jobs on a schedule &mdash; the failure digest and memory curation ship built in. Whatever an automation produces waits for your review; nothing merges itself.</p>
+      <a class="more" href="/docs/desktop">Read more &rarr;</a>
+    </article>
+  </div>
+</section>
+<section id="local">
+  <div class="sec-head reveal">
+    <p class="kicker">[ local ]</p>
+    <h2>The repo never leaves the machine.</h2>
+    <p class="lede">Tools run in your working tree. The prompt goes out. The source does not. Your provider key stays yours. We never train on your code.</p>
+  </div>
+  <div class="local-grid reveal">
+    <div class="viz">
+      <div class="cap"><span>your disk</span><span>stays</span></div>
+      <div class="row"><span class="note">Source files</span><span class="cost">never sent</span></div>
+      <div class="row"><span class="note">Git history</span><span class="cost">never sent</span></div>
+      <div class="row"><span class="note">Tool execution</span><span class="cost">local</span></div>
+      <div class="row"><span class="note">Tests</span><span class="cost">local</span></div>
+    </div>
+    <div class="local-arrow">prompt only &rarr;</div>
+    <div class="viz">
+      <div class="cap"><span>gateway</span><span>sees</span></div>
+      <div class="row"><span class="note">Prompt tokens</span><span class="cost">sent</span></div>
+      <div class="row"><span class="note">ObservationPack</span><span class="cost">handle + excerpt</span></div>
+      <div class="row"><span class="note">Meter + cap</span><span class="cost">enforced</span></div>
+      <div class="row"><span class="note">Source ingest</span><span class="cost">none</span></div>
+    </div>
+  </div>
+  <p class="local-result mono">a finished run looks like: 3 files &middot; tests passed &middot; $0.012</p>
+</section>
+<section id="upstream">
+  <div class="sec-head reveal">
+    <p class="kicker">[ built on open source ]</p>
+    <h2>Rebuilt on OpenCode v2.</h2>
+    <p class="lede">Grist moved from a surgical fork to a first-class OpenCode plugin, tracking upstream v2.0.32. The gate, the ladder, and the doctrine are unchanged &mdash; everything around them got better.</p>
+  </div>
+  <div class="steps reveal">
+    <div class="step"><h3>Zero-config plugin</h3><p>The harness ships baked into the <span class="mono">grist</span> binary &mdash; every session loads the Jev gate, doctrine, and control plane with no setup. One additive upstream hook is the entire fork surface, so upstream releases land as plain tags.</p></div>
+    <div class="step"><h3>The full CLI, inherited</h3><p class="mono" style="font-size:13px">grist auth &middot; models &middot; debug &middot; service &middot; upgrade &middot; stats &middot; session &middot; mcp</p><p>v2&rsquo;s command surface arrives as upstream features, not Grist code to maintain.</p></div>
+    <div class="step"><h3>Managed background service</h3><p><span class="mono" style="font-size:13px">grist serve --service</span> elects a single server; <span class="mono" style="font-size:13px">grist run</span> is a thin client over it. No ad-hoc servers lingering after a reinstall.</p></div>
+    <div class="step"><h3>Grist identity</h3><p>Config discovery prefers <span class="mono" style="font-size:13px">grist.json</span> and <span class="mono" style="font-size:13px">.grist/</span>, and global state lives under <span class="mono" style="font-size:13px">~/.grist</span> &mdash; the harness has its own name on disk.</p></div>
+  </div>
+</section>
+<section id="enterprise">
+  <div class="sec-head reveal">
+    <p class="kicker">[ for teams ]</p>
+    <h2>Your key. Your cloud. Your codebase.</h2>
+    <p class="lede">Grist for enterprise is API-only: the harness runs in your VPC, inference bills to your provider account at zero markup, and the team shares one verified memory and code map. Per-key spend caps and attribution come built in.</p>
+  </div>
+  <a class="btn" href="/docs/enterprise">How enterprise deployment works &rarr;</a>
+</section>
+<section id="get-started">
+  <div class="sec-head reveal">
+    <p class="kicker">[ get started ]</p>
+    <h2>Open to everyone.</h2>
+    <p class="lede">Create an account with your name and email, or sign in with Google &mdash; your account is ready on the spot.</p>
+  </div>
+  <div class="steps reveal">
+    <div class="step"><span class="num">01</span><h3>Install</h3><p class="mono" style="font-size:13.5px">npm install -g grist-ai</p><p>Or grab the desktop app above.</p></div>
+    <div class="step"><span class="num">02</span><h3>Sign in</h3><p class="mono" style="font-size:13.5px">grist auth login</p><p>Pick Grist and sign in &mdash; the account is created on the spot.</p></div>
+    <div class="step"><span class="num">03</span><h3>Bring your key</h3><p>OpenRouter, Vercel AI Gateway, or any OpenAI-compatible endpoint &mdash; or use a dashboard <span class="mono">grist_sk_</span> key.</p></div>
+    <div class="step"><span class="num">04</span><h3>Run</h3><p class="mono" style="font-size:13.5px">grist</p><p>Prompt. The gate handles the rest.</p></div>
+  </div>
+  <p class="signin-note reveal">New here? <a href="/docs/quickstart">How sign-in works &rarr;</a></p>
+  <div class="flow-card reveal" style="margin-top:20px">
+    <p style="font-weight:600;margin-bottom:8px">Already working with an AI agent?</p>
+    <p style="color:var(--ink-2);font-size:15px;margin-bottom:12px">Give it the Grist skill and it can delegate multi-step coding work to Grist itself:</p>
+    <span class="install"><span><span class="dollar">$</span> npx skills add grist-ai/grist-skills</span><button class="copy-btn" data-copy="npx skills add grist-ai/grist-skills">copy</button></span>
+    <p class="flow-cap" style="text-align:left">for Muse, OpenClaw, Hermes, or any agent with a shell &mdash; <a href="/docs/skills">how skills work</a></p>
+    <details class="prompt-block">
+      <summary>&#10022; Or paste this into your AI agent</summary>
+      <pre id="agent-prompt">Use Grist for my coding tasks from now on. Grist is an agentic coding-harness CLI.
+1. Install the Grist agent skill by running: npx skills add grist-ai/grist-skills (built for personal AI agents and agentic CLIs like Muse, OpenClaw, Hermes, and OpenCode). Read the installed skill file in full before doing anything else.
+2. Install the CLI if it is missing: npm install -g grist-ai.
+3. Ask me for my Grist API key if you do not have it (it starts with grist_sk_). Never print it, log it, or write it into any file &mdash; pass it via environment variable only.
+4. For multi-step coding work (features, bug fixes, refactors across files), delegate to Grist exactly as the skill describes. Report back what changed, the branch name, test results, and cost.</pre>
+      <button class="copy-btn" data-copy-target="agent-prompt" type="button">copy the prompt</button>
+    </details>
+  </div>
+</section>
+<section id="faq">
+  <div class="sec-head reveal">
+    <p class="kicker">[ faq ]</p>
+    <h2>Fair questions.</h2>
+  </div>
+  <div class="faq reveal">
+    <details><summary>Does my code leave my machine?</summary><p>No. Tools run in your local working tree. The prompt goes out to the model; your source does not. We never train on your code.</p></details>
+    <details><summary>What does Grist cost?</summary><p>The harness is open source and free. Inference bills to your own provider key at your provider's prices, with zero markup from us &mdash; and hard spend caps mean an over-cap request returns 402, not a bill.</p></details>
+    <details><summary>Which model does Grist use?</summary><p>Whichever the task earns. The Jev gate routes across four cost-tiered rungs, each holding the best model in its band. You work with rung names, and your dashboard can override any rung's model.</p></details>
+    <details><summary>How is this different from a plain agent CLI?</summary><p>A plain CLI spends the same on every task and forgets everything between sessions. Grist prices each task, remembers what was verified, navigates by a code map, and delegates to specialists &mdash; the harness is the product.</p></details>
+    <details><summary>Can my team use it?</summary><p>Yes &mdash; the enterprise deployment runs the harness in your own VPC on your own provider key, with shared team memory, a team code map, and per-key spend attribution. See the enterprise docs.</p></details>
+  </div>
+</section>
+<section class="cta" id="download">
+  <div class="reveal">
+    <h2>Stop re-teaching the agent your codebase.</h2>
+    <p class="lede">Open to everyone. Bring your own key. Your code stays on your machine.</p>
+    <span class="install"><span><span class="dollar">$</span> npm install -g grist-ai</span><button class="copy-btn" data-copy="npm install -g grist-ai">copy</button></span>
+  </div>
+</section>
+</div>
+</main>
+<footer><div class="wrap foot">
+  <nav><b>product</b><a href="#concepts">Concepts</a><a href="/docs">Docs</a><a href="/download/grist-desktop-mac-arm64.dmg">Download for macOS</a><a href="https://github.com/grist-ai/grist">GitHub</a></nav>
+  <nav><b>docs</b><a href="/docs/quickstart">Quickstart</a><a href="/docs/gate">The Jev gate</a><a href="/docs/memory">Verified memory</a><a href="/docs/cli">CLI reference</a></nav>
+  <nav><b>legal</b><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/acceptable-use">Acceptable Use Policy</a><a href="/cookies">Cookie Policy</a></nav>
+  <p class="fine">Grist is open source. Inference runs on your own provider key. Questions: <a href="mailto:admin@grist.lol">admin@grist.lol</a> &middot; &copy; <span id="year">2026</span> Grist</p>
+</div></footer>
+</body>
+</html>
