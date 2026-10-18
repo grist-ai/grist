@@ -19,7 +19,14 @@ import { Tool } from "@opencode/schema/tool"
 import { Effect, Scope, Stream } from "effect"
 
 import { controlPlaneEnabled } from "@grist-ai/logic"
-import { createBurnInLog, outcomeForExecution, recordTaskUsage, taskUsageFromStepEnded } from "@grist-ai/logic"
+import {
+  createBurnInLog,
+  distillFailures,
+  outcomeForExecution,
+  recordTaskUsage,
+  taskUsageFromStepEnded,
+  type MemoryStore,
+} from "@grist-ai/logic"
 import { routeTask } from "@grist-ai/logic"
 import {
   decideContinue,
@@ -83,6 +90,52 @@ function handleSessionEvent(event: { type: string; data?: Record<string, unknown
   void createBurnInLog()
     .recordOutcome({ sessionID, outcome: mapped.outcome, notes })
     .catch((error) => gristWarn("[grist:burn-in] outcome record failed", error))
+  // R3: on a terminal outcome, distill repeated/terminal tool failures from
+  // this session's history into negative memories (verified by the failing
+  // checks themselves). Fire-and-forget; deduped per session and against
+  // the store so the same trap is only ever written once.
+  if ((mapped.outcome === "success" || mapped.outcome === "fail") && learningMemory) {
+    void distillSessionFailures(sessionID, mapped.outcome === "success").catch((error) =>
+      gristWarn("[grist:learn] failure distillation failed", error),
+    )
+  }
+}
+
+/** R3 learning sink, configured by the plugin when a memory store resolved. */
+let learningMemory: { store: MemoryStore; container: string } | undefined
+const distilledSignatures = new Map<string, Set<string>>()
+
+export function configureFailureLearning(input: { store: MemoryStore; container: string }): void {
+  learningMemory = input
+}
+
+async function distillSessionFailures(sessionID: string, recovered: boolean): Promise<void> {
+  if (!learningMemory) return
+  const { store, container } = learningMemory
+  const seen = distilledSignatures.get(sessionID) ?? new Set<string>()
+  distilledSignatures.set(sessionID, seen)
+  const candidates = distillFailures({
+    parts: toolHistory.get(sessionID) ?? [],
+    container,
+    recovered,
+    sessionID,
+  })
+  for (const candidate of candidates) {
+    const signature = candidate.metadata?.signature ?? candidate.content
+    if (seen.has(signature)) continue
+    seen.add(signature)
+    const sample = candidate.content.match(/with "([^"]+)"/)?.[1]
+    if (sample) {
+      const hits = await store.recall({ query: sample, container, limit: 3 })
+      if (hits.some((hit) => hit.content.includes(sample))) continue
+    }
+    const record = await store.remember(candidate)
+    if (record) {
+      gristLog(
+        `[grist:learn] negative memory stored session=${sessionID} tool=${candidate.metadata?.tool} id=${record.id}`,
+      )
+    }
+  }
 }
 
 function historyFor(sessionID: string): ToolPartLike[] {

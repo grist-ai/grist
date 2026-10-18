@@ -1,6 +1,15 @@
 /** Verified-outcomes-only memory (pre-POC §6). */
 
-export type OutcomeKind = "tests_passed" | "user_approved" | "user_corrected"
+export type OutcomeKind =
+  | "tests_passed"
+  | "user_approved"
+  | "user_corrected"
+  /**
+   * Observed failure (R3): a tool/check failure the harness itself recorded.
+   * Verified by observation — the failing check ran — not by generation.
+   * Written by the failure distiller, not by agents through the memory tool.
+   */
+  | "check_failed"
 
 export type MemoryRecord = {
   id: string

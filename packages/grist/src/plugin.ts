@@ -15,7 +15,7 @@ import {
   type CodeMapProvider,
   type OutcomeKind,
 } from "@grist-ai/logic"
-import { registerGristHooks } from "./hooks.js"
+import { configureFailureLearning, registerGristHooks } from "./hooks.js"
 import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "@grist-ai/logic"
 
 function rungModel(rung: Rung): Model.Info {
@@ -136,15 +136,16 @@ const VERIFY_PERMISSIONS: Permission.Ruleset = [
 export const Plugin = define({
   id: "grist-ai.plugin",
   effect: Effect.fn(function* (ctx) {
-    yield* registerGristHooks(ctx)
-    // R1: verified-outcomes memory (ported from v1). Registered whenever a
-    // store resolves (GRIST_MEMORY=off disables it). The store enforces the
-    // verified-outcomes gate itself — unverified writes are refused there,
-    // never silently accepted here.
+    // R1: verified-outcomes memory (ported from v1). Created before the
+    // hooks so R3 failure learning can write negative memories through the
+    // same store. The store enforces the verified-outcomes gate itself —
+    // unverified writes are refused there, never silently accepted here.
     const memoryStore = createMemoryStore({ cwd: ctx.location.directory })
+    const defaultContainer =
+      ctx.location.directory.split("/").filter(Boolean).pop() ?? "default"
+    if (memoryStore) configureFailureLearning({ store: memoryStore, container: defaultContainer })
+    yield* registerGristHooks(ctx)
     if (memoryStore) {
-      const defaultContainer =
-        ctx.location.directory.split("/").filter(Boolean).pop() ?? "default"
       yield* ctx.tool.transform((editor) => {
         editor.add({
           name: "memory",

@@ -5,7 +5,13 @@ import type { MemoryRecord, OutcomeKind, RememberInput } from "./types"
  * tests passed, user approved, or explicit correction.
  * Never store unreviewed generations.
  */
-const ALLOWED = new Set<OutcomeKind>(["tests_passed", "user_approved", "user_corrected"])
+const ALLOWED = new Set<OutcomeKind>([
+  "tests_passed",
+  "user_approved",
+  "user_corrected",
+  // Observed failures are verified by the failing check itself (R3 distiller).
+  "check_failed",
+])
 
 export function isVerifiedOutcome(outcome: OutcomeKind): boolean {
   return ALLOWED.has(outcome)
@@ -27,6 +33,7 @@ export function requireVerified(input: RememberInput): RememberInput | undefined
 export function defaultWeight(outcome: OutcomeKind): number {
   if (outcome === "user_corrected") return 1
   if (outcome === "user_approved") return 0.9
+  if (outcome === "check_failed") return 0.85
   return 0.75
 }
 
