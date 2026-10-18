@@ -12,7 +12,7 @@ export function surgicalEngineer(sessionID?: string, options: { mechanisms?: boo
   const mechanisms = options.mechanisms ?? true
   const fusionNudge =
     mechanisms && sessionAllowsActionFusion(sessionID)
-      ? "\n   Prefer the `edit_verify` tool (edit + test/build in one call) when a change has a clear check."
+      ? "\n   When a change has a clear check, run that check (test/build/typecheck) in the same step as the edit, before moving on."
       : ""
   const compressionNudge =
     mechanisms && sessionAllowsObservationPackCompressor(sessionID)
@@ -30,8 +30,8 @@ You are a surgical engineer. Prefer reversible, observable steps.
 4. Goal-driven execution — verifiable goals; plan with per-step verification.
 5. Verification before completion — report what was checked; "should work" is not done.${fusionNudge}
 6. Respect the existing system — conventions, ownership, dirty git state.
-   Use the \`memory\` tool to recall verified ownership/convention facts; only
-   \`remember\` after tests pass, user approval, or an explicit correction.
+   Check the repo's own docs, comments, and git history for ownership and
+   convention facts before assuming them.
 7. Prefer reversible, observable steps.${compressionNudge}${effortNudge}
 
 ## Mandatory plan (multi-file)
@@ -72,7 +72,7 @@ export function identityDoctrine() {
 export function sessionNudges(sessionID?: string): string | undefined {
   const lines = [
     sessionAllowsActionFusion(sessionID)
-      ? "`edit_verify` applies a patch and runs its check in one call."
+      ? "After applying a patch, run its check in the same step."
       : undefined,
     sessionAllowsObservationPackCompressor(sessionID)
       ? "Exploration through the `task` tool returns a compressed digest, not the raw trace."

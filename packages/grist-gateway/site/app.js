@@ -61,7 +61,7 @@ const titles = {
 }
 
 const descriptions = {
-  "/": "Grist is a complete coding-agent harness: confidence-gated model routing, institutional memory, and BYOK economics. Open to everyone.",
+  "/": "Grist is a complete coding-agent harness: confidence-gated model routing, specialist subagents, and BYOK economics. Open to everyone.",
   "/login":
     "Sign in to Grist or create an account — your API key and dashboard are ready on the spot. Bring your own provider key for inference.",
   "/dashboard":
@@ -72,7 +72,7 @@ const descriptions = {
     "Override any Grist ladder rung with a model id your provider serves. Clearing a field restores the default.",
   "/admin": "Grist admin: mint account codes with preset spend caps for testers and special cases.",
   "/docs":
-    "Grist docs: install the CLI, sign in, start in a repo, and understand the gate, memory, SoL-Pi, and spend.",
+    "Grist docs: install the CLI, sign in, start in a repo, and understand the gate, specialists, SoL-Pi, and spend.",
   "/docs/quickstart":
     "Grist quickstart: install the CLI, sign in, attach your provider key, and run your first agent task.",
   "/docs/skills":
