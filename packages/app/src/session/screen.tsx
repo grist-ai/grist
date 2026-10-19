@@ -529,9 +529,9 @@ function SessionScreenContent(props: {
                       <div
                         data-slot="side-terminal-panel-presence"
                         data-opened={sideMotion().animateDock ? sideMotion().dock : undefined}
-                        class="absolute inset-0 rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
+                        class="absolute inset-0 bg-v2-background-bg-base"
                       >
-                        <div data-slot="side-terminal-panel-clip" class="size-full overflow-clip rounded-[10px]">
+                        <div data-slot="side-terminal-panel-clip" class="size-full overflow-clip">
                           <DockRegion
                             screen={props.screen}
                             view={props.view()}

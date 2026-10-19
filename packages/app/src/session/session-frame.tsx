@@ -15,14 +15,8 @@ export function SessionRouteFrame(props: ParentProps<{ padded?: boolean }>) {
 }
 
 export function SessionPanelFrame(props: ParentProps<{ raised?: boolean }>) {
-  return (
-    <div
-      class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] bg-v2-background-bg-base"
-      classList={{
-        "shadow-[var(--v2-elevation-raised)]": props.raised,
-      }}
-    >
-      {props.children}
-    </div>
-  )
+  // D6.1: panels are flush with the shell canvas — no rounding, no elevation
+  // shadow. `raised` is accepted for compatibility and no longer restyles.
+  void props.raised
+  return <div class="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-v2-background-bg-base">{props.children}</div>
 }

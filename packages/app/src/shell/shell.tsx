@@ -31,18 +31,22 @@ export default function Layout(props: ParentProps) {
       <div
         class="relative bg-v2-background-bg-deep flex-1 min-h-0 min-w-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text"
         style={{
-          // Mobile panels only need clearance for their outer border.
-          "--shell-inline-inset": mobile() ? "1px" : "8px",
-          // A bottom mobile titlebar leaves main's top edge to the safe area. Native Windows chrome supplies the gap;
-          // retain outer-outline clearance.
+          // D6.1: the desktop shell is one continuous canvas — route panels sit
+          // flush (no floating-card insets). Mobile panels keep their 1px
+          // outer-border clearance; Windows keeps 1px of outline clearance.
+          "--shell-inline-inset": mobile() ? "1px" : "0px",
           "--shell-top-inset": bottomTitlebar()
             ? "0px"
             : platform.platform === "desktop" && platform.os === "windows"
               ? "1px"
-              : "8px",
+              : mobile()
+                ? "8px"
+                : "0px",
           "--shell-bottom-inset": bottomTitlebar()
             ? "8px"
-            : "max(0px, calc(8px - var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))))",
+            : mobile()
+              ? "max(0px, calc(8px - var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))))"
+              : "0px",
         }}
       >
         <Titlebar verticalTabs={verticalTabs() ? { mount: state.tabsMount } : undefined} />
@@ -51,7 +55,7 @@ export default function Layout(props: ParentProps) {
             <aside
               ref={(element) => setState("tabsMount", element)}
               data-slot="vertical-tabs-sidebar"
-              class="relative flex h-full min-h-0 shrink-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
+              class="relative flex h-full min-h-0 shrink-0 flex-col border-r border-v2-border-border-muted bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
               style={{
                 width: `${state.tabsWidth}px`,
                 "padding-bottom": "max(10px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",

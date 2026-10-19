@@ -98,7 +98,7 @@ export function SideRegion(props: {
         aria-label={language.t("session.panel.reviewAndFiles")}
         aria-hidden={!open()}
         inert={!open()}
-        class="relative min-w-0 flex overflow-hidden bg-v2-background-bg-base rounded-[10px] shadow-[var(--v2-elevation-raised)] outline-none"
+        class="relative min-w-0 flex overflow-hidden bg-v2-background-bg-base outline-none"
         classList={{
           "h-full shrink-0": !props.stacked,
           "h-full min-h-0": props.stacked,

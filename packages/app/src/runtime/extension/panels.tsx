@@ -480,7 +480,6 @@ export function DockRegion(props: {
         "w-full": !isDesktop() || stacked(),
         "min-w-0 h-full flex-1": isDesktop() && present() && !stacked(),
         "w-0 h-full pointer-events-none": isDesktop() && !present(),
-        "rounded-[10px] shadow-[var(--v2-elevation-raised)]": isDesktop() && (props.framed ?? true),
         "will-change-[height]": !props.embedded && !size.active() && (!isDesktop() || stacked()),
       }}
       style={{ height: panelHeight(), "--terminal-panel-height": contentHeight() }}
