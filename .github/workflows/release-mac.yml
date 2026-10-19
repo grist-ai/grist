@@ -81,6 +81,11 @@ jobs:
           # bundled sidecar registers itself as 0.0.0, and the desktop's
           # version gate never converges (splash loop on cold start).
           GRIST_VERSION: ${{ inputs.cli_version }}
+          # Bake the release channel, like publish-grist does. The default
+          # "local" makes the sidecar register service-local.json while the
+          # packaged desktop watches service.json (channel "latest"), so it
+          # never discovers its own server and times out on the splash.
+          GRIST_CHANNEL: latest
         run: |
           set -euo pipefail
           cd packages/grist

@@ -13,6 +13,7 @@ import { GristCodeMapCard } from "@/grist/code-map-card"
 import { GristMemoryBrowser } from "@/grist/memory-browser"
 import { GristReviewQueue } from "@/grist/review-queue"
 import { GristThreadSidebar } from "@/grist/thread-sidebar"
+import { ServerProvider } from "@/runtime/server/current"
 
 export function Home() {
   const mobile = createMediaQuery("(max-width: 767px)")
@@ -66,8 +67,17 @@ export function Home() {
               <HomeProjects projects={projects} scroll={scroll} />
               <GristThreadSidebar sessions={threadSessions()} worktreeDirs={threadWorktreeDirs()} onOpen={openThread} />
               <GristReviewQueue sessions={threadSessions()} onOpen={openThread} />
-              <GristMemoryBrowser directory={gristSurface()?.directory} label={gristSurface()?.label} />
-              <GristCodeMapCard directory={gristSurface()?.directory} label={gristSurface()?.label} />
+              {/* The D5 surfaces call useServerSDK, which requires the current-server
+                  context. Home renders outside any ServerProvider, so give them the
+                  focused server's provider (same pattern as the new-session route). */}
+              <Show when={home.server.focused()} keyed>
+                {(conn) => (
+                  <ServerProvider conn={conn}>
+                    <GristMemoryBrowser directory={gristSurface()?.directory} label={gristSurface()?.label} />
+                    <GristCodeMapCard directory={gristSurface()?.directory} label={gristSurface()?.label} />
+                  </ServerProvider>
+                )}
+              </Show>
             </div>
           </Show>
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />
