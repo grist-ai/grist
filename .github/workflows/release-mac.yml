@@ -75,10 +75,22 @@ jobs:
       # reviewed, then stage it in the unpacked-npm-package layout that
       # OPENCODE_CLI_DIST expects (grist-darwin-arm64/{bin/grist,package.json}).
       - name: Build darwin-arm64 CLI
+        env:
+          # Stamp the real version into the binary itself. Without this the
+          # build falls back to packages/grist/package.json's 0.0.0, the
+          # bundled sidecar registers itself as 0.0.0, and the desktop's
+          # version gate never converges (splash loop on cold start).
+          GRIST_VERSION: ${{ inputs.cli_version }}
         run: |
           set -euo pipefail
           cd packages/grist
           bun run script/build.ts --target=bun-darwin-arm64 --outdir=/tmp/grist-cli-build
+          built_version=$(/tmp/grist-cli-build/grist --version)
+          echo "built CLI reports: $built_version"
+          if [ "$built_version" != "grist v${{ inputs.cli_version }}" ]; then
+            echo "CLI version stamp missing or wrong — refusing to package"
+            exit 1
+          fi
           mkdir -p /tmp/grist-cli-dist/grist-darwin-arm64/bin
           cp /tmp/grist-cli-build/grist /tmp/grist-cli-dist/grist-darwin-arm64/bin/grist
           printf '{"name":"grist-darwin-arm64","version":"%s"}\n' "${{ inputs.cli_version }}" \
