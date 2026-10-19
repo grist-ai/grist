@@ -5,6 +5,7 @@ import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createSimpleContext } from "../context/helper"
 import oc2ThemeJson from "./themes/oc-2.json"
+import gristThemeJson from "./themes/grist.json"
 import { resolveThemeVariant, themeToCss } from "./resolve"
 import { resolveThemeVariantV2, themeV2ToCss } from "./v2/resolve"
 import type { DesktopTheme } from "./types"
@@ -90,10 +91,14 @@ const names: Record<string, string> = {
 
 const oc2Theme = oc2ThemeJson as DesktopTheme
 
-function resolveStoredTheme(id: string | null | undefined, registered?: Record<string, DesktopTheme>) {
-  if (id === "oc-2" || (id && (knownThemes().has(id) || registered?.[id]))) return id
+const gristTheme = gristThemeJson as DesktopTheme
 
-  return "oc-2"
+function resolveStoredTheme(id: string | null | undefined, registered?: Record<string, DesktopTheme>) {
+  if (id === "grist" || id === "oc-2" || (id && (knownThemes().has(id) || registered?.[id]))) return id
+
+  // Grist ships its own theme as the default: anyone who has not explicitly
+  // picked a theme gets Grist; an explicit choice in Appearance still wins.
+  return "grist"
 }
 
 function read(key: string) {
@@ -207,6 +212,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     const [store, setStore] = createStore({
       themes: {
         "oc-2": oc2Theme,
+        grist: gristTheme,
       } as Record<string, DesktopTheme>,
       themeId,
       colorScheme,
