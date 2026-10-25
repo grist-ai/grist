@@ -658,6 +658,72 @@ describe("gateway HTTP", () => {
     delete process.env.FIREBASE_APP_ID
   })
 
+  test("sign-in renews a lapsed account invite in place", async () => {
+    process.env.FIREBASE_API_KEY = "test-api-key"
+    process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+    process.env.FIREBASE_PROJECT_ID = "grist-test"
+    process.env.FIREBASE_APP_ID = "1:1:web:abc"
+    const store = openGatewayStore()
+    const invite = store.createInvite({ note: "account", expiresAt: Date.now() - 1000 })
+    expect(store.bindAccount({ uid: "uid_lapsed", email: "a@b.co", inviteCode: invite.code }).ok).toBe(true)
+    const gateway = createGateway({
+      store,
+      fetch: async () =>
+        new Response(JSON.stringify({ users: [{ localId: "uid_lapsed", email: "a@b.co" }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    })
+    // The lapsed code is rejected everywhere before sign-in.
+    const dead = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { "X-Grist-Invite": invite.code },
+    })
+    expect(dead.status).toBe(401)
+    const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
+      body: { id_token: "tok" },
+    })
+    expect(session.status).toBe(200)
+    // Same code, alive again — cap, spend and API keys keep their lineage.
+    expect((session.json as { code: string }).code).toBe(invite.code)
+    const usage = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { "X-Grist-Invite": invite.code },
+    })
+    expect(usage.status).toBe(200)
+    store.close()
+    delete process.env.FIREBASE_API_KEY
+    delete process.env.FIREBASE_AUTH_DOMAIN
+    delete process.env.FIREBASE_PROJECT_ID
+    delete process.env.FIREBASE_APP_ID
+  })
+
+  test("sign-in does not revive a revoked account invite", async () => {
+    process.env.FIREBASE_API_KEY = "test-api-key"
+    process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+    process.env.FIREBASE_PROJECT_ID = "grist-test"
+    process.env.FIREBASE_APP_ID = "1:1:web:abc"
+    const store = openGatewayStore()
+    const invite = store.createInvite({ note: "account", expiresAt: Date.now() + 60_000 })
+    expect(store.bindAccount({ uid: "uid_revoked", email: "a@b.co", inviteCode: invite.code }).ok).toBe(true)
+    expect(store.revoke(invite.code)).toBe(true)
+    const gateway = createGateway({
+      store,
+      fetch: async () =>
+        new Response(JSON.stringify({ users: [{ localId: "uid_revoked", email: "a@b.co" }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    })
+    const session = await call(gateway.fetch, "POST", "/v1/auth/session", {
+      body: { id_token: "tok" },
+    })
+    expect(session.status).toBe(500)
+    store.close()
+    delete process.env.FIREBASE_API_KEY
+    delete process.env.FIREBASE_AUTH_DOMAIN
+    delete process.env.FIREBASE_PROJECT_ID
+    delete process.env.FIREBASE_APP_ID
+  })
+
   test("single-use binding: 409 on taken code, 400 on rebind, idempotent retry", async () => {
     process.env.FIREBASE_API_KEY = "test-key"
     process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"

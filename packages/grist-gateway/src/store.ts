@@ -235,6 +235,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   const addSpent = db.prepare(`UPDATE invites SET spent_usd = spent_usd + ? WHERE code = ?`)
   const resetSpent = db.prepare(`UPDATE invites SET spent_usd = 0 WHERE code = ?`)
   const setCapUsd = db.prepare(`UPDATE invites SET cap_usd = ? WHERE code = ?`)
+  const renewInviteExpiry = db.prepare(`UPDATE invites SET expires_at = ? WHERE code = ? AND revoked = 0`)
   const insertUsage = db.prepare(
     `INSERT INTO usage_events (code, key_id, at, model, rung, input_tokens, output_tokens, usd)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -396,6 +397,17 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
      */
     setCap(code: string, capUsd: number): InviteRow | undefined {
       setCapUsd.run(capUsd, code)
+      return selectInvite.get(code) as InviteRow | undefined
+    },
+
+    /**
+     * Extends a lapsed invite's expiry in place. Cap, spend history and API
+     * keys all hang off the code, so renewing the row keeps the account
+     * whole. A revoked invite is a deliberate operator act: the statement's
+     * revoked = 0 guard leaves it untouched and the stale row is returned.
+     */
+    renewInvite(code: string, expiresAt: number): InviteRow | undefined {
+      renewInviteExpiry.run(expiresAt, code)
       return selectInvite.get(code) as InviteRow | undefined
     },
 

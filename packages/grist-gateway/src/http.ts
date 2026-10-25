@@ -510,6 +510,20 @@ export function createGateway(opts: GatewayOptions = {}) {
     return json(200, { enabled: true, ...config })
   }
 
+  // An account outlives its invite: codes minted under shorter expiries lapse
+  // while the account row persists, and every credential check then rejects
+  // the very code sign-in hands back. The owner is provably present at
+  // sign-in, so heal a lapsed invite in place — cap, spend and API keys all
+  // hang off the code and stay intact. A revoked invite is an operator
+  // decision and is never healed here.
+  function usableInviteFor(account: { invite_code: string }) {
+    const invite = store.getInvite(account.invite_code)
+    if (!invite || invite.revoked) return undefined
+    if (invite.expires_at > now()) return invite
+    const renewed = store.renewInvite(invite.code, now() + ACCOUNT_TTL_MS)
+    return renewed && inviteUsable(renewed, now()) ? renewed : undefined
+  }
+
   async function firebaseSession(req: Request): Promise<Response> {
     const body = await readJson(req)
     const token = typeof body?.id_token === "string" ? body.id_token : ""
@@ -519,12 +533,14 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (!user) return json(401, { error: "unauthorized" })
     if (isAdminEmail(user.email)) {
       const account = ensureAdminAccount(user)
+      const invite = usableInviteFor(account)
+      if (!invite) return json(500, { error: "account setup failed" })
       return json(200, {
         ok: true,
         admin: true,
         needs_invite: false,
         email: user.email,
-        code: account.invite_code,
+        code: invite.code,
       })
     }
     // Open accounts: first sign-in mints the account on the fly, so the
@@ -542,8 +558,8 @@ export function createGateway(opts: GatewayOptions = {}) {
       if (!result.ok) return json(500, { error: "account setup failed" })
       account = result.account
     }
-    const invite = store.getInvite(account.invite_code)
-    if (!invite || !inviteUsable(invite, now())) {
+    const invite = usableInviteFor(account)
+    if (!invite) {
       return json(500, { error: "account setup failed" })
     }
     return json(200, {
