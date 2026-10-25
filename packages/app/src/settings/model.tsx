@@ -308,6 +308,21 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   gate: false,
   init: () => {
     const [store, setStore, , ready] = persisted({ key: "settings.v3" }, settingsPersistence, defaultSettings)
+
+    // One-time default migration: installs that saved settings while the top
+    // tab bar was the default carry "horizontal" as a stored value, which
+    // always wins over the sidebar default. Flip those once; the marker
+    // keeps a later deliberate choice in Settings.
+    createEffect(() => {
+      if (!ready()) return
+      if (typeof localStorage !== "object") return
+
+      try {
+        if (localStorage.getItem("grist-tablayout-default-v1")) return
+        if (store.appearance?.tabLayout === "horizontal") setStore("appearance", "tabLayout", "vertical")
+        localStorage.setItem("grist-tablayout-default-v1", "done")
+      } catch {}
+    })
     const showFileTree = withFallback(() => store.general?.showFileTree, defaultSettings.general.showFileTree)
 
     const showCustomAgents = withFallback(
