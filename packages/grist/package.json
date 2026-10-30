@@ -12,7 +12,7 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "name": "@grist-ai/plugin",
   "scripts": {
     "typecheck": "tsgo --noEmit",

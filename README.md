@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/grist-ai"><img src="https://img.shields.io/npm/v/grist-ai" alt="npm version" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" alt="PolyForm Noncommercial license" /></a>
   <img src="https://img.shields.io/badge/BYOK-your%20key%2C%20zero%20markup-blue" alt="BYOK" />
 </p>
 
@@ -264,4 +264,4 @@ stays pristine upstream.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+PolyForm Noncommercial 1.0.0 — free for personal and other noncommercial use; commercial use is not permitted. See [LICENSE](LICENSE). Portions derived from OpenCode remain under the MIT License — see [NOTICE](NOTICE).

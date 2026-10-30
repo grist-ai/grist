@@ -9,7 +9,7 @@
     ".": "./src/http.ts",
     "./package.json": "./package.json"
   },
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "name": "@grist-ai/gateway",
   "scripts": {
     "start": "bun src/entry.ts",
