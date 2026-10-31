@@ -15,7 +15,7 @@ import {
   type CodeMapProvider,
   type OutcomeKind,
 } from "@grist-ai/logic"
-import { configureFailureLearning, registerGristHooks } from "./hooks.js"
+import { registerGristHooks } from "./hooks.js"
 import { GRIST_PROVIDER_ID, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, RUNG_CONTEXT_FLOOR, type Rung } from "@grist-ai/logic"
 
 function rungModel(rung: Rung): Model.Info {
@@ -143,8 +143,10 @@ export const Plugin = define({
     const memoryStore = createMemoryStore({ cwd: ctx.location.directory })
     const defaultContainer =
       ctx.location.directory.split("/").filter(Boolean).pop() ?? "default"
-    if (memoryStore) configureFailureLearning({ store: memoryStore, container: defaultContainer })
-    yield* registerGristHooks(ctx)
+    yield* registerGristHooks(
+      ctx,
+      memoryStore ? { store: memoryStore, container: defaultContainer } : undefined,
+    )
     if (memoryStore) {
       yield* ctx.tool.transform((editor) => {
         editor.add({

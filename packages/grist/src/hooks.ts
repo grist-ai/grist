@@ -15,13 +15,17 @@
 import { SystemPart } from "@opencode/ai"
 import type { Context as PluginContext } from "@opencode/plugin/effect/plugin"
 import { Model } from "@opencode/schema/model"
+import type { SessionID } from "@opencode/schema/session-id"
 import { Tool } from "@opencode/schema/tool"
 import { Effect, Scope, Stream } from "effect"
 
 import { controlPlaneEnabled } from "@grist-ai/logic"
 import {
   createBurnInLog,
+  createMemoryStore,
   distillFailures,
+  distillSuccesses,
+  formatHits,
   outcomeForExecution,
   recordTaskUsage,
   taskUsageFromStepEnded,
@@ -69,7 +73,11 @@ const sessionModels = new Map<string, { providerID: string; modelID: string }>()
  * in v2 with zero callers; this subscription is the wiring. Only sessions
  * the gate has seen are recorded.
  */
-function handleSessionEvent(event: { type: string; data?: Record<string, unknown> }): void {
+function handleSessionEvent(
+  ctx: PluginContext,
+  event: { type: string; data?: Record<string, unknown> },
+  learningMemory?: LearningSink,
+): void {
   if (!controlPlaneEnabled()) return
   const data = event.data ?? {}
   const sessionID = typeof data.sessionID === "string" ? data.sessionID : undefined
@@ -90,26 +98,93 @@ function handleSessionEvent(event: { type: string; data?: Record<string, unknown
   void createBurnInLog()
     .recordOutcome({ sessionID, outcome: mapped.outcome, notes })
     .catch((error) => gristWarn("[grist:burn-in] outcome record failed", error))
-  // R3: on a terminal outcome, distill repeated/terminal tool failures from
-  // this session's history into negative memories (verified by the failing
-  // checks themselves). Fire-and-forget; deduped per session and against
-  // the store so the same trap is only ever written once.
-  if ((mapped.outcome === "success" || mapped.outcome === "fail") && learningMemory) {
-    void distillSessionFailures(sessionID, mapped.outcome === "success").catch((error) =>
-      gristWarn("[grist:learn] failure distillation failed", error),
-    )
+  // R3 + R4: on a terminal outcome, distill this session's history into
+  // memories — repeated/terminal tool failures as negative memories
+  // (verified by the failing checks themselves), and on success the
+  // verified change as a `tests_passed` memory, recorded whether or not
+  // the agent remembered it itself. Fire-and-forget; deduped per session
+  // and against the store so the same lesson is only ever written once.
+  // The sink is resolved from the SESSION's own location (see
+  // resolveSessionSink): this handler fires for every location hosted in
+  // the process, and another project's learnings must never land here.
+  if (mapped.outcome === "success" || mapped.outcome === "fail") {
+    void resolveSessionSink(ctx, sessionID, learningMemory).then((sink) => {
+      if (!sink) return
+      void distillSessionFailures(sessionID, mapped.outcome === "success", sink).catch((error) =>
+        gristWarn("[grist:learn] failure distillation failed", error),
+      )
+      if (mapped.outcome === "success") {
+        void distillSessionSuccesses(sessionID, sink).catch((error) =>
+          gristWarn("[grist:learn] success distillation failed", error),
+        )
+      }
+    })
   }
 }
 
-/** R3 learning sink, configured by the plugin when a memory store resolved. */
-let learningMemory: { store: MemoryStore; container: string } | undefined
-const distilledSignatures = new Map<string, Set<string>>()
+/**
+ * A learning sink: the memory store for one project directory, plus the
+ * container name derived from it. Sinks are resolved PER SESSION from the
+ * session's own location and cached by directory below. Neither a module
+ * global set at plugin load (last-loaded location wins) nor the plugin
+ * instance's own location (first-loaded wins) can be trusted: the session
+ * event stream is process-global, plugin instances load per location in
+ * arbitrary order, and every instance's handler sees every session's
+ * terminal event — so a sink chosen any other way eventually writes one
+ * project's learnings into another project's store (seen live 2026-10-31,
+ * in both directions, before this resolution existed).
+ */
+export type LearningSink = { store: MemoryStore; container: string }
 
-export function configureFailureLearning(input: { store: MemoryStore; container: string }): void {
-  learningMemory = input
+const sinksByDirectory = new Map<string, LearningSink>()
+
+function sinkForDirectory(directory: string): LearningSink | undefined {
+  const cached = sinksByDirectory.get(directory)
+  if (cached) return cached
+  const store = createMemoryStore({ cwd: directory })
+  if (!store) return undefined
+  const sink: LearningSink = {
+    store,
+    container: directory.split("/").filter(Boolean).pop() ?? "default",
+  }
+  sinksByDirectory.set(directory, sink)
+  return sink
 }
 
-async function distillSessionFailures(sessionID: string, recovered: boolean): Promise<void> {
+/**
+ * The sink for a session, resolved from the session record's own
+ * location. Falls back to the plugin instance's sink when the session
+ * can't be read (e.g. a host without a session service at event time).
+ */
+async function resolveSessionSink(
+  ctx: PluginContext,
+  sessionID: string,
+  fallback?: LearningSink,
+): Promise<LearningSink | undefined> {
+  try {
+    const info = await Effect.runPromise(
+      ctx.session.get({ sessionID: sessionID as SessionID }).pipe(Effect.option),
+    )
+    const directory = info._tag === "Some" ? info.value.location?.directory : undefined
+    if (typeof directory === "string" && directory) {
+      return sinkForDirectory(directory) ?? fallback
+    }
+  } catch {
+    // fall through to the instance sink
+  }
+  return fallback
+}
+
+const distilledSignatures = new Map<string, Set<string>>()
+const capturedSignatures = new Map<string, Set<string>>()
+/** Auto-recalled memory for a session's current task, consumed by session.context. */
+const pendingRecall = new Map<string, string>()
+
+async function distillSessionFailures(
+  sessionID: string,
+  recovered: boolean,
+  learningMemory?: LearningSink,
+): Promise<void> {
   if (!learningMemory) return
   const { store, container } = learningMemory
   const seen = distilledSignatures.get(sessionID) ?? new Set<string>()
@@ -134,6 +209,48 @@ async function distillSessionFailures(sessionID: string, recovered: boolean): Pr
       gristLog(
         `[grist:learn] negative memory stored session=${sessionID} tool=${candidate.metadata?.tool} id=${record.id}`,
       )
+    }
+  }
+}
+
+/**
+ * R4: on a successful execution, distill the session's verified change
+ * into a `tests_passed` memory — the positive twin of failure learning.
+ * This is what makes capture deterministic: it no longer depends on the
+ * agent choosing to call `memory.remember`. Parts from `grist-verify`
+ * child sessions are spliced in at the subagent call site, so checks the
+ * specialist ran count at the point verification actually happened.
+ * Deduped per session and against the store (signature in metadata), so
+ * re-verifying the same change never writes the same entry twice.
+ */
+async function distillSessionSuccesses(sessionID: string, learningMemory?: LearningSink): Promise<void> {
+  if (!learningMemory) return
+  const { store, container } = learningMemory
+  const seen = capturedSignatures.get(sessionID) ?? new Set<string>()
+  capturedSignatures.set(sessionID, seen)
+  const expanded: ToolPartLike[] = []
+  for (const part of toolHistory.get(sessionID) ?? []) {
+    expanded.push(part)
+    if (part.tool !== "subagent" || part.state?.status !== "completed") continue
+    if (part.state.input?.agent !== "grist-verify") continue
+    const childID =
+      (typeof part.state.input?.sessionID === "string" && part.state.input.sessionID) ||
+      (typeof part.state.metadata?.sessionID === "string" && part.state.metadata.sessionID) ||
+      undefined
+    if (childID) expanded.push(...(toolHistory.get(childID) ?? []))
+  }
+  const candidates = distillSuccesses({ parts: expanded, container, sessionID })
+  for (const candidate of candidates) {
+    const signature = candidate.metadata?.signature ?? candidate.content
+    if (seen.has(signature)) continue
+    seen.add(signature)
+    if (store.list) {
+      const existing = await store.list().catch(() => [])
+      if (existing.some((record) => record.metadata?.signature === signature)) continue
+    }
+    const record = await store.remember(candidate)
+    if (record) {
+      gristLog(`[grist:learn] verified-change memory stored session=${sessionID} id=${record.id}`)
     }
   }
 }
@@ -176,7 +293,10 @@ function guarded(label: string, run: () => Promise<void>): Effect.Effect<void> {
   )
 }
 
-export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, never, Scope.Scope> {
+export function registerGristHooks(
+  ctx: PluginContext,
+  learningMemory?: LearningSink,
+): Effect.Effect<void, never, Scope.Scope> {
   return Effect.gen(function* () {
     yield* ctx.session.hook("prompt", (input) =>
       guarded("session.prompt", async () => {
@@ -184,6 +304,28 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
         const text = input.prompt.text.trim()
         if (!text) return
         const sessionID = input.sessionID
+        // R4: auto-recall — relevant verified memory is pulled at task
+        // start and injected by session.context, instead of depending on
+        // the agent remembering to recall. Best-effort: a recall failure
+        // never blocks the prompt.
+        const recallSink = await resolveSessionSink(ctx, sessionID, learningMemory)
+        if (recallSink) {
+          try {
+            const hits = await recallSink.store.recall({
+              query: text,
+              container: recallSink.container,
+              limit: 5,
+            })
+            if (hits.length > 0) {
+              const status = await recallSink.store.status()
+              pendingRecall.set(sessionID, formatHits({ query: text, hits, backend: status.backend }))
+            } else {
+              pendingRecall.delete(sessionID)
+            }
+          } catch (error) {
+            gristWarn("[grist:hooks] memory auto-recall failed; continuing", error)
+          }
+        }
         const info = await Effect.runPromise(ctx.session.get({ sessionID }).pipe(Effect.option))
         const ref = info._tag === "Some" ? info.value.model : undefined
         if (ref && ref.providerID === GRIST_PROVIDER_ID) {
@@ -215,6 +357,16 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
       guarded("session.context", async () => {
         if (!controlPlaneEnabled()) return
         input.system.push(SystemPart.make(surgicalEngineer(input.sessionID)))
+        const recalled = pendingRecall.get(input.sessionID)
+        if (recalled) {
+          pendingRecall.delete(input.sessionID)
+          input.system.push(
+            SystemPart.make(
+              `## Verified memory — auto-recalled for this task\n\n${recalled}\n\nTreat these as verified facts about this codebase. If one contradicts what you observe, trust the observation and note the conflict.`,
+            ),
+          )
+          gristLog(`[grist:hooks] memory auto-recall injected session=${input.sessionID}`)
+        }
         // Keep the serialized history under the gateway's 256 KB body cap; only
         // old tool output is shrunk, never the recent tail.
         const report = truncateHistory(input.messages)
@@ -306,8 +458,11 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
               metadata: asRecord(input.result.metadata),
             },
           })
-          if ((input.tool === "edit" || input.tool === "write") && typeof args?.filePath === "string") {
-            const verify = await decideVerify({ sessionID: input.sessionID, filePath: args.filePath })
+          // v2 edit/write take `path` (v1 used `filePath`) — accept both.
+          const editedPath =
+            typeof args?.path === "string" ? args.path : typeof args?.filePath === "string" ? args.filePath : undefined
+          if ((input.tool === "edit" || input.tool === "write") && editedPath) {
+            const verify = await decideVerify({ sessionID: input.sessionID, filePath: editedPath })
             if (verify.message) {
               const current = input.result.content
               const nudge = { type: "text" as const, text: verify.message }
@@ -370,7 +525,7 @@ export function registerGristHooks(ctx: PluginContext): Effect.Effect<void, neve
         Stream.runForEach((event) =>
           Effect.sync(() => {
             try {
-              handleSessionEvent(event as { type: string; data?: Record<string, unknown> })
+              handleSessionEvent(ctx, event as { type: string; data?: Record<string, unknown> }, learningMemory)
             } catch (error) {
               gristWarn("[grist:hooks] session event handling failed; continuing", error)
             }
