@@ -897,7 +897,9 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       const target = selectMembership.get(input.targetUid) as TeamMemberRow | undefined
       if (!target || target.team_id !== input.teamId) return { ok: false, reason: "not_member" }
       db.transaction(() => {
-        updateMemberRole.run("member", input.teamId, input.actorUid)
+        // The outgoing owner steps back to admin — still able to manage
+        // the team, no longer its owner.
+        updateMemberRole.run("admin", input.teamId, input.actorUid)
         updateMemberRole.run("owner", input.teamId, input.targetUid)
         updateTeamOwner.run(input.targetUid, input.teamId)
       })()
