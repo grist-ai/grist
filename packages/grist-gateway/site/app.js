@@ -374,7 +374,7 @@ async function route() {
     void loadAdmin()
     return
   }
-  if (path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models" || path === "/dashboard/provider") {
+  if (path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models" || path === "/dashboard/provider" || path === "/dashboard/team") {
     if (!signedIn()) {
       history.replaceState(null, "", "/login")
       show("view-login")
@@ -952,6 +952,8 @@ async function loadTeam() {
   document.getElementById("team-user-id").textContent = state.userId || "—"
   const mine = await teamCall("/v1/teams/mine")
   if (gen !== teamLoad) return
+  const myId = mine.data.user_id || state.userId
+  document.getElementById("team-user-id").textContent = myId || "—"
   const notes = await teamCall("/v1/notifications")
   if (gen !== teamLoad) return
   const team = mine.data.team
@@ -969,12 +971,12 @@ async function loadTeam() {
           member.email ||
           member.user_id
         const actions = []
-        if (canManage && member.user_id !== state.userId && member.role !== "owner") {
+        if (canManage && member.user_id !== myId && member.role !== "owner") {
           actions.push(
             `<button class="text-btn" type="button" data-remove-member="${member.user_id}">Remove</button>`,
           )
         }
-        if (team.role === "owner" && member.user_id !== state.userId && member.role !== "owner") {
+        if (team.role === "owner" && member.user_id !== myId && member.role !== "owner") {
           const next = member.role === "admin" ? "member" : "admin"
           actions.push(
             `<button class="text-btn" type="button" data-role-member="${member.user_id}" data-role-next="${next}">Make ${next}</button>`,

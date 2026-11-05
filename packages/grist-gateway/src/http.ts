@@ -730,7 +730,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       return json(201, { team: publicTeamState(uid) })
     }
     if (pathname === "/v1/teams/mine") {
-      return json(200, { team: publicTeamState(uid) })
+      return json(200, { team: publicTeamState(uid), user_id: account.user_id })
     }
     if (pathname === "/v1/teams/leave") {
       const left = store.leaveTeam({ uid })
