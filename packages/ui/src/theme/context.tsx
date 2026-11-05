@@ -198,6 +198,19 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     defaultTheme?: string
     onThemeApplied?: (theme: DesktopTheme, mode: "light" | "dark", scheme: ColorScheme) => void
   }) => {
+    // One-time default migration: builds from before the Grist theme existed
+    // persisted the upstream theme id even when the user never picked a theme,
+    // and a stored id always wins over the default. Move those installs to the
+    // Grist theme once; the marker keeps a later deliberate choice in Appearance.
+    if (!read("grist-theme-default-v1")) {
+      if (read(STORAGE_KEYS.THEME_ID) === "oc-2") {
+        write(STORAGE_KEYS.THEME_ID, "grist")
+        clear()
+      }
+
+      write("grist-theme-default-v1", "done")
+    }
+
     const rawTheme = read(STORAGE_KEYS.THEME_ID) ?? props.defaultTheme
     const themeId = resolveStoredTheme(rawTheme)
 
