@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { createGateway } from "./http.js"
+import { parseMasterKey } from "./provider-keys.js"
 import { openGatewayStore } from "./store.js"
 
 type Store = ReturnType<typeof openGatewayStore>
@@ -318,6 +319,131 @@ describe("teams HTTP API", () => {
     const rows = memberView.json.members as { spent_usd: number }[]
     expect(rows).toHaveLength(1)
     expect(rows[0]?.spent_usd).toBeCloseTo(1.25)
+  })
+
+  test("team key sharing: members run on the owner's provider key", async () => {
+    const gw = createGateway({
+      masterKey: parseMasterKey("ab".repeat(32)) as Buffer,
+      fetch: async (_input: string, init?: RequestInit) => {
+        const token = (JSON.parse(String(init?.body)) as { idToken?: string }).idToken ?? ""
+        const user = USERS[token]
+        return new Response(JSON.stringify({ users: user ? [user] : [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      },
+    })
+    async function byInvite(
+      method: string,
+      path: string,
+      code: string,
+      body?: Record<string, unknown>,
+    ): Promise<{ status: number; json: Record<string, unknown> }> {
+      const response = await gw.fetch(
+        new Request(`http://localhost${path}`, {
+          method,
+          headers: { "Content-Type": "application/json", "X-Grist-Invite": code },
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+      )
+      return { status: response.status, json: (await response.json()) as Record<string, unknown> }
+    }
+    const sessionA = await call(gw.fetch, "/v1/auth/session", { id_token: "tok_a" })
+    const sessionB = await call(gw.fetch, "/v1/auth/session", { id_token: "tok_b" })
+    const aCode = sessionA.json.code as string
+    const bCode = sessionB.json.code as string
+    await call(gw.fetch, "/v1/teams", { id_token: "tok_a", name: "Keysharers" })
+    await call(gw.fetch, "/v1/teams/members", {
+      id_token: "tok_a",
+      user_id: sessionB.json.user_id as string,
+    })
+
+    // Before the owner attaches a key, the member has no team key.
+    const before = await byInvite("GET", "/v1/provider", bCode)
+    expect(before.json.team_key).toBeNull()
+    const usageBefore = await byInvite("GET", "/v1/usage", bCode)
+    expect(usageBefore.json.provider).toBeNull()
+    expect(usageBefore.json.provider_source).toBeNull()
+
+    // The owner attaches an OpenRouter key.
+    const attach = await byInvite("POST", "/v1/provider", aCode, {
+      provider: "openrouter",
+      api_key: "sk-or-team-key",
+    })
+    expect(attach.status).toBe(200)
+
+    // The member now resolves to the owner's key, with none of their own.
+    const after = await byInvite("GET", "/v1/provider", bCode)
+    expect(after.json.provider).toBeNull()
+    const teamKey = after.json.team_key as { team_name: string; provider: string } | null
+    expect(teamKey?.team_name).toBe("Keysharers")
+    expect(teamKey?.provider).toBe("openrouter")
+    const usageAfter = await byInvite("GET", "/v1/usage", bCode)
+    expect(usageAfter.json.provider).toBe("openrouter")
+    expect(usageAfter.json.provider_source).toBe("team")
+
+    // The owner's own view is unchanged: their key, no team key.
+    const owner = await byInvite("GET", "/v1/provider", aCode)
+    expect(owner.json.provider).toBe("openrouter")
+    expect(owner.json.team_key).toBeNull()
+    const ownerUsage = await byInvite("GET", "/v1/usage", aCode)
+    expect(ownerUsage.json.provider_source).toBe("own")
+  })
+
+  test("a member's completion rides the owner's key but meters to the member", async () => {
+    let upstreamAuth = ""
+    const gw = createGateway({
+      masterKey: parseMasterKey("ab".repeat(32)) as Buffer,
+      fetch: async (input: string, init?: RequestInit) => {
+        if (String(input).includes("identitytoolkit")) {
+          const token = (JSON.parse(String(init?.body)) as { idToken?: string }).idToken ?? ""
+          const user = USERS[token]
+          return new Response(JSON.stringify({ users: user ? [user] : [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        }
+        upstreamAuth = new Headers(init?.headers).get("Authorization") ?? ""
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+            usage: { prompt_tokens: 1000, completion_tokens: 500 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      },
+    })
+    const sessionA = await call(gw.fetch, "/v1/auth/session", { id_token: "tok_a" })
+    const sessionB = await call(gw.fetch, "/v1/auth/session", { id_token: "tok_b" })
+    const aCode = sessionA.json.code as string
+    const bCode = sessionB.json.code as string
+    await call(gw.fetch, "/v1/teams", { id_token: "tok_a", name: "Riders" })
+    await call(gw.fetch, "/v1/teams/members", {
+      id_token: "tok_a",
+      user_id: sessionB.json.user_id as string,
+    })
+    const attach = await gw.fetch(
+      new Request("http://localhost/v1/provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Grist-Invite": aCode },
+        body: JSON.stringify({ provider: "openrouter", api_key: "sk-or-team-key" }),
+      }),
+    )
+    expect(attach.status).toBe(200)
+
+    const completion = await gw.fetch(
+      new Request("http://localhost/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Grist-Invite": bCode },
+        body: JSON.stringify({ model: "cheapest", messages: [], stream: false }),
+      }),
+    )
+    expect(completion.status).toBe(200)
+    // The upstream call carried the OWNER's key…
+    expect(upstreamAuth).toBe("Bearer sk-or-team-key")
+    // …while the spend metered to the member's own account, not the owner's.
+    expect(gw.store.getInvite(bCode)?.spent_usd).toBeGreaterThan(0)
+    expect(gw.store.getInvite(aCode)?.spent_usd).toBe(0)
   })
 
   test("adding a user from another team 409s and notifies that user", async () => {

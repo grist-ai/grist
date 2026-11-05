@@ -1111,6 +1111,9 @@ async function loadProvider() {
     const when = data.updatedAt ? ` · updated ${new Date(data.updatedAt).toLocaleDateString()}` : ""
     status.innerHTML = `Using your <strong>${escapeHtml(data.provider)}</strong> key${when}. Inference bills to your provider account.`
     document.getElementById("provider-remove").hidden = false
+  } else if (data.team_key) {
+    status.innerHTML = `Running on your team owner’s <strong>${escapeHtml(data.team_key.provider)}</strong> key (team ${escapeHtml(data.team_key.team_name)}) — inference bills to the owner’s provider account. You don’t need your own key.`
+    document.getElementById("provider-remove").hidden = true
   } else {
     status.textContent = "No provider key attached — inference runs on Grist’s gateway key."
     document.getElementById("provider-remove").hidden = true

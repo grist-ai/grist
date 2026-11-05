@@ -247,7 +247,7 @@ export function createGateway(opts: GatewayOptions = {}) {
   function resolveRequestUpstream(inviteCode: string, rung: Rung): UpstreamResolution {
     let credential: ProviderCredential | undefined
     try {
-      credential = store.getProviderCredential(inviteCode)
+      credential = store.getProviderCredential(effectiveInviteCode(inviteCode))
     } catch (error) {
       if (error instanceof Error && error.message.includes("GRIST_MASTER_KEY")) {
         return { ok: false, reason: "master_key_missing" }
@@ -323,6 +323,35 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   /**
+   * Team key sharing: a team runs on its owner's provider key (the OpenAI
+   * or Vercel AI Gateway key the owner attached). A member whose team
+   * owner has a usable credential resolves to the owner's invite for
+   * credential purposes — the member needs no key of their own. Model
+   * overrides, spend, and caps stay on the member's own account; only the
+   * key (and the Jev route it implies) comes from the owner.
+   */
+  function effectiveInviteCode(inviteCode: string): string {
+    const context = store.teamKeyContext(inviteCode)
+    if (!context || context.is_owner === 1) return inviteCode
+    return hasUsableCredential(context.owner_invite_code) ? context.owner_invite_code : inviteCode
+  }
+
+  /** The team key serving this account, when one does. */
+  function teamKeyShare(inviteCode: string) {
+    const context = store.teamKeyContext(inviteCode)
+    if (!context || context.is_owner === 1) return undefined
+    const effective = effectiveInviteCode(inviteCode)
+    if (effective === inviteCode) return undefined
+    const summary = store.providerCredentialSummary(effective)
+    if (!summary) return undefined
+    return {
+      team_name: context.team_name,
+      owner_email: context.owner_email,
+      provider: summary.provider,
+    }
+  }
+
+  /**
    * The Jev gate rides the caller's provider key: OpenRouter/Vercel users
    * score on their own key at their own Jev endpoint. Custom providers have
    * no Jev endpoint, and accounts without a credential use the house route.
@@ -330,7 +359,7 @@ export function createGateway(opts: GatewayOptions = {}) {
   function jevRouteForInvite(inviteCode: string): JevRoute | undefined {
     let credential: ProviderCredential | undefined
     try {
-      credential = store.getProviderCredential(inviteCode)
+      credential = store.getProviderCredential(effectiveInviteCode(inviteCode))
     } catch {
       return jevRoute()
     }
@@ -823,7 +852,7 @@ export function createGateway(opts: GatewayOptions = {}) {
   async function gateRoute(req: Request): Promise<Response> {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
-    const capBlock = capResponse(invite, hasUsableCredential(invite.code))
+    const capBlock = capResponse(invite, hasUsableCredential(effectiveInviteCode(invite.code)))
     if (capBlock) return capBlock
     if (!allowWindow(`gate:${invite.code}`, limits.gateRoute.limit, limits.gateRoute.windowMs)) {
       return json(429, { error: "too many routing requests" })
@@ -959,12 +988,15 @@ export function createGateway(opts: GatewayOptions = {}) {
     const events = store.usageFor(invite.code)
     const by_rung: Record<Rung, number> = { cheapest: 0, medium: 0, frontier: 0, premium: 0 }
     for (const event of events) by_rung[event.rung] += event.usd
+    const share = teamKeyShare(invite.code)
+    const ownSummary = store.providerCredentialSummary(invite.code)
     return json(200, {
       spent_usd: roundUsd(invite.spent_usd),
       cap_usd: invite.cap_usd,
       remaining_usd: roundUsd(Math.max(0, invite.cap_usd - invite.spent_usd)),
       plan: "beta",
-      provider: store.providerCredentialSummary(invite.code)?.provider ?? null,
+      provider: share?.provider ?? ownSummary?.provider ?? null,
+      provider_source: share ? "team" : ownSummary ? "own" : null,
       expires_at: new Date(invite.expires_at).toISOString(),
       by_rung: {
         cheapest: roundUsd(by_rung.cheapest),
@@ -1111,7 +1143,10 @@ export function createGateway(opts: GatewayOptions = {}) {
 
     if (req.method === "GET") {
       const summary = store.providerCredentialSummary(invite.code)
-      return json(200, summary ?? { provider: null })
+      return json(200, {
+        ...(summary ?? { provider: null }),
+        team_key: teamKeyShare(invite.code) ?? null,
+      })
     }
 
     if (req.method === "DELETE") {

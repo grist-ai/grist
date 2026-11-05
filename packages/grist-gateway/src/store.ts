@@ -69,6 +69,13 @@ export type TeamUsageRow = {
   spent_usd: number
 }
 
+export type TeamKeyContext = {
+  owner_invite_code: string
+  team_name: string
+  owner_email: string | null
+  is_owner: number
+}
+
 export type NotificationRow = {
   id: string
   firebase_uid: string
@@ -399,6 +406,15 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `UPDATE notifications SET read_at = ? WHERE id = ? AND firebase_uid = ? AND read_at IS NULL`,
   )
   const selectNotification = db.prepare(`SELECT * FROM notifications WHERE id = ?`)
+  const selectTeamKeyContext = db.prepare(
+    `SELECT o.invite_code AS owner_invite_code, t.name AS team_name, o.email AS owner_email,
+            (t.owner_uid = a.firebase_uid) AS is_owner
+     FROM accounts a
+     JOIN team_members m ON m.firebase_uid = a.firebase_uid
+     JOIN teams t ON t.id = m.team_id
+     JOIN accounts o ON o.firebase_uid = t.owner_uid
+     WHERE a.invite_code = ?`,
+  )
   const selectTeamUsage = db.prepare(
     `SELECT a.firebase_uid, a.user_id, a.email, a.first_name, a.last_name, m.role, i.spent_usd
      FROM team_members m
@@ -887,6 +903,14 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       })()
       notify(input.targetUid, "team_ownership", { teamId: team.id, teamName: team.name })
       return { ok: true }
+    },
+
+    /**
+     * Team key-sharing context for an account: its team's owner invite
+     * code and identity. Undefined when the account is in no team.
+     */
+    teamKeyContext(inviteCode: string): TeamKeyContext | undefined {
+      return (selectTeamKeyContext.get(inviteCode) as TeamKeyContext | null) ?? undefined
     },
 
     /** Per-member spend for a team, from each member account's own invite. */
