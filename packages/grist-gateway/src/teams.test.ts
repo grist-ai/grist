@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
+import { createGateway } from "./http.js"
 import { openGatewayStore } from "./store.js"
 
 type Store = ReturnType<typeof openGatewayStore>
@@ -182,6 +183,117 @@ describe("teams", () => {
     ).toEqual({ ok: true })
     expect(store.getTeamForUser(b.uid)).toBeUndefined()
     expect(payloads(store, b.uid).some((note) => note.type === "team_removed")).toBe(true)
+  })
+})
+
+describe("teams HTTP API", () => {
+  const USERS: Record<string, { localId: string; email: string }> = {
+    tok_a: { localId: "uid_a", email: "a@example.com" },
+    tok_b: { localId: "uid_b", email: "b@example.com" },
+    tok_c: { localId: "uid_c", email: "c@example.com" },
+  }
+  process.env.FIREBASE_API_KEY = "key"
+  process.env.FIREBASE_AUTH_DOMAIN = "grist-test.firebaseapp.com"
+  process.env.FIREBASE_PROJECT_ID = "grist-test"
+  process.env.FIREBASE_APP_ID = "1:1:web:abc"
+  afterAll(() => {
+    delete process.env.FIREBASE_API_KEY
+    delete process.env.FIREBASE_AUTH_DOMAIN
+    delete process.env.FIREBASE_PROJECT_ID
+    delete process.env.FIREBASE_APP_ID
+  })
+
+  function gateway() {
+    return createGateway({
+      fetch: async (_input: string, init?: RequestInit) => {
+        const token = (JSON.parse(String(init?.body)) as { idToken?: string }).idToken ?? ""
+        const user = USERS[token]
+        return new Response(JSON.stringify({ users: user ? [user] : [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      },
+    })
+  }
+
+  async function call(
+    fetchImpl: (req: Request) => Promise<Response>,
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<{ status: number; json: Record<string, unknown> }> {
+    const response = await fetchImpl(
+      new Request(`http://localhost${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    )
+    return { status: response.status, json: (await response.json()) as Record<string, unknown> }
+  }
+
+  async function userId(fetchImpl: (req: Request) => Promise<Response>, token: string): Promise<string> {
+    const session = await call(fetchImpl, "/v1/auth/session", { id_token: token })
+    const id = session.json.user_id
+    if (typeof id !== "string") throw new Error("session carried no user_id")
+    return id
+  }
+
+  test("session carries the public user ID; teams flow end to end", async () => {
+    const gw = gateway()
+    const aId = await userId(gw.fetch, "tok_a")
+    const bId = await userId(gw.fetch, "tok_b")
+    expect(aId).toMatch(/^gu_/)
+
+    const created = await call(gw.fetch, "/v1/teams", { id_token: "tok_a", name: "Core" })
+    expect(created.status).toBe(201)
+    const team = created.json.team as { name: string; role: string; members: unknown[] }
+    expect(team.name).toBe("Core")
+    expect(team.role).toBe("owner")
+    expect(team.members).toHaveLength(1)
+
+    const added = await call(gw.fetch, "/v1/teams/members", { id_token: "tok_a", user_id: bId })
+    expect(added.status).toBe(200)
+    expect((added.json.team as { members: unknown[] }).members).toHaveLength(2)
+
+    // b got the team_added notification.
+    const notes = await call(gw.fetch, "/v1/notifications", { id_token: "tok_b" })
+    const list = notes.json.notifications as { id: string; type: string; read: boolean }[]
+    expect(list).toHaveLength(1)
+    expect(list[0]?.type).toBe("team_added")
+    const read = await call(gw.fetch, "/v1/notifications/read", {
+      id_token: "tok_b",
+      id: list[0]?.id,
+    })
+    expect(read.status).toBe(200)
+    const after = await call(gw.fetch, "/v1/notifications", { id_token: "tok_b" })
+    expect((after.json.notifications as { read: boolean }[])[0]?.read).toBe(true)
+
+    // A plain member cannot add; an unknown token is unauthorized.
+    const cId = await userId(gw.fetch, "tok_c")
+    const byMember = await call(gw.fetch, "/v1/teams/members", { id_token: "tok_b", user_id: cId })
+    expect(byMember.status).toBe(403)
+    const anon = await call(gw.fetch, "/v1/teams/mine", {})
+    expect(anon.status).toBe(401)
+  })
+
+  test("adding a user from another team 409s and notifies that user", async () => {
+    const gw = gateway()
+    const aId = await userId(gw.fetch, "tok_a")
+    const cId = await userId(gw.fetch, "tok_c")
+    void aId
+    await call(gw.fetch, "/v1/teams", { id_token: "tok_a", name: "Mine" })
+    await call(gw.fetch, "/v1/teams", { id_token: "tok_c", name: "Theirs" })
+    const blocked = await call(gw.fetch, "/v1/teams/members", { id_token: "tok_a", user_id: cId })
+    expect(blocked.status).toBe(409)
+    expect(blocked.json.other_team_name).toBe("Theirs")
+    const notes = await call(gw.fetch, "/v1/notifications", { id_token: "tok_c" })
+    const list = notes.json.notifications as { type: string }[]
+    expect(list.map((note) => note.type)).toContain("team_add_blocked")
+    // c leaves theirs (sole owner: dissolves), then the add succeeds.
+    const left = await call(gw.fetch, "/v1/teams/leave", { id_token: "tok_c" })
+    expect(left.status).toBe(200)
+    const added = await call(gw.fetch, "/v1/teams/members", { id_token: "tok_a", user_id: cId })
+    expect(added.status).toBe(200)
   })
 })
 

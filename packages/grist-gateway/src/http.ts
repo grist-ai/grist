@@ -10,7 +10,14 @@ import { parseByokProvider, providerEndpoints, resolveUpstream, type ByokProvide
 import { applyModeCap, type OperatingMode } from "@grist-ai/logic"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase.js"
 import { isLadderModel, publicLadderID, priceForModel, usdForUsage } from "./prices.js"
-import { ACCOUNT_TTL_MS, openGatewayStore, type ApiKeyKind, type GatewayStore, type InviteRow } from "./store.js"
+import {
+  ACCOUNT_TTL_MS,
+  openGatewayStore,
+  type ApiKeyKind,
+  type GatewayStore,
+  type InviteRow,
+  type NotificationRow,
+} from "./store.js"
 import { canonicalApiKey } from "./codes.js"
 import { parseMasterKey } from "./provider-keys.js"
 import type { ProviderCredential } from "./store.js"
@@ -423,6 +430,14 @@ export function createGateway(opts: GatewayOptions = {}) {
     if (pathname === "/v1/api-keys" || pathname.startsWith("/v1/api-keys/")) {
       return apiKeys(req, pathname, peerIp)
     }
+    if (
+      pathname === "/v1/teams" ||
+      pathname.startsWith("/v1/teams/") ||
+      pathname === "/v1/notifications" ||
+      pathname.startsWith("/v1/notifications/")
+    ) {
+      return teams(req, pathname, peerIp)
+    }
 
     if (pathname === "/v1/rung-models") {
       return rungModels(req)
@@ -516,6 +531,25 @@ export function createGateway(opts: GatewayOptions = {}) {
   // sign-in, so heal a lapsed invite in place — cap, spend and API keys all
   // hang off the code and stay intact. A revoked invite is an operator
   // decision and is never healed here.
+  /**
+   * First sign-in mints the account on the fly (open accounts). Shared by
+   * the session endpoint and the team endpoints so an account — and its
+   * public user ID — exists before any team call is made.
+   */
+  function ensureUserAccount(user: FirebaseUser, firstName?: string, lastName?: string) {
+    const existing = store.getAccount(user.uid)
+    if (existing) return existing
+    const fresh = store.createInvite({ note: "account", expiresAt: now() + ACCOUNT_TTL_MS })
+    const result = store.bindAccount({
+      uid: user.uid,
+      email: user.email,
+      firstName,
+      lastName,
+      inviteCode: fresh.code,
+    })
+    return result.ok ? result.account : undefined
+  }
+
   function usableInviteFor(account: { invite_code: string }) {
     const invite = store.getInvite(account.invite_code)
     if (!invite || invite.revoked) return undefined
@@ -541,22 +575,14 @@ export function createGateway(opts: GatewayOptions = {}) {
         needs_invite: false,
         email: user.email,
         code: invite.code,
+        user_id: account.user_id,
       })
     }
     // Open accounts: first sign-in mints the account on the fly, so the
     // session always carries a usable code.
-    let account = store.getAccount(user.uid)
+    const account = ensureUserAccount(user, firstName, lastName)
     if (!account) {
-      const fresh = store.createInvite({ note: "account", expiresAt: now() + ACCOUNT_TTL_MS })
-      const result = store.bindAccount({
-        uid: user.uid,
-        email: user.email,
-        firstName,
-        lastName,
-        inviteCode: fresh.code,
-      })
-      if (!result.ok) return json(500, { error: "account setup failed" })
-      account = result.account
+      return json(500, { error: "account setup failed" })
     }
     const invite = usableInviteFor(account)
     if (!invite) {
@@ -568,6 +594,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       needs_invite: false,
       email: user.email,
       code: invite.code,
+      user_id: account.user_id,
     })
   }
 
@@ -600,6 +627,174 @@ export function createGateway(opts: GatewayOptions = {}) {
         : json(400, { ok: false, error: "account already bound to a different code" })
     }
     return json(200, { ok: true, code: invite.code })
+  }
+
+  function publicTeamState(uid: string) {
+    const found = store.getTeamForUser(uid)
+    if (!found) return null
+    const owner = store.getAccount(found.team.owner_uid)
+    return {
+      id: found.team.id,
+      name: found.team.name,
+      owner_user_id: owner?.user_id ?? null,
+      role: found.membership.role,
+      created_at: found.team.created_at,
+      members: store.listTeamMembers(found.team.id).map((member) => ({
+        user_id: member.user_id,
+        email: member.email,
+        first_name: member.first_name,
+        last_name: member.last_name,
+        role: member.role,
+        created_at: member.created_at,
+      })),
+    }
+  }
+
+  function publicNotification(row: NotificationRow) {
+    return {
+      id: row.id,
+      type: row.type,
+      payload: JSON.parse(row.payload) as Record<string, unknown>,
+      read: row.read_at !== null,
+      created_at: row.created_at,
+    }
+  }
+
+  /**
+   * Teams + notifications. Every call is a POST carrying the caller's
+   * Firebase ID token in the body (the auth shape of /v1/auth/session):
+   * these are account-holder surfaces, not agent API-key surfaces. Only
+   * public user IDs are exposed — firebase_uid never leaves the server.
+   */
+  async function teams(req: Request, pathname: string, peerIp?: string): Promise<Response> {
+    if (req.method !== "POST") return json(405, { error: "method not allowed" })
+    if (!allowValidate(clientIp(req, peerIp, trustedProxies))) {
+      return json(401, { error: "unauthorized" })
+    }
+    const body = await readJson(req)
+    const token = typeof body?.id_token === "string" ? body.id_token : ""
+    const user = token ? await verifyFirebaseIdToken(token, fetchImpl) : undefined
+    if (!user) return json(401, { error: "unauthorized" })
+    const account = ensureUserAccount(user)
+    if (!account) return json(500, { error: "account setup failed" })
+    const uid = user.uid
+
+    if (pathname === "/v1/notifications") {
+      return json(200, { notifications: store.listNotifications(uid).map(publicNotification) })
+    }
+    if (pathname === "/v1/notifications/read") {
+      const id = typeof body?.id === "string" ? body.id : ""
+      if (!store.markNotificationRead(uid, id)) {
+        return json(404, { error: "notification not found" })
+      }
+      return json(200, { ok: true })
+    }
+    if (pathname === "/v1/teams") {
+      const name = typeof body?.name === "string" ? body.name : ""
+      const created = store.createTeam({ ownerUid: uid, name })
+      if (!created.ok) {
+        if (created.reason === "invalid_name") return json(400, { error: "team name is required" })
+        return json(409, { error: "already in a team", team: publicTeamState(uid) })
+      }
+      return json(201, { team: publicTeamState(uid) })
+    }
+    if (pathname === "/v1/teams/mine") {
+      return json(200, { team: publicTeamState(uid) })
+    }
+    if (pathname === "/v1/teams/leave") {
+      const left = store.leaveTeam({ uid })
+      if (!left.ok) {
+        if (left.reason === "not_in_team") return json(409, { error: "not in a team" })
+        return json(409, { error: "transfer ownership before leaving" })
+      }
+      return json(200, { ok: true, dissolved: left.dissolved })
+    }
+
+    const mine = store.getTeamForUser(uid)
+    if (!mine) return json(409, { error: "not in a team" })
+
+    if (pathname === "/v1/teams/members") {
+      const targetUserId = typeof body?.user_id === "string" ? body.user_id : ""
+      const added = store.addTeamMember({ teamId: mine.team.id, actorUid: uid, targetUserId })
+      if (!added.ok) {
+        if (added.reason === "user_not_found") return json(404, { error: "no user with that ID" })
+        if (added.reason === "already_member") {
+          return json(409, { error: "already a member of your team" })
+        }
+        if (added.reason === "in_other_team") {
+          return json(409, {
+            error: "that user belongs to another team — they've been notified",
+            other_team_name: added.otherTeam?.name ?? null,
+          })
+        }
+        if (added.reason === "not_authorized") {
+          return json(403, { error: "only team owners and admins can add members" })
+        }
+        return json(404, { error: "team not found" })
+      }
+      return json(200, { team: publicTeamState(uid) })
+    }
+
+    if (
+      pathname === "/v1/teams/members/remove" ||
+      pathname === "/v1/teams/members/role" ||
+      pathname === "/v1/teams/transfer"
+    ) {
+      const targetUserId = typeof body?.target_user_id === "string" ? body.target_user_id : ""
+      const target = store.getAccountByUserId(targetUserId)
+      if (!target) return json(404, { error: "no user with that ID" })
+      if (pathname === "/v1/teams/members/remove") {
+        const removed = store.removeTeamMember({
+          teamId: mine.team.id,
+          actorUid: uid,
+          targetUid: target.firebase_uid,
+        })
+        if (!removed.ok) {
+          if (removed.reason === "cannot_remove_owner") {
+            return json(409, { error: "the team owner cannot be removed" })
+          }
+          if (removed.reason === "not_member") {
+            return json(404, { error: "that user is not in your team" })
+          }
+          return json(403, { error: "only team owners and admins can remove members" })
+        }
+        return json(200, { team: publicTeamState(uid) })
+      }
+      if (pathname === "/v1/teams/members/role") {
+        const role =
+          body?.role === "admin" ? "admin" : body?.role === "member" ? "member" : undefined
+        if (!role) return json(400, { error: "role must be admin or member" })
+        const updated = store.setTeamMemberRole({
+          teamId: mine.team.id,
+          actorUid: uid,
+          targetUid: target.firebase_uid,
+          role,
+        })
+        if (!updated.ok) {
+          if (updated.reason === "not_authorized") {
+            return json(403, { error: "only the team owner can change roles" })
+          }
+          if (updated.reason === "cannot_change_owner") {
+            return json(409, { error: "the owner's role cannot be changed" })
+          }
+          return json(404, { error: "that user is not in your team" })
+        }
+        return json(200, { team: publicTeamState(uid) })
+      }
+      const transferred = store.transferTeamOwnership({
+        teamId: mine.team.id,
+        actorUid: uid,
+        targetUid: target.firebase_uid,
+      })
+      if (!transferred.ok) {
+        if (transferred.reason === "not_authorized") {
+          return json(403, { error: "only the team owner can transfer ownership" })
+        }
+        return json(404, { error: "that user is not in your team" })
+      }
+      return json(200, { team: publicTeamState(uid) })
+    }
+    return json(404, { error: "not found" })
   }
 
   async function gateRoute(req: Request): Promise<Response> {
