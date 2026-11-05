@@ -276,6 +276,50 @@ describe("teams HTTP API", () => {
     expect(anon.status).toBe(401)
   })
 
+  test("team usage: owner sees every member, member sees total + own row", async () => {
+    const store = openGatewayStore(":memory:")
+    const gw = createGateway({
+      store,
+      fetch: async (_input: string, init?: RequestInit) => {
+        const token = (JSON.parse(String(init?.body)) as { idToken?: string }).idToken ?? ""
+        const user = USERS[token]
+        return new Response(JSON.stringify({ users: user ? [user] : [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      },
+    })
+    const sessionA = await call(gw.fetch, "/v1/auth/session", { id_token: "tok_a" })
+    const sessionB = await call(gw.fetch, "/v1/auth/session", { id_token: "tok_b" })
+    const bId = sessionB.json.user_id as string
+    for (const [session, usd] of [
+      [sessionA, 3.5],
+      [sessionB, 1.25],
+    ] as const) {
+      store.addSpend({
+        code: session.json.code as string,
+        model: "gate/route",
+        rung: "cheapest",
+        inputTokens: 0,
+        outputTokens: 0,
+        usd,
+      })
+    }
+    await call(gw.fetch, "/v1/teams", { id_token: "tok_a", name: "Spenders" })
+    await call(gw.fetch, "/v1/teams/members", { id_token: "tok_a", user_id: bId })
+
+    const ownerView = await call(gw.fetch, "/v1/teams/usage", { id_token: "tok_a" })
+    expect(ownerView.status).toBe(200)
+    expect(ownerView.json.total_spent_usd).toBeCloseTo(4.75)
+    expect(ownerView.json.members as unknown[]).toHaveLength(2)
+
+    const memberView = await call(gw.fetch, "/v1/teams/usage", { id_token: "tok_b" })
+    expect(memberView.json.total_spent_usd).toBeCloseTo(4.75)
+    const rows = memberView.json.members as { spent_usd: number }[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.spent_usd).toBeCloseTo(1.25)
+  })
+
   test("adding a user from another team 409s and notifies that user", async () => {
     const gw = gateway()
     const aId = await userId(gw.fetch, "tok_a")

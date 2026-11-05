@@ -992,6 +992,23 @@ async function loadTeam() {
       })
       .join("")
   }
+  if (team) {
+    const usage = await teamCall("/v1/teams/usage")
+    if (gen !== teamLoad) return
+    document.getElementById("team-usage-total").textContent =
+      `$${Number(usage.data.total_spent_usd ?? 0).toFixed(2)} spent by the team in total.`
+    document.getElementById("team-usage").innerHTML = (usage.data.members ?? [])
+      .map((row) => {
+        const name =
+          [row.first_name, row.last_name].filter(Boolean).join(" ") || row.email || row.user_id
+        return `<article class="admin-row">
+          <span>${escapeHtml(name)}</span>
+          <span>${row.role}</span>
+          <span>$${Number(row.spent_usd).toFixed(2)}</span>
+        </article>`
+      })
+      .join("")
+  }
   const list = notes.data.notifications ?? []
   document.getElementById("team-notifications").innerHTML = list.length
     ? list

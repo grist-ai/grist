@@ -661,10 +661,11 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   /**
-   * Teams + notifications. Every call is a POST carrying the caller's
-   * Firebase ID token in the body (the auth shape of /v1/auth/session):
-   * these are account-holder surfaces, not agent API-key surfaces. Only
-   * public user IDs are exposed — firebase_uid never leaves the server.
+   * Teams + notifications. Account-holder surfaces, not agent API-key
+   * surfaces: every call is a POST authenticated by the caller's Firebase
+   * ID token, sent either as the dashboard's Authorization: Bearer header
+   * or as `id_token` in the body (the /v1/auth/session shape). Only public
+   * user IDs are exposed — firebase_uid never leaves the server.
    */
   async function teams(req: Request, pathname: string, peerIp?: string): Promise<Response> {
     if (req.method !== "POST") return json(405, { error: "method not allowed" })
@@ -672,7 +673,9 @@ export function createGateway(opts: GatewayOptions = {}) {
       return json(401, { error: "unauthorized" })
     }
     const body = await readJson(req)
-    const token = typeof body?.id_token === "string" ? body.id_token : ""
+    const bearer = req.headers.get("Authorization") ?? ""
+    const headerToken = bearer.startsWith("Bearer ") ? bearer.slice(7).trim() : ""
+    const token = headerToken || (typeof body?.id_token === "string" ? body.id_token : "")
     const user = token ? await verifyFirebaseIdToken(token, fetchImpl) : undefined
     if (!user) return json(401, { error: "unauthorized" })
     const account = ensureUserAccount(user)
@@ -712,6 +715,24 @@ export function createGateway(opts: GatewayOptions = {}) {
 
     const mine = store.getTeamForUser(uid)
     if (!mine) return json(409, { error: "not in a team" })
+
+    if (pathname === "/v1/teams/usage") {
+      const rows = store.teamUsage(mine.team.id)
+      const total = rows.reduce((sum, row) => sum + row.spent_usd, 0)
+      const canSeeAll = mine.membership.role === "owner" || mine.membership.role === "admin"
+      const visible = canSeeAll ? rows : rows.filter((row) => row.firebase_uid === uid)
+      return json(200, {
+        total_spent_usd: total,
+        members: visible.map((row) => ({
+          user_id: row.user_id,
+          email: row.email,
+          first_name: row.first_name,
+          last_name: row.last_name,
+          role: row.role,
+          spent_usd: row.spent_usd,
+        })),
+      })
+    }
 
     if (pathname === "/v1/teams/members") {
       const targetUserId = typeof body?.user_id === "string" ? body.user_id : ""

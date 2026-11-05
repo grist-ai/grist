@@ -59,6 +59,16 @@ export type TeamMemberView = TeamMemberRow & {
   user_id: string | null
 }
 
+export type TeamUsageRow = {
+  firebase_uid: string
+  user_id: string | null
+  email: string | null
+  first_name: string | null
+  last_name: string | null
+  role: TeamRole
+  spent_usd: number
+}
+
 export type NotificationRow = {
   id: string
   firebase_uid: string
@@ -389,6 +399,13 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `UPDATE notifications SET read_at = ? WHERE id = ? AND firebase_uid = ? AND read_at IS NULL`,
   )
   const selectNotification = db.prepare(`SELECT * FROM notifications WHERE id = ?`)
+  const selectTeamUsage = db.prepare(
+    `SELECT a.firebase_uid, a.user_id, a.email, a.first_name, a.last_name, m.role, i.spent_usd
+     FROM team_members m
+     JOIN accounts a ON a.firebase_uid = m.firebase_uid
+     JOIN invites i ON i.code = a.invite_code
+     WHERE m.team_id = ? ORDER BY m.created_at ASC`,
+  )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
     `INSERT INTO api_keys (id, invite_code, hash, prefix, name, kind, created_at, last_used_at, revoked)
@@ -870,6 +887,11 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       })()
       notify(input.targetUid, "team_ownership", { teamId: team.id, teamName: team.name })
       return { ok: true }
+    },
+
+    /** Per-member spend for a team, from each member account's own invite. */
+    teamUsage(teamId: string): TeamUsageRow[] {
+      return selectTeamUsage.all(teamId) as TeamUsageRow[]
     },
 
     createApiKey(input: { inviteCode: string; name?: string; kind?: ApiKeyKind }): { secret: string; key: PublicApiKey } | undefined {
