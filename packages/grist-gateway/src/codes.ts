@@ -40,6 +40,33 @@ export function hashApiKey(secret: string): string {
   return createHash("sha256").update(secret).digest("hex")
 }
 
+/**
+ * Public user IDs look like `gu_` plus 10 Crockford chars. They are the
+ * shareable handle a user gives a team owner to be added by — safe to
+ * dictate or paste, and useless as a credential.
+ */
+export function generateUserId(): string {
+  // Lowercase: user IDs get typed into forms and read over calls, and the
+  // canonical form is lowercase, so generation matches it exactly.
+  return `gu_${randomCrockford(10).toLowerCase()}`
+}
+
+export function canonicalUserId(raw: string): string | undefined {
+  const value = raw.trim().toLowerCase()
+  if (!/^gu_[0-9a-hjkmnp-tv-z]{10}$/.test(value)) return
+  return value
+}
+
+/** Team IDs look like `gt_` plus 12 Crockford chars. */
+export function generateTeamId(): string {
+  return `gt_${randomCrockford(12)}`
+}
+
+/** Notification IDs look like `gn_` plus 12 Crockford chars. */
+export function generateNotificationId(): string {
+  return `gn_${randomCrockford(12)}`
+}
+
 /** Invite codes look like `grist-XXXX-XXXX`. */
 export function generateInviteCode(): string {
   const chars = randomCrockford(8)

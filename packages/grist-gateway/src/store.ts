@@ -12,12 +12,16 @@ import {
   canonicalApiKey,
   canonicalDeviceUserCode,
   canonicalInviteCode,
+  canonicalUserId,
   generateApiKeyId,
   generateApiKeySecret,
   generateConnectorSecret,
   generateDeviceSecret,
   generateDeviceUserCode,
   generateInviteCode,
+  generateNotificationId,
+  generateTeamId,
+  generateUserId,
   hashApiKey,
 } from "./codes.js"
 
@@ -27,6 +31,40 @@ export type AccountRow = {
   email: string | null
   first_name: string | null
   last_name: string | null
+  user_id: string | null
+  created_at: number
+}
+
+export type TeamRole = "owner" | "admin" | "member"
+
+export type TeamRow = {
+  id: string
+  name: string
+  owner_uid: string
+  created_at: number
+}
+
+export type TeamMemberRow = {
+  team_id: string
+  firebase_uid: string
+  role: TeamRole
+  added_by: string | null
+  created_at: number
+}
+
+export type TeamMemberView = TeamMemberRow & {
+  email: string | null
+  first_name: string | null
+  last_name: string | null
+  user_id: string | null
+}
+
+export type NotificationRow = {
+  id: string
+  firebase_uid: string
+  type: string
+  payload: string
+  read_at: number | null
   created_at: number
 }
 
@@ -173,8 +211,33 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       email TEXT,
       first_name TEXT,
       last_name TEXT,
+      user_id TEXT,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      owner_uid TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS team_members (
+      team_id TEXT NOT NULL,
+      firebase_uid TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      added_by TEXT,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (team_id, firebase_uid)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS team_members_uid ON team_members(firebase_uid);
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      firebase_uid TEXT NOT NULL,
+      type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      read_at INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS notifications_uid_at ON notifications(firebase_uid, created_at);
     CREATE TABLE IF NOT EXISTS api_keys (
       id TEXT PRIMARY KEY,
       invite_code TEXT NOT NULL,
@@ -225,6 +288,22 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   if (!apiKeyColumns.some((column) => column.name === "kind")) {
     db.exec("ALTER TABLE api_keys ADD COLUMN kind TEXT NOT NULL DEFAULT 'standard'")
   }
+  // Public user IDs: the shareable handle teams add members by. Backfilled
+  // for every account created before they existed, so an ID always resolves.
+  if (!accountColumns.some((column) => column.name === "user_id")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN user_id TEXT")
+  }
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS accounts_user_id ON accounts(user_id)")
+  const selectUserIdTaken = db.prepare(`SELECT 1 FROM accounts WHERE user_id = ?`)
+  const setAccountUserId = db.prepare(`UPDATE accounts SET user_id = ? WHERE firebase_uid = ?`)
+  const accountsMissingUserId = db
+    .prepare(`SELECT firebase_uid FROM accounts WHERE user_id IS NULL`)
+    .all() as { firebase_uid: string }[]
+  for (const row of accountsMissingUserId) {
+    let userId = generateUserId()
+    while (selectUserIdTaken.get(userId)) userId = generateUserId()
+    setAccountUserId.run(userId, row.firebase_uid)
+  }
 
   const insertInvite = db.prepare(
     `INSERT INTO invites (code, cap_usd, spent_usd, expires_at, revoked, note, created_at)
@@ -268,7 +347,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   // processes; ON CONFLICT DO NOTHING turns a lost race into changes === 0
   // (clean 409) instead of an unhandled 500.
   const insertAccountIgnore = db.prepare(
-    `INSERT INTO accounts (firebase_uid, invite_code, email, first_name, last_name, created_at) VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO accounts (firebase_uid, invite_code, email, first_name, last_name, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT DO NOTHING`,
   )
   const updateAccountNames = db.prepare(
@@ -276,6 +355,40 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   )
   const selectAccount = db.prepare(`SELECT * FROM accounts WHERE firebase_uid = ?`)
   const selectAccountByInvite = db.prepare(`SELECT * FROM accounts WHERE invite_code = ?`)
+  const selectAccountByUserId = db.prepare(`SELECT * FROM accounts WHERE user_id = ?`)
+  const insertTeam = db.prepare(
+    `INSERT INTO teams (id, name, owner_uid, created_at) VALUES (?, ?, ?, ?)`,
+  )
+  const selectTeam = db.prepare(`SELECT * FROM teams WHERE id = ?`)
+  const deleteTeamRow = db.prepare(`DELETE FROM teams WHERE id = ?`)
+  const updateTeamOwner = db.prepare(`UPDATE teams SET owner_uid = ? WHERE id = ?`)
+  const insertTeamMember = db.prepare(
+    `INSERT INTO team_members (team_id, firebase_uid, role, added_by, created_at) VALUES (?, ?, ?, ?, ?)`,
+  )
+  const selectMembership = db.prepare(`SELECT * FROM team_members WHERE firebase_uid = ?`)
+  const selectTeamMembers = db.prepare(
+    `SELECT m.*, a.email, a.first_name, a.last_name, a.user_id
+     FROM team_members m JOIN accounts a ON a.firebase_uid = m.firebase_uid
+     WHERE m.team_id = ? ORDER BY m.created_at ASC`,
+  )
+  const deleteTeamMember = db.prepare(
+    `DELETE FROM team_members WHERE team_id = ? AND firebase_uid = ?`,
+  )
+  const deleteAllTeamMembers = db.prepare(`DELETE FROM team_members WHERE team_id = ?`)
+  const updateMemberRole = db.prepare(
+    `UPDATE team_members SET role = ? WHERE team_id = ? AND firebase_uid = ?`,
+  )
+  const insertNotification = db.prepare(
+    `INSERT INTO notifications (id, firebase_uid, type, payload, read_at, created_at)
+     VALUES (?, ?, ?, ?, NULL, ?)`,
+  )
+  const selectNotifications = db.prepare(
+    `SELECT * FROM notifications WHERE firebase_uid = ? ORDER BY created_at DESC LIMIT ?`,
+  )
+  const markNotificationReadRow = db.prepare(
+    `UPDATE notifications SET read_at = ? WHERE id = ? AND firebase_uid = ? AND read_at IS NULL`,
+  )
+  const selectNotification = db.prepare(`SELECT * FROM notifications WHERE id = ?`)
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
     `INSERT INTO api_keys (id, invite_code, hash, prefix, name, kind, created_at, last_used_at, revoked)
@@ -322,6 +435,20 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     const code = canonicalInviteCode(raw)
     if (!code) return
     return selectInvite.get(code) as InviteRow | undefined
+  }
+
+  function accountByUserId(raw: string): AccountRow | undefined {
+    const userId = canonicalUserId(raw)
+    if (!userId) return
+    // bun:sqlite returns null for no row; normalize to undefined.
+    return (selectAccountByUserId.get(userId) as AccountRow | null) ?? undefined
+  }
+
+  function notify(uid: string, type: string, payload: Record<string, unknown>): NotificationRow {
+    let id = generateNotificationId()
+    while (selectNotification.get(id)) id = generateNotificationId()
+    insertNotification.run(id, uid, type, JSON.stringify(payload), Date.now())
+    return selectNotification.get(id) as NotificationRow
   }
 
   /** Resolve an API key to its invite code without touching last_used_at. */
@@ -543,12 +670,15 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           db.exec("COMMIT")
           return { ok: false, reason: "code_taken" }
         }
+        let userId = generateUserId()
+        while (selectAccountByUserId.get(userId)) userId = generateUserId()
         const applied = insertAccountIgnore.run(
           input.uid,
           input.inviteCode,
           input.email ?? null,
           input.firstName?.trim() || null,
           input.lastName?.trim() || null,
+          userId,
           Date.now(),
         )
         if (applied.changes === 0) {
@@ -566,6 +696,178 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
         db.exec("ROLLBACK")
         throw error
       }
+    },
+
+    getAccountByUserId(raw: string): AccountRow | undefined {
+      return accountByUserId(raw)
+    },
+
+    createNotification(input: {
+      uid: string
+      type: string
+      payload: Record<string, unknown>
+    }): NotificationRow {
+      return notify(input.uid, input.type, input.payload)
+    },
+
+    listNotifications(uid: string, limit = 50): NotificationRow[] {
+      return selectNotifications.all(uid, limit) as NotificationRow[]
+    },
+
+    markNotificationRead(uid: string, id: string): boolean {
+      return markNotificationReadRow.run(Date.now(), id, uid).changes > 0
+    },
+
+    /**
+     * Anyone can create a team — unless they already belong to one. The
+     * one-team rule is structural: team_members carries a UNIQUE index on
+     * firebase_uid, so a second membership cannot exist even if a caller
+     * skips these checks.
+     */
+    createTeam(input: { ownerUid: string; name: string }):
+      | { ok: true; team: TeamRow }
+      | { ok: false; reason: "invalid_name" | "already_in_team" } {
+      const name = input.name.trim().slice(0, 80)
+      if (!name) return { ok: false, reason: "invalid_name" }
+      if (selectMembership.get(input.ownerUid)) return { ok: false, reason: "already_in_team" }
+      let id = generateTeamId()
+      while (selectTeam.get(id)) id = generateTeamId()
+      const at = Date.now()
+      db.transaction(() => {
+        insertTeam.run(id, name, input.ownerUid, at)
+        insertTeamMember.run(id, input.ownerUid, "owner", input.ownerUid, at)
+      })()
+      return { ok: true, team: selectTeam.get(id) as TeamRow }
+    },
+
+    getTeamForUser(uid: string): { team: TeamRow; membership: TeamMemberRow } | undefined {
+      const membership = selectMembership.get(uid) as TeamMemberRow | undefined
+      if (!membership) return
+      const team = selectTeam.get(membership.team_id) as TeamRow | undefined
+      if (!team) return
+      return { team, membership }
+    },
+
+    listTeamMembers(teamId: string): TeamMemberView[] {
+      return selectTeamMembers.all(teamId) as TeamMemberView[]
+    },
+
+    /**
+     * Add a user to a team by their public user ID (owner/admin only). A
+     * user who belongs to another team is never moved silently: the add is
+     * refused and THEY are notified which team tried to add them and which
+     * team they must leave first. A teamless user is added directly and
+     * notified that it happened.
+     */
+    addTeamMember(input: { teamId: string; actorUid: string; targetUserId: string }):
+      | { ok: true; member: TeamMemberRow }
+      | {
+          ok: false
+          reason: "team_not_found" | "not_authorized" | "user_not_found" | "already_member" | "in_other_team"
+          otherTeam?: TeamRow
+        } {
+      const team = selectTeam.get(input.teamId) as TeamRow | undefined
+      if (!team) return { ok: false, reason: "team_not_found" }
+      const actor = selectMembership.get(input.actorUid) as TeamMemberRow | undefined
+      if (!actor || actor.team_id !== input.teamId || (actor.role !== "owner" && actor.role !== "admin")) {
+        return { ok: false, reason: "not_authorized" }
+      }
+      const target = accountByUserId(input.targetUserId)
+      if (!target) return { ok: false, reason: "user_not_found" }
+      const existing = selectMembership.get(target.firebase_uid) as TeamMemberRow | undefined
+      if (existing && existing.team_id === input.teamId) return { ok: false, reason: "already_member" }
+      if (existing) {
+        const otherTeam = selectTeam.get(existing.team_id) as TeamRow | undefined
+        notify(target.firebase_uid, "team_add_blocked", {
+          teamId: team.id,
+          teamName: team.name,
+          currentTeamId: existing.team_id,
+          currentTeamName: otherTeam?.name ?? null,
+        })
+        return { ok: false, reason: "in_other_team", otherTeam }
+      }
+      insertTeamMember.run(input.teamId, target.firebase_uid, "member", input.actorUid, Date.now())
+      notify(target.firebase_uid, "team_added", { teamId: team.id, teamName: team.name })
+      return { ok: true, member: selectMembership.get(target.firebase_uid) as TeamMemberRow }
+    },
+
+    removeTeamMember(input: { teamId: string; actorUid: string; targetUid: string }):
+      | { ok: true }
+      | { ok: false; reason: "team_not_found" | "not_authorized" | "not_member" | "cannot_remove_owner" } {
+      const team = selectTeam.get(input.teamId) as TeamRow | undefined
+      if (!team) return { ok: false, reason: "team_not_found" }
+      const target = selectMembership.get(input.targetUid) as TeamMemberRow | undefined
+      if (!target || target.team_id !== input.teamId) return { ok: false, reason: "not_member" }
+      if (target.role === "owner") return { ok: false, reason: "cannot_remove_owner" }
+      const actor = selectMembership.get(input.actorUid) as TeamMemberRow | undefined
+      if (!actor || actor.team_id !== input.teamId || (actor.role !== "owner" && actor.role !== "admin")) {
+        return { ok: false, reason: "not_authorized" }
+      }
+      deleteTeamMember.run(input.teamId, input.targetUid)
+      notify(input.targetUid, "team_removed", { teamId: team.id, teamName: team.name })
+      return { ok: true }
+    },
+
+    setTeamMemberRole(input: { teamId: string; actorUid: string; targetUid: string; role: "admin" | "member" }):
+      | { ok: true }
+      | { ok: false; reason: "team_not_found" | "not_authorized" | "not_member" | "cannot_change_owner" } {
+      const team = selectTeam.get(input.teamId) as TeamRow | undefined
+      if (!team) return { ok: false, reason: "team_not_found" }
+      if (team.owner_uid !== input.actorUid) return { ok: false, reason: "not_authorized" }
+      const target = selectMembership.get(input.targetUid) as TeamMemberRow | undefined
+      if (!target || target.team_id !== input.teamId) return { ok: false, reason: "not_member" }
+      if (target.role === "owner") return { ok: false, reason: "cannot_change_owner" }
+      updateMemberRole.run(input.role, input.teamId, input.targetUid)
+      return { ok: true }
+    },
+
+    /**
+     * Leave the caller's current team. An owner with members left must
+     * transfer ownership first; a sole owner leaving dissolves the team.
+     */
+    leaveTeam(input: { uid: string }):
+      | { ok: true; dissolved: boolean }
+      | { ok: false; reason: "not_in_team" | "owner_must_transfer" } {
+      const membership = selectMembership.get(input.uid) as TeamMemberRow | undefined
+      if (!membership) return { ok: false, reason: "not_in_team" }
+      const team = selectTeam.get(membership.team_id) as TeamRow | undefined
+      if (membership.role !== "owner") {
+        deleteTeamMember.run(membership.team_id, input.uid)
+        if (team) {
+          notify(team.owner_uid, "team_member_left", {
+            teamId: team.id,
+            teamName: team.name,
+            userUid: input.uid,
+          })
+        }
+        return { ok: true, dissolved: false }
+      }
+      const others = (selectTeamMembers.all(membership.team_id) as TeamMemberView[]).filter(
+        (member) => member.firebase_uid !== input.uid,
+      )
+      if (others.length > 0) return { ok: false, reason: "owner_must_transfer" }
+      db.transaction(() => {
+        deleteAllTeamMembers.run(membership.team_id)
+        deleteTeamRow.run(membership.team_id)
+      })()
+      return { ok: true, dissolved: true }
+    },
+
+    transferTeamOwnership(input: { teamId: string; actorUid: string; targetUid: string }):
+      | { ok: true }
+      | { ok: false; reason: "team_not_found" | "not_authorized" | "not_member" } {
+      const team = selectTeam.get(input.teamId) as TeamRow | undefined
+      if (!team) return { ok: false, reason: "team_not_found" }
+      if (team.owner_uid !== input.actorUid) return { ok: false, reason: "not_authorized" }
+      const target = selectMembership.get(input.targetUid) as TeamMemberRow | undefined
+      if (!target || target.team_id !== input.teamId) return { ok: false, reason: "not_member" }
+      db.transaction(() => {
+        updateMemberRole.run("member", input.teamId, input.actorUid)
+        updateMemberRole.run("owner", input.teamId, input.targetUid)
+        updateTeamOwner.run(input.targetUid, input.teamId)
+      })()
+      notify(input.targetUid, "team_ownership", { teamId: team.id, teamName: team.name })
+      return { ok: true }
     },
 
     createApiKey(input: { inviteCode: string; name?: string; kind?: ApiKeyKind }): { secret: string; key: PublicApiKey } | undefined {
