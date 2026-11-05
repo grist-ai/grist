@@ -446,6 +446,20 @@ describe("teams HTTP API", () => {
     expect(gw.store.getInvite(aCode)?.spent_usd).toBe(0)
   })
 
+  test("member adds are rate-limited per actor (notification spam guard)", async () => {
+    const gw = gateway()
+    const bId = await userId(gw.fetch, "tok_b")
+    await call(gw.fetch, "/v1/teams", { id_token: "tok_a", name: "Spamguard" })
+    let last = 0
+    for (let attempt = 0; attempt < 31; attempt++) {
+      const res = await call(gw.fetch, "/v1/teams/members", { id_token: "tok_a", user_id: bId })
+      last = res.status
+    }
+    // First add succeeds, repeats 409 as already-member — the 31st is the
+    // rate limit kicking in at 30/hour.
+    expect(last).toBe(429)
+  })
+
   test("adding a user from another team 409s and notifies that user", async () => {
     const gw = gateway()
     const aId = await userId(gw.fetch, "tok_a")

@@ -467,7 +467,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       pathname === "/v1/notifications" ||
       pathname.startsWith("/v1/notifications/")
     ) {
-      return teams(req, pathname, peerIp)
+      return teams(req, pathname)
     }
 
     if (pathname === "/v1/rung-models") {
@@ -698,11 +698,8 @@ export function createGateway(opts: GatewayOptions = {}) {
    * or as `id_token` in the body (the /v1/auth/session shape). Only public
    * user IDs are exposed — firebase_uid never leaves the server.
    */
-  async function teams(req: Request, pathname: string, peerIp?: string): Promise<Response> {
+  async function teams(req: Request, pathname: string): Promise<Response> {
     if (req.method !== "POST") return json(405, { error: "method not allowed" })
-    if (!allowValidate(clientIp(req, peerIp, trustedProxies))) {
-      return json(401, { error: "unauthorized" })
-    }
     const body = await readJson(req)
     const bearer = req.headers.get("Authorization") ?? ""
     const headerToken = bearer.startsWith("Bearer ") ? bearer.slice(7).trim() : ""
@@ -766,6 +763,12 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
 
     if (pathname === "/v1/teams/members") {
+      // Adds notify the target (and blocked adds notify too), so cap them
+      // per actor — the one team route with a spam vector. The rest are
+      // authenticated by the Firebase token alone, like /v1/usage.
+      if (!allowWindow(`teamadd:${uid}`, 30, 3_600_000)) {
+        return json(429, { error: "too many member adds — try again later" })
+      }
       const targetUserId = typeof body?.user_id === "string" ? body.user_id : ""
       const added = store.addTeamMember({ teamId: mine.team.id, actorUid: uid, targetUserId })
       if (!added.ok) {
