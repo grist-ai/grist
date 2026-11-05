@@ -834,10 +834,12 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       if (membership.role !== "owner") {
         deleteTeamMember.run(membership.team_id, input.uid)
         if (team) {
+          const leaver = selectAccount.get(input.uid) as AccountRow | undefined
           notify(team.owner_uid, "team_member_left", {
             teamId: team.id,
             teamName: team.name,
-            userUid: input.uid,
+            userId: leaver?.user_id ?? null,
+            email: leaver?.email ?? null,
           })
         }
         return { ok: true, dissolved: false }

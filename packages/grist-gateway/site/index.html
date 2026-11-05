@@ -1096,6 +1096,7 @@ grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</
         <a href="/dashboard/api" data-dash="api">API keys</a>
         <a href="/dashboard/models" data-dash="models">Models</a>
         <a href="/dashboard/provider" data-dash="provider">Provider</a>
+        <a href="/dashboard/team" data-dash="team">Team</a>
       </nav>
       <p class="error" id="dash-error" hidden></p>
       <p class="remain" id="remain">—</p>
@@ -1208,6 +1209,54 @@ grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</
           <button type="button" class="text-btn" id="provider-remove" hidden>Remove key</button>
           <span class="muted" id="provider-msg" role="status"></span>
         </form>
+      </div>
+      <div id="dash-panel-team" hidden>
+        <p class="lede">
+          Your Grist user ID is how a team owner adds you. Share it freely —
+          it is not a password and cannot sign you in. One person can only
+          be in one team.
+        </p>
+        <section class="install">
+          <h2>Your user ID</h2>
+          <pre id="team-user-id">—</pre>
+          <button type="button" class="copy" id="copy-user-id">Copy</button>
+        </section>
+        <section id="team-none" hidden>
+          <h2>Create a team</h2>
+          <p class="muted">
+            You are not in a team. Create one, or share your user ID with a
+            team owner to be added to theirs.
+          </p>
+          <form id="team-create-form" class="key-form">
+            <div>
+              <label for="team-name">Team name</label>
+              <input id="team-name" name="name" maxlength="80" placeholder="Core team" autocomplete="off" />
+            </div>
+            <button class="btn" type="submit">Create team</button>
+            <span class="muted" id="team-create-msg" role="status"></span>
+          </form>
+        </section>
+        <section id="team-main" hidden>
+          <h2 id="team-name-line">Team</h2>
+          <p class="muted" id="team-role-line"></p>
+          <section class="admin-list" id="team-members"></section>
+          <form id="team-add-form" class="key-form" hidden>
+            <div>
+              <label for="team-add-id">Add by user ID</label>
+              <input id="team-add-id" name="user_id" maxlength="32" placeholder="gu_…" autocomplete="off" />
+            </div>
+            <button class="btn" type="submit">Add member</button>
+            <span class="muted" id="team-add-msg" role="status"></span>
+          </form>
+          <p>
+            <button type="button" class="text-btn" id="team-leave">Leave team</button>
+            <span class="muted" id="team-msg" role="status"></span>
+          </p>
+        </section>
+        <section class="install">
+          <h2>Notifications</h2>
+          <section class="admin-list" id="team-notifications"></section>
+        </section>
       </div>
     </main>
 

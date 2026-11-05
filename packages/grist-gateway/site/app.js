@@ -16,6 +16,7 @@ const state = {
   ready: false,
   admin: false,
   uid: "",
+  userId: "",
   sessionKnown: false,
 }
 let sessionTicket = 0
@@ -31,6 +32,7 @@ const views = {
   "/dashboard/api": "view-dashboard",
   "/dashboard/models": "view-dashboard",
   "/dashboard/provider": "view-dashboard",
+  "/dashboard/team": "view-dashboard",
   "/admin": "view-admin",
   "/docs": "view-docs",
   "/docs/quickstart": "view-docs-quickstart",
@@ -49,6 +51,7 @@ const titles = {
   "/dashboard/api": "API keys — Grist",
   "/dashboard/models": "Models — Grist",
   "/dashboard/provider": "Provider — Grist",
+  "/dashboard/team": "Team — Grist",
   "/admin": "Admin — Grist",
   "/docs": "Docs — Grist",
   "/docs/quickstart": "Quickstart — Grist",
@@ -248,6 +251,7 @@ async function afterFirebase() {
   if (ticket !== sessionTicket) return
   if (!data || !data.ok) return false
   state.admin = Boolean(data.admin)
+  state.userId = data.user_id ?? ""
   state.sessionKnown = true
   if (data.code) localStorage.setItem(KEY, data.code)
   return true
@@ -378,12 +382,13 @@ async function route() {
       return
     }
     show("view-dashboard")
-    setDashTab(path === "/dashboard/api" ? "api" : path === "/dashboard/models" ? "models" : path === "/dashboard/provider" ? "provider" : "usage")
+    setDashTab(path === "/dashboard/api" ? "api" : path === "/dashboard/models" ? "models" : path === "/dashboard/provider" ? "provider" : path === "/dashboard/team" ? "team" : "usage")
     setAuthNav()
     void loadDashboard()
     if (path === "/dashboard/api") void loadApiKeys()
     if (path === "/dashboard/models") void loadModels()
     if (path === "/dashboard/provider") void loadProvider()
+    if (path === "/dashboard/team") void loadTeam()
     return
   }
   if (path === "/login" && device() && invite()) {
@@ -444,12 +449,13 @@ async function loadDashboard() {
 }
 
 function setDashTab(tab) {
-  const titles = { usage: "Usage", api: "API keys", models: "Models", provider: "Provider" }
+  const titles = { usage: "Usage", api: "API keys", models: "Models", provider: "Provider", team: "Team" }
   document.getElementById("dash-title").textContent = titles[tab] ?? "Usage"
   document.getElementById("dash-panel-usage").hidden = tab !== "usage"
   document.getElementById("dash-panel-api").hidden = tab !== "api"
   document.getElementById("dash-panel-models").hidden = tab !== "models"
   document.getElementById("dash-panel-provider").hidden = tab !== "provider"
+  document.getElementById("dash-panel-team").hidden = tab !== "team"
   for (const node of document.querySelectorAll("[data-dash]")) {
     node.classList.toggle("is-on", node.getAttribute("data-dash") === tab)
   }
@@ -807,6 +813,84 @@ document.getElementById("copy-key")?.addEventListener("click", async (event) => 
   flashCopied(node)
 })
 
+document.getElementById("copy-user-id")?.addEventListener("click", async (event) => {
+  const node = event.currentTarget
+  const ok = await copyText(document.getElementById("team-user-id").textContent)
+  if (!ok) return
+  flashCopied(node)
+})
+
+document.getElementById("team-create-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault()
+  const input = document.getElementById("team-name")
+  const result = await teamCall("/v1/teams", { name: input.value })
+  const msg = document.getElementById("team-create-msg")
+  if (result.status === 201) {
+    msg.textContent = ""
+    void loadTeam()
+    return
+  }
+  msg.textContent = result.data.error ?? "Couldn’t create the team."
+})
+
+document.getElementById("team-add-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault()
+  const input = document.getElementById("team-add-id")
+  const result = await teamCall("/v1/teams/members", { user_id: input.value.trim() })
+  const msg = document.getElementById("team-add-msg")
+  if (result.status === 200) {
+    input.value = ""
+    msg.textContent = "Added."
+    void loadTeam()
+    return
+  }
+  msg.textContent = result.data.error ?? "Couldn’t add that user."
+})
+
+document.getElementById("team-leave")?.addEventListener("click", async () => {
+  const result = await teamCall("/v1/teams/leave")
+  const msg = document.getElementById("team-msg")
+  if (result.status === 200) {
+    void loadTeam()
+    return
+  }
+  msg.textContent = result.data.error ?? "Couldn’t leave the team."
+})
+
+document.getElementById("team-members")?.addEventListener("click", async (event) => {
+  const remove = event.target.closest("[data-remove-member]")
+  if (remove) {
+    await teamCall("/v1/teams/members/remove", {
+      target_user_id: remove.getAttribute("data-remove-member"),
+    })
+    void loadTeam()
+    return
+  }
+  const role = event.target.closest("[data-role-member]")
+  if (role) {
+    await teamCall("/v1/teams/members/role", {
+      target_user_id: role.getAttribute("data-role-member"),
+      role: role.getAttribute("data-role-next"),
+    })
+    void loadTeam()
+    return
+  }
+  const transfer = event.target.closest("[data-transfer-member]")
+  if (transfer) {
+    await teamCall("/v1/teams/transfer", {
+      target_user_id: transfer.getAttribute("data-transfer-member"),
+    })
+    void loadTeam()
+  }
+})
+
+document.getElementById("team-notifications")?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-read-note]")
+  if (!button) return
+  await teamCall("/v1/notifications/read", { id: button.getAttribute("data-read-note") })
+  void loadTeam()
+})
+
 document.getElementById("mcn-mint")?.addEventListener("click", async () => {
   const error = document.getElementById("dash-error")
   error.hidden = true
@@ -833,6 +917,94 @@ document.getElementById("copy-mcn")?.addEventListener("click", async (event) => 
 })
 
 let modelsLoad = 0
+
+async function teamCall(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await headers()) },
+    body: JSON.stringify(body ?? {}),
+  })
+  return { status: response.status, data: await response.json() }
+}
+
+function notificationText(note) {
+  const p = note.payload ?? {}
+  switch (note.type) {
+    case "team_added":
+      return `You were added to team ${p.teamName ?? ""}.`
+    case "team_add_blocked":
+      return `${p.teamName ?? "A team"} tried to add you, but you are in ${p.currentTeamName ?? "another team"}. Leave that team first to switch.`
+    case "team_removed":
+      return `You were removed from team ${p.teamName ?? ""}.`
+    case "team_member_left":
+      return `${p.email ?? p.userId ?? "A member"} left team ${p.teamName ?? ""}.`
+    case "team_ownership":
+      return `You are now the owner of team ${p.teamName ?? ""}.`
+    default:
+      return note.type
+  }
+}
+
+let teamLoad = 0
+
+async function loadTeam() {
+  const gen = ++teamLoad
+  document.getElementById("team-user-id").textContent = state.userId || "—"
+  const mine = await teamCall("/v1/teams/mine")
+  if (gen !== teamLoad) return
+  const notes = await teamCall("/v1/notifications")
+  if (gen !== teamLoad) return
+  const team = mine.data.team
+  document.getElementById("team-none").hidden = Boolean(team)
+  document.getElementById("team-main").hidden = !team
+  if (team) {
+    document.getElementById("team-name-line").textContent = team.name
+    document.getElementById("team-role-line").textContent = `You are the ${team.role}.`
+    const canManage = team.role === "owner" || team.role === "admin"
+    document.getElementById("team-add-form").hidden = !canManage
+    document.getElementById("team-members").innerHTML = team.members
+      .map((member) => {
+        const name =
+          [member.first_name, member.last_name].filter(Boolean).join(" ") ||
+          member.email ||
+          member.user_id
+        const actions = []
+        if (canManage && member.user_id !== state.userId && member.role !== "owner") {
+          actions.push(
+            `<button class="text-btn" type="button" data-remove-member="${member.user_id}">Remove</button>`,
+          )
+        }
+        if (team.role === "owner" && member.user_id !== state.userId && member.role !== "owner") {
+          const next = member.role === "admin" ? "member" : "admin"
+          actions.push(
+            `<button class="text-btn" type="button" data-role-member="${member.user_id}" data-role-next="${next}">Make ${next}</button>`,
+          )
+          actions.push(
+            `<button class="text-btn" type="button" data-transfer-member="${member.user_id}">Make owner</button>`,
+          )
+        }
+        return `<article class="admin-row">
+          <code>${member.user_id ?? ""}</code>
+          <span>${escapeHtml(name)}</span>
+          <span>${member.role}</span>
+          ${actions.join("")}
+        </article>`
+      })
+      .join("")
+  }
+  const list = notes.data.notifications ?? []
+  document.getElementById("team-notifications").innerHTML = list.length
+    ? list
+        .map(
+          (note) => `<article class="admin-row">
+          <span>${escapeHtml(notificationText(note))}</span>
+          <span>${new Date(note.created_at).toLocaleDateString()}</span>
+          ${note.read ? "" : `<button class="text-btn" type="button" data-read-note="${note.id}">Mark read</button>`}
+        </article>`,
+        )
+        .join("")
+    : `<p class="muted">Nothing yet.</p>`
+}
 
 async function loadModels() {
   const gen = ++modelsLoad
