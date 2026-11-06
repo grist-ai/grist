@@ -1063,7 +1063,7 @@ export const dict = {
   "dialog.server.description": "Switch which Grist server this app connects to.",
   "settings.account.title": "Account",
   "settings.account.description": "Sign in to your Grist account. Signing in here also signs in the bundled CLI.",
-  "settings.account.gateway": "Gateway: {url}",
+  "settings.account.gateway": "Gateway: {{url}}",
   "settings.account.signedIn.title": "Signed in",
   "settings.account.signedIn.device": "Signed in via website",
   "settings.account.signedIn.apiKey": "Signed in with an API key",
