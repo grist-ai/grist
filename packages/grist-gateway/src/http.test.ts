@@ -472,7 +472,7 @@ describe("gateway HTTP", () => {
     expect(html).not.toContain("Pranav")
     expect(html).not.toContain("pranavmm25")
     expect(html).not.toContain("pranav6226")
-    expect(html).toContain("admin@grist.lol")
+    expect(html).toContain("admin@gristcode.tech")
     expect(html).not.toContain("privacy@grist.lol")
 
     const docs = await gateway.fetch(new Request("http://gateway.test/docs"))
