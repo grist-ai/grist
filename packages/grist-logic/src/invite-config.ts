@@ -36,6 +36,31 @@ export function writeInviteConfig(input: { code: string; gatewayUrl: string }) {
   return file
 }
 
+/**
+ * Remove the stored Grist credential (the `code` written by writeInviteConfig),
+ * leaving any other config keys in place — the same removal the desktop's
+ * sign-out performs on this file. Returns true when a credential was removed.
+ */
+export function removeInviteConfig(): boolean {
+  const file = inviteConfigPath()
+  if (!fs.existsSync(file)) return false
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>
+  } catch {
+    return false
+  }
+  if (typeof parsed.code !== "string" || !parsed.code) return false
+  delete parsed.code
+  fs.writeFileSync(file, JSON.stringify(parsed, null, 2) + "\n")
+  try {
+    fs.chmodSync(file, 0o600)
+  } catch {
+    // non-POSIX filesystems: best effort
+  }
+  return true
+}
+
 export function loadInviteConfig(): InviteConfig | undefined {
   const envUrl = process.env.GRIST_GATEWAY_URL?.trim()
   const file = readConfigFile()
