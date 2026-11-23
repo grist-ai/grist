@@ -32,9 +32,10 @@ export function gristMethodLabel(method: GristMethod): string {
  * The gateway's session endpoint (/v1/auth/session) answers only to a Firebase
  * ID token, which the CLI never holds — it stores an invite code or an API key.
  * So the default lookup validates the stored credential with an authenticated
- * usage call and resolves no identity fields; email and user ID appear only
- * when a lookup can resolve them. Any failure (offline, rejected credential)
- * returns undefined so status degrades to the locally stored state.
+ * usage call; /v1/usage carries the caller's account identity (email and
+ * public user ID) alongside the spend summary, so status renders both. Any
+ * failure (offline, rejected credential) returns undefined so status degrades
+ * to the locally stored state.
  */
 const gatewaySession: SessionLookup = async (config) => {
   try {
@@ -43,7 +44,13 @@ const gatewaySession: SessionLookup = async (config) => {
       signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) return undefined
-    return {}
+    const body = (await response.json()) as {
+      account?: { email?: string | null; user_id?: string | null } | null
+    }
+    const details: GristSessionDetails = {}
+    if (typeof body.account?.email === "string" && body.account.email) details.email = body.account.email
+    if (typeof body.account?.user_id === "string" && body.account.user_id) details.userId = body.account.user_id
+    return details
   } catch {
     return undefined
   }

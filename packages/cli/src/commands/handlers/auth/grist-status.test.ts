@@ -93,6 +93,80 @@ describe("gristStatus", () => {
     expect(JSON.stringify(gristStatusJson(status))).not.toContain(apiKey)
   })
 
+  test("default lookup parses identity from the gateway /v1/usage account field", async () => {
+    const savedGatewayUrl = process.env.GRIST_GATEWAY_URL
+    delete process.env.GRIST_GATEWAY_URL
+    let seenPath = ""
+    let seenInvite = ""
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch(req) {
+        seenPath = new URL(req.url).pathname
+        seenInvite = req.headers.get("X-Grist-Invite") ?? ""
+        return Response.json({
+          spent_usd: 0,
+          cap_usd: 10,
+          remaining_usd: 10,
+          plan: "beta",
+          provider: null,
+          provider_source: null,
+          account: { email: "default-lookup@example.com", user_id: "gu_default42" },
+          expires_at: "2027-01-01T00:00:00.000Z",
+          by_rung: { cheapest: 0, medium: 0, frontier: 0, premium: 0 },
+        })
+      },
+    })
+    try {
+      writeInviteConfig({ code: inviteCode, gatewayUrl: `http://127.0.0.1:${server.port}` })
+      const status = await run(gristStatus({}))
+      expect(seenPath).toBe("/v1/usage")
+      expect(seenInvite).toBe(inviteCode)
+      expect(status.signedIn).toBe(true)
+      expect(status.refreshed).toBe(true)
+      expect(status.email).toBe("default-lookup@example.com")
+      expect(status.userId).toBe("gu_default42")
+      const text = formatGristStatus(status)
+      expect(text).toContain("default-lookup@example.com")
+      expect(text).toContain("gu_default42")
+      expect(text).not.toContain(inviteCode)
+      expect(gristStatusJson(status)).toEqual({
+        signed_in: true,
+        method: "website",
+        gateway_url: `http://127.0.0.1:${server.port}`,
+        email: "default-lookup@example.com",
+        user_id: "gu_default42",
+        refreshed: true,
+      })
+    } finally {
+      server.stop(true)
+      restore("GRIST_GATEWAY_URL", savedGatewayUrl)
+    }
+  })
+
+  test("default lookup stays refreshed without identity when the account field is null", async () => {
+    const savedGatewayUrl = process.env.GRIST_GATEWAY_URL
+    delete process.env.GRIST_GATEWAY_URL
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch() {
+        return Response.json({ account: null })
+      },
+    })
+    try {
+      writeInviteConfig({ code: inviteCode, gatewayUrl: `http://127.0.0.1:${server.port}` })
+      const status = await run(gristStatus({}))
+      expect(status.signedIn).toBe(true)
+      expect(status.refreshed).toBe(true)
+      expect(status.email).toBeUndefined()
+      expect(status.userId).toBeUndefined()
+    } finally {
+      server.stop(true)
+      restore("GRIST_GATEWAY_URL", savedGatewayUrl)
+    }
+  })
+
   test("a failing session lookup still reports the locally stored state", async () => {
     writeInviteConfig({ code: inviteCode, gatewayUrl: "https://grist.example" })
     const session: SessionLookup = async () => {
