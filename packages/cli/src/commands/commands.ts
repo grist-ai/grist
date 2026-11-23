@@ -154,6 +154,15 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             ),
           },
         }),
+        Spec.make("status", {
+          description: "show Grist account sign-in status",
+          params: {
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
         Spec.make("login", {
           description: "connect an integration",
           params: {
@@ -186,7 +195,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           params: {
             ...ServerParams,
             target: Argument.String("target").pipe(
-              Argument.withDescription("Integration ID or name"),
+              Argument.withDescription("Integration ID or name (grist signs out of your Grist account)"),
               Argument.optional,
             ),
             credential: Argument.String("credential").pipe(
