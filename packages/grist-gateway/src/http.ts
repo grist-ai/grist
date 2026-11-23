@@ -6,6 +6,7 @@ import { publicModelRef, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, type Rung } from "@gris
 import { resolveRung, resolveRungWithOverrides } from "./ladder.js"
 import { typesafeKey } from "@grist-ai/logic"
 import { resolveJevRoute, resolveProviderKey, type JevProvider, type JevRoute } from "@grist-ai/logic"
+import { defaultWeight, isVerifiedOutcome, type OutcomeKind } from "@grist-ai/logic"
 import { parseByokProvider, providerEndpoints, resolveUpstream, type ByokProvider } from "./providers.js"
 import { applyModeCap, type OperatingMode } from "@grist-ai/logic"
 import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "./firebase.js"
@@ -17,7 +18,10 @@ import {
   type GatewayStore,
   type InviteRow,
   type NotificationRow,
+  type TeamMemoryPushInput,
+  type TeamMemoryRow,
 } from "./store.js"
+import { findSecretKind } from "./secrets-scan.js"
 import { canonicalApiKey } from "./codes.js"
 import { parseMasterKey } from "./provider-keys.js"
 import type { ProviderCredential } from "./store.js"
@@ -140,6 +144,9 @@ const RATE_LIMITS = {
   completions: { limit: 300, windowMs: 10 * 60_000 },
   deviceStart: { limit: 10, windowMs: 60_000 },
   gateRoute: { limit: 30, windowMs: 60_000 },
+  // Team memory pushes land at session end; 120 batches/hr per actor is
+  // far above real harness cadence and bounds store-spam from a bad client.
+  teamMemoryPush: { limit: 120, windowMs: 3_600_000 },
 }
 /**
  * Flat debit per Jev `scoreTask` call. Jev bills per request rather than per
@@ -149,6 +156,10 @@ const RATE_LIMITS = {
 const GATE_ROUTE_COST_USD = 0.0003
 const MAX_JSON_BYTES = 256 * 1024
 const MAX_GATE_BYTES = 8 * 1024
+/** Team memory (spec v2 §6): at most 50 entries per push, 4 KB content each. */
+const TEAM_MEMORY_MAX_ENTRIES = 50
+const TEAM_MEMORY_MAX_CONTENT_BYTES = 4 * 1024
+const TEAM_MEMORY_PUSH_MAX_BYTES = 512 * 1024
 const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
@@ -478,6 +489,9 @@ export function createGateway(opts: GatewayOptions = {}) {
       pathname.startsWith("/v1/notifications/")
     ) {
       return teams(req, pathname)
+    }
+    if (pathname === "/v1/team-memory" || pathname.startsWith("/v1/team-memory/")) {
+      return teamMemory(req, pathname)
     }
 
     if (pathname === "/v1/rung-models") {
@@ -995,6 +1009,195 @@ export function createGateway(opts: GatewayOptions = {}) {
     })
   }
 
+  type ParsedPushEntry =
+    | { ok: true; input: TeamMemoryPushInput }
+    | { ok: false; id: string | null; reason: string; container?: string }
+
+  /**
+   * Validate one pushed entry at the boundary (spec v2 §§5–7): shape, the
+   * four verified outcome kinds only, a dedupe signature from the capture
+   * pipeline, the 4 KB content cap, and the secrets re-scan. The record's
+   * team fields ride in metadata, exactly as the harness stores them.
+   */
+  function parsePushEntry(raw: unknown): ParsedPushEntry {
+    if (!raw || typeof raw !== "object") return { ok: false, id: null, reason: "invalid_entry" }
+    const entry = raw as Record<string, unknown>
+    const id =
+      typeof entry.id === "string" && entry.id.length > 0 && entry.id.length <= 128
+        ? entry.id
+        : undefined
+    if (!id) return { ok: false, id: null, reason: "invalid_entry" }
+    const fail = (reason: string, container?: string): ParsedPushEntry => ({
+      ok: false,
+      id,
+      reason,
+      container,
+    })
+    const content = entry.content
+    const container = entry.container
+    if (typeof content !== "string" || content.length === 0) return fail("invalid_entry")
+    if (typeof container !== "string" || container.length === 0 || container.length > 256) {
+      return fail("invalid_entry")
+    }
+    if (typeof entry.outcome !== "string" || !isVerifiedOutcome(entry.outcome as OutcomeKind)) {
+      return fail("invalid_outcome", container)
+    }
+    const outcome = entry.outcome as OutcomeKind
+    const metadata: Record<string, string> = {}
+    if (entry.metadata && typeof entry.metadata === "object") {
+      for (const [key, value] of Object.entries(entry.metadata as Record<string, unknown>)) {
+        if (typeof value === "string") metadata[key] = value
+      }
+    }
+    const signature = metadata.signature
+    if (!signature || signature.length > 512) return fail("missing_signature", container)
+    if (new TextEncoder().encode(content).length > TEAM_MEMORY_MAX_CONTENT_BYTES) {
+      return fail("oversize", container)
+    }
+    if (findSecretKind(content)) return fail("secret_detected", container)
+    const weight =
+      typeof entry.weight === "number" && Number.isFinite(entry.weight)
+        ? Math.min(1, Math.max(0, entry.weight))
+        : defaultWeight(outcome)
+    const createdAt =
+      typeof entry.createdAt === "number" && Number.isFinite(entry.createdAt) ? entry.createdAt : now()
+    // The session id is not a team-store column (spec v2 §5); it rides in
+    // the stored metadata so a pulled entry round-trips the full record.
+    if (typeof entry.sessionID === "string" && entry.sessionID) metadata.session_id = entry.sessionID
+    return {
+      ok: true,
+      input: {
+        id,
+        container,
+        outcome,
+        content,
+        signature,
+        weight,
+        createdAt,
+        commitSha: metadata.commit_sha?.trim() ? metadata.commit_sha.trim() : null,
+        codeRefs: parseCodeRefs(metadata, signature),
+        metadata,
+      },
+    }
+  }
+
+  /**
+   * Team memory sync (spec v2 §6). Authenticated like every CLI surface —
+   * resolveInvite (API key / invite / Firebase Bearer) — and the caller's
+   * team is derived from tenancy, never from the request: no endpoint
+   * accepts a team parameter. Membership is re-read on every call, so a
+   * removal cuts sync on the very next request. Scoped connector keys may
+   * read (pull/list) but never modify team memory.
+   */
+  async function teamMemory(req: Request, pathname: string): Promise<Response> {
+    if (req.method !== "POST") return json(405, { error: "method not allowed" })
+    const invite = await resolveInvite(req)
+    if (invite instanceof Response) return invite
+    const account = store.getAccountByInvite(invite.code)
+    if (!account) return json(403, { error: "an account is required for team memory" })
+    const uid = account.firebase_uid
+    const mine = store.getTeamForUser(uid)
+
+    if (pathname === "/v1/team-memory/pull") {
+      const body = await readJson(req)
+      // No team → nothing to mirror, and a leaver's local mirror must be
+      // wiped: the explicit revoked signal (spec v2 §7).
+      if (!mine) return json(200, { revoked: true, entries: [], tombstones: [], next_seq: 0 })
+      const sinceSeq =
+        typeof body?.since_seq === "number" && Number.isFinite(body.since_seq) && body.since_seq > 0
+          ? Math.floor(body.since_seq)
+          : 0
+      const containers = Array.isArray(body?.containers)
+        ? body.containers.filter((c): c is string => typeof c === "string")
+        : undefined
+      const pulled = store.pullTeamMemory(mine.team.id, sinceSeq, containers)
+      return json(200, {
+        entries: pulled.entries.map(publicTeamMemoryEntry),
+        tombstones: pulled.tombstones,
+        next_seq: pulled.nextSeq,
+      })
+    }
+
+    if (!mine) return json(409, { error: "not in a team" })
+
+    if (pathname === "/v1/team-memory/push") {
+      if (invite.keyKind === "connector") {
+        return json(403, { error: "connector keys cannot modify team memory" })
+      }
+      if (
+        !allowWindow(
+          `teammemorypush:${uid}`,
+          limits.teamMemoryPush.limit,
+          limits.teamMemoryPush.windowMs,
+        )
+      ) {
+        return json(429, { error: "too many team memory pushes — try again later" })
+      }
+      const body = await readJson(req, TEAM_MEMORY_PUSH_MAX_BYTES)
+      const entries = body?.entries
+      if (!Array.isArray(entries)) return json(400, { error: "entries must be an array" })
+      if (entries.length > TEAM_MEMORY_MAX_ENTRIES) {
+        return json(400, { error: `at most ${TEAM_MEMORY_MAX_ENTRIES} entries per push` })
+      }
+      const actor = { uid, userId: account.user_id }
+      const results = entries.map((raw) => {
+        const parsed = parsePushEntry(raw)
+        if (!parsed.ok) {
+          if (parsed.reason === "secret_detected") {
+            // The author learns the entry was rejected and why — never
+            // which pattern matched or what it matched (spec v2 §7).
+            store.createNotification({
+              uid,
+              type: "memory_rejected",
+              payload: {
+                entry_id: parsed.id,
+                container: parsed.container ?? null,
+                reason: "secret_detected",
+              },
+            })
+          }
+          return { id: parsed.id, result: "rejected" as const, reason: parsed.reason }
+        }
+        const applied = store.pushTeamMemoryEntry(mine.team.id, actor, parsed.input)
+        if (applied.status === "rejected") {
+          return { id: parsed.input.id, result: "rejected" as const, reason: applied.reason }
+        }
+        return { id: parsed.input.id, result: applied.status }
+      })
+      return json(200, { results })
+    }
+
+    if (pathname === "/v1/team-memory/remove") {
+      if (invite.keyKind === "connector") {
+        return json(403, { error: "connector keys cannot modify team memory" })
+      }
+      const body = await readJson(req)
+      const id = typeof body?.id === "string" ? body.id : ""
+      const removed = store.removeTeamMemoryEntry(mine.team.id, id, {
+        uid,
+        role: mine.membership.role,
+      })
+      if (!removed.ok) {
+        if (removed.reason === "not_found") return json(404, { error: "entry not found" })
+        return json(403, { error: "only the author or a team owner/admin can remove an entry" })
+      }
+      return json(200, { ok: true })
+    }
+
+    if (pathname === "/v1/team-memory/list") {
+      const body = await readJson(req)
+      const rows = store.listTeamMemory(mine.team.id, {
+        container: typeof body?.container === "string" ? body.container : undefined,
+        outcome: typeof body?.outcome === "string" ? body.outcome : undefined,
+        authorUserId: typeof body?.author_user_id === "string" ? body.author_user_id : undefined,
+        limit: typeof body?.limit === "number" ? body.limit : undefined,
+      })
+      return json(200, { entries: rows.map(publicTeamMemoryEntry) })
+    }
+
+    return json(404, { error: "not found" })
+  }
+
   async function usage(req: Request): Promise<Response> {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
@@ -1371,6 +1574,66 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   return { fetch: handle, store }
+}
+
+/**
+ * Code refs for a pushed entry (spec v2 §5): an explicit `code_refs`
+ * metadata field (JSON array, or comma-separated) wins; in v1 the file set
+ * otherwise comes from the capture signature — sorted file paths before
+ * the first "|".
+ */
+function parseCodeRefs(metadata: Record<string, string>, signature: string): string[] {
+  const raw = metadata.code_refs
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed.filter((value): value is string => typeof value === "string")
+      }
+    } catch {
+      // Not JSON — fall through to the comma-separated form.
+    }
+    return raw
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+  }
+  return (signature.split("|")[0] ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+/**
+ * A team memory row as the sync + browse surface returns it: the
+ * MemoryRecord shape (metadata round-tripped, session id restored) plus
+ * the team fields recall and the dashboard need — author, commit, refs,
+ * status, and the pull cursor. firebase_uid never leaves the server.
+ */
+function publicTeamMemoryEntry(row: TeamMemoryRow) {
+  const stored = JSON.parse(row.metadata) as Record<string, unknown>
+  const metadata: Record<string, string> = {}
+  for (const [key, value] of Object.entries(stored)) {
+    if (key === "session_id") continue
+    metadata[key] = typeof value === "string" ? value : JSON.stringify(value)
+  }
+  const sessionID = typeof stored.session_id === "string" ? stored.session_id : undefined
+  return {
+    id: row.id,
+    content: row.content,
+    container: row.container,
+    outcome: row.outcome,
+    weight: row.weight,
+    createdAt: row.created_at,
+    ...(sessionID ? { sessionID } : {}),
+    metadata,
+    author_user_id: row.author_user_id,
+    commit_sha: row.commit_sha,
+    code_refs: JSON.parse(row.code_refs) as string[],
+    status: row.status,
+    seq: row.seq,
+    superseded_by: row.superseded_by,
+  }
 }
 
 function inviteUsable(invite: InviteRow, t: number): boolean {
