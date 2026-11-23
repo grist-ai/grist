@@ -1420,6 +1420,30 @@ describe("gateway HTTP", () => {
   })
 })
 
+describe("primary domain redirect", () => {
+  test("redirects grist.lol page traffic to gristcode.tech, preserving path and query", async () => {
+    const gateway = createGateway()
+    const page = await gateway.fetch(new Request("https://grist.lol/docs/gate?x=1"))
+    expect(page.status).toBe(301)
+    expect(page.headers.get("location")).toBe("https://gristcode.tech/docs/gate?x=1")
+    const www = await gateway.fetch(new Request("https://www.grist.lol/"))
+    expect(www.status).toBe(301)
+    expect(www.headers.get("location")).toBe("https://gristcode.tech/")
+  })
+
+  test("keeps serving /v1 API paths on the old hosts", async () => {
+    const gateway = createGateway()
+    const config = await gateway.fetch(new Request("https://grist.lol/v1/auth/config"))
+    expect(config.status).toBe(200)
+  })
+
+  test("serves pages on gristcode.tech without redirecting", async () => {
+    const gateway = createGateway()
+    const home = await gateway.fetch(new Request("https://gristcode.tech/"))
+    expect(home.status).toBe(200)
+  })
+})
+
 async function call(
   fetch: (req: Request, peerIp?: string) => Promise<Response>,
   method: string,

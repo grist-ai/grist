@@ -425,6 +425,16 @@ export function createGateway(opts: GatewayOptions = {}) {
       return json(200, { ok: true })
     }
 
+    // gristcode.tech is the primary public domain. Page traffic arriving on
+    // the old grist.lol hosts redirects there; /v1 API paths keep serving on
+    // every host so installed CLIs and saved gateway URLs keep working.
+    if (!pathname.startsWith("/v1/") && (url.hostname === "grist.lol" || url.hostname === "www.grist.lol")) {
+      return new Response(null, {
+        status: 301,
+        headers: { location: `https://gristcode.tech${url.pathname}${url.search}` },
+      })
+    }
+
     if (req.method === "POST" && pathname === "/v1/invite/validate") {
       return validate(req, peerIp)
     }
