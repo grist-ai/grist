@@ -33,16 +33,16 @@ memory** and **code map** that brief every session on your codebase; and
 Vercel AI Gateway, or any OpenAI-compatible endpoint) with zero markup. Grist
 never holds your inference budget.
 
-**Docs:** [grist.lol/docs](https://grist.lol/docs) — every concept explained:
-the [gate](https://grist.lol/docs/gate), the
-[ladder](https://grist.lol/docs/ladder),
-[specialists](https://grist.lol/docs/specialists),
-[SoL-Pi](https://grist.lol/docs/solpi),
-[memory](https://grist.lol/docs/memory),
-[Dreaming](https://grist.lol/docs/dreaming), the
-[code map](https://grist.lol/docs/codemap), the
-[desktop app](https://grist.lol/docs/desktop), and
-[enterprise](https://grist.lol/docs/enterprise).
+**Docs:** [gristcode.tech/docs](https://gristcode.tech/docs) — every concept explained:
+the [gate](https://gristcode.tech/docs/gate), the
+[ladder](https://gristcode.tech/docs/ladder),
+[specialists](https://gristcode.tech/docs/specialists),
+[SoL-Pi](https://gristcode.tech/docs/solpi),
+[memory](https://gristcode.tech/docs/memory),
+[Dreaming](https://gristcode.tech/docs/dreaming), the
+[code map](https://gristcode.tech/docs/codemap), the
+[desktop app](https://gristcode.tech/docs/desktop), and
+[enterprise](https://gristcode.tech/docs/enterprise).
 
 ## New in v2
 
@@ -89,9 +89,9 @@ Latest release: **0.1.19** (CLI + desktop, October 2026).
   per-hunk accept/revert and commit, scheduled automations whose output
   lands in a review queue (nothing merges itself), and the memory browser
   and code-map card built in. Settings is a Grist sign-in — no provider or
-  model pickers anywhere. [Download for macOS](https://grist.lol/download/grist-desktop-mac-arm64.dmg).
+  model pickers anywhere. [Download for macOS](https://gristcode.tech/download/grist-desktop-mac-arm64.dmg).
 - **Website + docs** — grist.lol rebuilt: a new landing and full concept
-  docs at [grist.lol/docs](https://grist.lol/docs).
+  docs at [gristcode.tech/docs](https://gristcode.tech/docs).
 
 Earlier improvements:
 
@@ -185,8 +185,8 @@ on a schedule with a review queue, and built-in memory and code-map
 panels. Sign in with your Grist account or paste an API key — providers
 and models stay hidden; the gate decides.
 
-[Download for macOS](https://grist.lol/download/grist-desktop-mac-arm64.dmg) ·
-[Desktop docs](https://grist.lol/docs/desktop)
+[Download for macOS](https://gristcode.tech/download/grist-desktop-mac-arm64.dmg) ·
+[Desktop docs](https://gristcode.tech/docs/desktop)
 
 ## How it works
 
@@ -225,7 +225,7 @@ and models stay hidden; the gate decides.
 
 ```
 packages/grist/            @grist-ai/plugin — provider, hooks, CLI build/publish scripts
-packages/grist-gateway/    @grist-ai/gateway — BYOK gateway + the grist.lol site (Bun.serve + bun:sqlite)
+packages/grist-gateway/    @grist-ai/gateway — BYOK gateway + the gristcode.tech site (Bun.serve + bun:sqlite)
 packages/grist-logic/      @grist-ai/logic — shared rung/gate/control-plane logic, memory, code map
 packages/route-graph/      route graph extraction for the code map
 skills/grist/              @grist-ai/grist-skills — agent skill for delegating to Grist
