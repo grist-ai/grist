@@ -85,6 +85,58 @@ export type NotificationRow = {
   created_at: number
 }
 
+export type TeamMemoryStatus = "active" | "flagged" | "archived"
+
+/** One row of the team memory store (spec v2 §5). `code_refs` and
+ * `metadata` are JSON text: a string array and an object respectively. */
+export type TeamMemoryRow = {
+  id: string
+  team_id: string
+  container: string
+  author_uid: string
+  author_user_id: string | null
+  outcome: string
+  content: string
+  signature: string
+  weight: number
+  commit_sha: string | null
+  code_refs: string
+  metadata: string
+  created_at: number
+  updated_at: number
+  seq: number
+  status: TeamMemoryStatus
+  superseded_by: string | null
+}
+
+/** A validated push entry, normalized by the HTTP layer from a MemoryRecord. */
+export type TeamMemoryPushInput = {
+  id: string
+  container: string
+  outcome: string
+  content: string
+  signature: string
+  weight: number
+  createdAt: number
+  commitSha: string | null
+  codeRefs: string[]
+  metadata: Record<string, string>
+}
+
+export type TeamMemoryPushResult =
+  | { status: "stored"; entry: TeamMemoryRow; replayed: boolean }
+  | { status: "strengthened"; entry: TeamMemoryRow }
+  | { status: "rejected"; reason: "archived" }
+
+export type TeamMemoryAuditRow = {
+  id: number
+  team_id: string
+  actor_uid: string
+  action: string
+  entry_id: string
+  at: number
+}
+
 export type CliLoginRow = {
   device_code: string
   user_code: string
@@ -284,6 +336,37 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (code, rung)
     );
+    CREATE TABLE IF NOT EXISTS team_memory_entries (
+      id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      container TEXT NOT NULL,
+      author_uid TEXT NOT NULL,
+      author_user_id TEXT,
+      outcome TEXT NOT NULL,
+      content TEXT NOT NULL,
+      signature TEXT NOT NULL,
+      weight REAL NOT NULL DEFAULT 1,
+      commit_sha TEXT,
+      code_refs TEXT NOT NULL DEFAULT '[]',
+      metadata TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      superseded_by TEXT,
+      PRIMARY KEY (team_id, id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS team_memory_signature
+      ON team_memory_entries(team_id, container, signature);
+    CREATE INDEX IF NOT EXISTS team_memory_team_seq ON team_memory_entries(team_id, seq);
+    CREATE TABLE IF NOT EXISTS team_memory_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id TEXT NOT NULL,
+      actor_uid TEXT NOT NULL,
+      action TEXT NOT NULL,
+      entry_id TEXT NOT NULL,
+      at INTEGER NOT NULL
+    );
   `)
   // `CREATE TABLE IF NOT EXISTS` will not add the column to a database created
   // before per-key attribution existed, so backfill it in place.
@@ -422,6 +505,36 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
      JOIN invites i ON i.code = a.invite_code
      WHERE m.team_id = ? ORDER BY m.created_at ASC`,
   )
+  const insertTeamMemory = db.prepare(
+    `INSERT INTO team_memory_entries
+       (id, team_id, container, author_uid, author_user_id, outcome, content, signature,
+        weight, commit_sha, code_refs, metadata, created_at, updated_at, seq, status, superseded_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL)`,
+  )
+  const selectTeamMemoryById = db.prepare(
+    `SELECT * FROM team_memory_entries WHERE team_id = ? AND id = ?`,
+  )
+  const selectTeamMemoryBySignature = db.prepare(
+    `SELECT * FROM team_memory_entries WHERE team_id = ? AND container = ? AND signature = ?`,
+  )
+  const strengthenTeamMemory = db.prepare(
+    `UPDATE team_memory_entries
+     SET weight = ?, commit_sha = ?, metadata = ?, updated_at = ?, seq = ?
+     WHERE team_id = ? AND id = ?`,
+  )
+  const archiveTeamMemory = db.prepare(
+    `UPDATE team_memory_entries SET status = 'archived', updated_at = ?, seq = ?
+     WHERE team_id = ? AND id = ?`,
+  )
+  const maxTeamMemorySeq = db.prepare(
+    `SELECT COALESCE(MAX(seq), 0) AS max_seq FROM team_memory_entries WHERE team_id = ?`,
+  )
+  const insertTeamMemoryAudit = db.prepare(
+    `INSERT INTO team_memory_audit (team_id, actor_uid, action, entry_id, at) VALUES (?, ?, ?, ?, ?)`,
+  )
+  const selectTeamMemoryAudit = db.prepare(
+    `SELECT * FROM team_memory_audit WHERE team_id = ? ORDER BY id ASC`,
+  )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
     `INSERT INTO api_keys (id, invite_code, hash, prefix, name, kind, created_at, last_used_at, revoked)
@@ -482,6 +595,11 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     while (selectNotification.get(id)) id = generateNotificationId()
     insertNotification.run(id, uid, type, JSON.stringify(payload), Date.now())
     return selectNotification.get(id) as NotificationRow
+  }
+
+  /** Next per-team change-feed cursor for team memory (spec v2 §5). */
+  function nextTeamMemorySeq(teamId: string): number {
+    return (maxTeamMemorySeq.get(teamId) as { max_seq: number }).max_seq + 1
   }
 
   /** Resolve an API key to its invite code without touching last_used_at. */
@@ -922,6 +1040,207 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     /** Per-member spend for a team, from each member account's own invite. */
     teamUsage(teamId: string): TeamUsageRow[] {
       return selectTeamUsage.all(teamId) as TeamUsageRow[]
+    },
+
+    /**
+     * Apply one validated push entry to a team's memory store (spec v2
+     * §§5–7). Tenancy is structural: every statement is scoped by team_id,
+     * so an unscoped read or write cannot be expressed through this API.
+     *
+     * - Same entry id again → idempotent replay (no mutation, no audit):
+     *   a harness retrying a queued push must not double-store or inflate.
+     * - New id, same (container, signature) → strengthened: weight grows by
+     *   the incoming weight, the verifier joins `also_verified_by`, and the
+     *   row takes a fresh seq so mirrors re-pull it.
+     * - A signature (or id) whose row was removed → rejected: removals are
+     *   deliberate, and a stale queued push must not resurrect them.
+     */
+    pushTeamMemoryEntry(
+      teamId: string,
+      actor: { uid: string; userId: string | null },
+      input: TeamMemoryPushInput,
+    ): TeamMemoryPushResult {
+      const at = Date.now()
+      let result: TeamMemoryPushResult | undefined
+      db.transaction(() => {
+        const byId = selectTeamMemoryById.get(teamId, input.id) as TeamMemoryRow | undefined
+        if (byId) {
+          result =
+            byId.status === "archived"
+              ? { status: "rejected", reason: "archived" }
+              : { status: "stored", entry: byId, replayed: true }
+          return
+        }
+        const bySignature = selectTeamMemoryBySignature.get(
+          teamId,
+          input.container,
+          input.signature,
+        ) as TeamMemoryRow | undefined
+        if (bySignature) {
+          if (bySignature.status === "archived") {
+            result = { status: "rejected", reason: "archived" }
+            return
+          }
+          const metadata = JSON.parse(bySignature.metadata) as Record<string, unknown>
+          const verifiers = new Set(
+            Array.isArray(metadata.also_verified_by)
+              ? metadata.also_verified_by.filter((v): v is string => typeof v === "string")
+              : [],
+          )
+          if (actor.userId && actor.userId !== bySignature.author_user_id) verifiers.add(actor.userId)
+          metadata.also_verified_by = [...verifiers]
+          strengthenTeamMemory.run(
+            bySignature.weight + input.weight,
+            input.commitSha ?? bySignature.commit_sha,
+            JSON.stringify(metadata),
+            at,
+            nextTeamMemorySeq(teamId),
+            teamId,
+            bySignature.id,
+          )
+          insertTeamMemoryAudit.run(teamId, actor.uid, "strengthen", bySignature.id, at)
+          result = {
+            status: "strengthened",
+            entry: selectTeamMemoryById.get(teamId, bySignature.id) as TeamMemoryRow,
+          }
+          return
+        }
+        insertTeamMemory.run(
+          input.id,
+          teamId,
+          input.container,
+          actor.uid,
+          actor.userId,
+          input.outcome,
+          input.content,
+          input.signature,
+          input.weight,
+          input.commitSha,
+          JSON.stringify(input.codeRefs),
+          JSON.stringify(input.metadata),
+          input.createdAt,
+          at,
+          nextTeamMemorySeq(teamId),
+        )
+        insertTeamMemoryAudit.run(teamId, actor.uid, "store", input.id, at)
+        result = {
+          status: "stored",
+          entry: selectTeamMemoryById.get(teamId, input.id) as TeamMemoryRow,
+          replayed: false,
+        }
+      })()
+      if (!result) throw new Error("team memory push produced no result")
+      return result
+    },
+
+    /**
+     * Incremental pull for one team (spec v2 §6): active entries with
+     * seq > sinceSeq in seq order, plus the ids archived since sinceSeq so
+     * local mirrors converge. An optional container filter scopes both.
+     */
+    pullTeamMemory(
+      teamId: string,
+      sinceSeq: number,
+      containers?: string[],
+    ): { entries: TeamMemoryRow[]; tombstones: string[]; nextSeq: number } {
+      const scope = containers && containers.length > 0 ? containers : undefined
+      const marks = scope ? scope.map(() => "?").join(", ") : ""
+      const entries = (
+        scope
+          ? db
+              .prepare(
+                `SELECT * FROM team_memory_entries
+                 WHERE team_id = ? AND status = 'active' AND seq > ? AND container IN (${marks})
+                 ORDER BY seq ASC`,
+              )
+              .all(teamId, sinceSeq, ...scope)
+          : db
+              .prepare(
+                `SELECT * FROM team_memory_entries
+                 WHERE team_id = ? AND status = 'active' AND seq > ?
+                 ORDER BY seq ASC`,
+              )
+              .all(teamId, sinceSeq)
+      ) as TeamMemoryRow[]
+      const tombstones = (
+        scope
+          ? db
+              .prepare(
+                `SELECT id FROM team_memory_entries
+                 WHERE team_id = ? AND status = 'archived' AND seq > ? AND container IN (${marks})`,
+              )
+              .all(teamId, sinceSeq, ...scope)
+          : db
+              .prepare(
+                `SELECT id FROM team_memory_entries
+                 WHERE team_id = ? AND status = 'archived' AND seq > ?`,
+              )
+              .all(teamId, sinceSeq)
+      ) as { id: string }[]
+      return {
+        entries,
+        tombstones: tombstones.map((row) => row.id),
+        nextSeq: (maxTeamMemorySeq.get(teamId) as { max_seq: number }).max_seq,
+      }
+    },
+
+    /**
+     * Remove one entry (spec v2 §6): the author, or a team owner/admin.
+     * Removal archives the row and gives it a fresh seq, so the removal
+     * itself travels the pull feed as a tombstone; the row (and its audit
+     * trail) stays server-side. Idempotent for an already-archived entry.
+     */
+    removeTeamMemoryEntry(
+      teamId: string,
+      entryId: string,
+      actor: { uid: string; role: TeamRole },
+    ): { ok: true } | { ok: false; reason: "not_found" | "not_authorized" } {
+      const row = selectTeamMemoryById.get(teamId, entryId) as TeamMemoryRow | undefined
+      if (!row) return { ok: false, reason: "not_found" }
+      if (row.author_uid !== actor.uid && actor.role !== "owner" && actor.role !== "admin") {
+        return { ok: false, reason: "not_authorized" }
+      }
+      if (row.status === "archived") return { ok: true }
+      const at = Date.now()
+      db.transaction(() => {
+        archiveTeamMemory.run(at, nextTeamMemorySeq(teamId), teamId, entryId)
+        insertTeamMemoryAudit.run(teamId, actor.uid, "remove", entryId, at)
+      })()
+      return { ok: true }
+    },
+
+    /** Browse a team's memory (dashboard + CLI surface), newest first. */
+    listTeamMemory(
+      teamId: string,
+      filters?: { container?: string; outcome?: string; authorUserId?: string; limit?: number },
+    ): TeamMemoryRow[] {
+      const clauses = ["team_id = ?"]
+      const params: (string | number)[] = [teamId]
+      if (filters?.container) {
+        clauses.push("container = ?")
+        params.push(filters.container)
+      }
+      if (filters?.outcome) {
+        clauses.push("outcome = ?")
+        params.push(filters.outcome)
+      }
+      if (filters?.authorUserId) {
+        clauses.push("author_user_id = ?")
+        params.push(filters.authorUserId)
+      }
+      const limit = Math.min(200, Math.max(1, Math.floor(filters?.limit ?? 100)))
+      return db
+        .prepare(
+          `SELECT * FROM team_memory_entries WHERE ${clauses.join(" AND ")}
+           ORDER BY created_at DESC, seq DESC LIMIT ?`,
+        )
+        .all(...params, limit) as TeamMemoryRow[]
+    },
+
+    /** The audit trail for a team's memory (spec v2 §7): who did what to
+     * which entry, when — never entry bodies. */
+    teamMemoryAudit(teamId: string): TeamMemoryAuditRow[] {
+      return selectTeamMemoryAudit.all(teamId) as TeamMemoryAuditRow[]
     },
 
     createApiKey(input: { inviteCode: string; name?: string; kind?: ApiKeyKind }): { secret: string; key: PublicApiKey } | undefined {
