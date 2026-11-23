@@ -1420,6 +1420,55 @@ describe("gateway HTTP", () => {
   })
 })
 
+describe("usage account identity", () => {
+  test("returns the caller's email and public user_id for invite and API-key auth, never the firebase uid", async () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite({ note: "account", expiresAt: Date.now() + 60_000 })
+    const bound = store.bindAccount({ uid: "uid_usage_whoami", email: "whoami@example.com", inviteCode: invite.code })
+    expect(bound.ok).toBe(true)
+    if (!bound.ok) throw new Error("bind failed")
+    const userId = bound.account.user_id
+    expect(userId).toMatch(/^gu_/)
+    if (!userId) throw new Error("account has no user_id")
+    const gateway = createGateway({ store })
+
+    const viaInvite = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { "X-Grist-Invite": invite.code },
+    })
+    expect(viaInvite.status).toBe(200)
+    const inviteBody = viaInvite.json as { account: { email: string; user_id: string } | null }
+    expect(inviteBody.account).toEqual({ email: "whoami@example.com", user_id: userId })
+    expect(JSON.stringify(viaInvite.json)).not.toContain("uid_usage_whoami")
+
+    const created = store.createApiKey({ inviteCode: invite.code, name: "whoami-test" })
+    expect(created).toBeDefined()
+    const viaKey = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { "X-Grist-Api-Key": created!.secret },
+    })
+    expect(viaKey.status).toBe(200)
+    const keyBody = viaKey.json as { account: { email: string; user_id: string } | null }
+    expect(keyBody.account).toEqual({ email: "whoami@example.com", user_id: userId })
+    expect(JSON.stringify(viaKey.json)).not.toContain("uid_usage_whoami")
+    store.close()
+  })
+
+  test("usage stays 401 unauthenticated and reports a null account for an unbound invite", async () => {
+    const store = openGatewayStore()
+    const invite = store.createInvite({ note: "plain", expiresAt: Date.now() + 60_000 })
+    const gateway = createGateway({ store })
+
+    const anon = await call(gateway.fetch, "GET", "/v1/usage")
+    expect(anon.status).toBe(401)
+
+    const usage = await call(gateway.fetch, "GET", "/v1/usage", {
+      headers: { "X-Grist-Invite": invite.code },
+    })
+    expect(usage.status).toBe(200)
+    expect((usage.json as { account: unknown }).account).toBeNull()
+    store.close()
+  })
+})
+
 describe("primary domain redirect", () => {
   test("redirects grist.lol page traffic to gristcode.tech, preserving path and query", async () => {
     const gateway = createGateway()

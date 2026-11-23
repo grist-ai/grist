@@ -735,6 +735,10 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       return accountByUserId(raw)
     },
 
+    getAccountByInvite(code: string): AccountRow | undefined {
+      return selectAccountByInvite.get(code) as AccountRow | undefined
+    },
+
     createNotification(input: {
       uid: string
       type: string

@@ -1003,6 +1003,10 @@ export function createGateway(opts: GatewayOptions = {}) {
     for (const event of events) by_rung[event.rung] += event.usd
     const share = teamKeyShare(invite.code)
     const ownSummary = store.providerCredentialSummary(invite.code)
+    // The caller's own account identity — the owner of the invite that
+    // authenticated this request, even when the upstream credential is a
+    // team owner's. Only the public identity is exposed, never firebase_uid.
+    const account = store.getAccountByInvite(invite.code)
     return json(200, {
       spent_usd: roundUsd(invite.spent_usd),
       cap_usd: invite.cap_usd,
@@ -1010,6 +1014,7 @@ export function createGateway(opts: GatewayOptions = {}) {
       plan: "beta",
       provider: share?.provider ?? ownSummary?.provider ?? null,
       provider_source: share ? "team" : ownSummary ? "own" : null,
+      account: account ? { email: account.email, user_id: account.user_id } : null,
       expires_at: new Date(invite.expires_at).toISOString(),
       by_rung: {
         cheapest: roundUsd(by_rung.cheapest),
@@ -2035,6 +2040,15 @@ function connectorOpenApi(): Record<string, unknown> {
                       remaining_usd: { type: "number" },
                       plan: { type: "string" },
                       provider: { type: "string", nullable: true },
+                      account: {
+                        type: "object",
+                        nullable: true,
+                        description: "The caller's account identity (absent for invites with no bound account).",
+                        properties: {
+                          email: { type: "string", nullable: true },
+                          user_id: { type: "string", nullable: true },
+                        },
+                      },
                       expires_at: { type: "string", format: "date-time" },
                       by_rung: {
                         type: "object",
