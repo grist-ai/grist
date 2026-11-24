@@ -32,7 +32,14 @@ function formatList(environments: ReadonlyArray<EnvironmentInfo>) {
         environment.status,
         environment.directory ?? "",
         environment.branch ?? "",
+        environment.policy ? policySummary(environment.policy) : "",
       ].join("\t"),
     )
     .join(EOL)
+}
+
+/** The sandbox honesty matrix on one line: what the jail enforces on this machine, never more than it does. */
+function policySummary(policy: NonNullable<EnvironmentInfo["policy"]>) {
+  const surface = (entry: { status: string }) => entry.status
+  return `policy[${policy.backend}] filesystem=${surface(policy.filesystem)} network=${surface(policy.network)} environment=${surface(policy.environment)} limits=${surface(policy.limits)}`
 }

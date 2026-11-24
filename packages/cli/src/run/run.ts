@@ -201,7 +201,10 @@ async function resolveEnvironmentTarget(
   const found = list.environments.find((environment) => environment.name === name)
   if (!found) fail(`Environment not found: ${name} (see: grist env list)`)
   if (found.kind === "local") return undefined
-  if (found.kind === "sandbox") fail(`Sandbox environments are not available yet: ${name}`)
+  // A sandbox environment whose jail cannot run on this machine fails here,
+  // before a session exists; the driver would refuse every spawn anyway.
+  if (found.kind === "sandbox" && found.policy?.filesystem.status === "unavailable")
+    fail(`Sandbox environments are not available on this machine: ${name}`)
   if (found.status === "missing" || !found.directory)
     fail(`Environment ${name} is missing its worktree directory${found.directory ? `: ${found.directory}` : ""}`)
   return { id: found.id, directory: found.directory }

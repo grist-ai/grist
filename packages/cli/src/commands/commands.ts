@@ -319,7 +319,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
               Argument.withDescription("Environment name (lowercase letters, digits, dashes)"),
             ),
             kind: Flag.Literals("kind", ["worktree", "sandbox"]).pipe(
-              Flag.withDescription("Environment kind (sandbox is not available yet)"),
+              Flag.withDescription("Environment kind (sandbox runs in a local OS jail; see the spec's policy summary)"),
               Flag.withDefault("worktree"),
             ),
           },
