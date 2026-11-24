@@ -44,6 +44,7 @@ const handler = Effect.fn("cli.session.list")(function* (
             projectId: session.projectID,
             directory: session.location.directory,
             environment: session.environmentID ?? "local",
+            conversation: session.conversationID ?? null,
           })),
           null,
           2,

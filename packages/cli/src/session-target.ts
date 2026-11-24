@@ -46,11 +46,24 @@ export async function resolveSessionTarget(input: {
    * different environment is an error, never a silent retarget.
    */
   environmentTarget?: { id: string; directory?: string }
+  /**
+   * A conversation target for a NEW session (S-CONV1): the session is
+   * created already linked to the conversation. Resumed sessions keep
+   * their recorded conversation; targeting one that names a different
+   * conversation (or none) is an error, never a silent re-link.
+   */
+  conversationTarget?: { id: string }
   prepare: SessionTargetPreparation
   signal?: AbortSignal
 }): Promise<SessionTarget> {
   const selection = await selectSession(input)
   const selected = selection.session
+  if (selected && input.conversationTarget) {
+    if (selected.conversationID !== input.conversationTarget.id)
+      throw new Error(
+        `Session ${selected.id} is not part of conversation ${input.conversationTarget.id} — start a new session to join it`,
+      )
+  }
   if (selected && input.environmentTarget) {
     const recorded = selected.environmentID ?? Environment.LOCAL_ENVIRONMENT_ID
     if (recorded !== input.environmentTarget.id)
@@ -87,6 +100,7 @@ export async function resolveSessionTarget(input: {
           model: prepared.model,
           location: { directory: location.directory },
           environmentID: input.environmentTarget?.id,
+          conversationID: input.conversationTarget?.id,
         },
         ...requestOptions(input.signal),
       )

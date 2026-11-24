@@ -337,6 +337,32 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         }),
       ],
     }),
+    Spec.make("conversation", {
+      description: "Inspect conversations (durable threads of work spanning sessions)",
+      commands: [
+        Spec.make("list", {
+          description: "List conversations for the current project, most recently created first",
+          params: {
+            ...ServerParams,
+            format: Flag.Literals("format", ["table", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("table"),
+            ),
+          },
+        }),
+        Spec.make("show", {
+          description: "Show one conversation: its sessions, posted stream, and captured memory",
+          params: {
+            ...ServerParams,
+            id: Argument.String("id").pipe(Argument.withDescription("Conversation id (see: grist conversation list)")),
+            format: Flag.Literals("format", ["table", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("table"),
+            ),
+          },
+        }),
+      ],
+    }),
     Spec.make("mcp", {
       description: "Manage MCP (Model Context Protocol) servers",
       commands: [
@@ -540,6 +566,12 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         title: Flag.String("title").pipe(Flag.withDescription("Session title"), Flag.optional),
         env: Flag.String("env").pipe(
           Flag.withDescription("Environment to run in, by name (see: grist env list); new sessions only"),
+          Flag.optional,
+        ),
+        conversation: Flag.String("conversation").pipe(
+          Flag.withDescription(
+            "Conversation to join, by id (see: grist conversation list); new sessions only. Without it, a new conversation is created for the run",
+          ),
           Flag.optional,
         ),
         thinking: Flag.Boolean("thinking").pipe(Flag.withDescription("Show thinking blocks"), Flag.withDefault(false)),

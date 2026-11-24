@@ -86,6 +86,10 @@ const Handlers = Runtime.handlers(Commands, {
     create: () => import("./commands/handlers/env/create"),
     remove: () => import("./commands/handlers/env/remove"),
   },
+  conversation: {
+    list: () => import("./commands/handlers/conversation/list"),
+    show: () => import("./commands/handlers/conversation/show"),
+  },
   doctor: () => import("./commands/handlers/doctor"),
   stats: () => import("./commands/handlers/stats"),
   mini: () => import("./commands/handlers/mini"),

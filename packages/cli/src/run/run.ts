@@ -25,6 +25,8 @@ export type RunCommandInput = {
   title?: string
   /** Named environment to run in (S-ENV1); applies to new sessions. Absent = the implicit local environment. */
   env?: string
+  /** Conversation to join by id (S-CONV1); applies to new sessions. Absent = a new conversation is created for the run. */
+  conversation?: string
   thinking?: boolean
   auto?: boolean
 }
@@ -92,10 +94,12 @@ async function execute(input: RunCommandInput, prepared: Prepared, endpoint: End
   })
   const explicit = parseRunModel(input.model)
   const environmentTarget = input.env === undefined ? undefined : await resolveEnvironmentTarget(client, input.env, prepared.directory)
+  const conversationTarget = await resolveConversationTarget(client, input, prepared)
   const target = await resolveSessionTarget({
     client,
     location: prepared.directory ? { directory: prepared.directory } : undefined,
     environmentTarget,
+    conversationTarget,
     continue: input.continue,
     session: input.session,
     fork: input.fork,
@@ -208,6 +212,41 @@ async function resolveEnvironmentTarget(
   if (found.status === "missing" || !found.directory)
     fail(`Environment ${name} is missing its worktree directory${found.directory ? `: ${found.directory}` : ""}`)
   return { id: found.id, directory: found.directory }
+}
+
+/**
+ * Resolve the conversation a run posts into (S-CONV1). An explicit
+ * `--conversation <id>` joins that conversation — validated against the
+ * project's list, so an unknown or foreign id fails loudly before a
+ * session exists. A brand-new run without the flag creates a fresh
+ * conversation titled from the session title or the message. Resumed and
+ * forked sessions keep the conversation they already belong to (forks
+ * inherit it in the projector), so no target is resolved for them.
+ */
+async function resolveConversationTarget(
+  client: ReturnType<typeof OpenCode.make>,
+  input: RunCommandInput,
+  prepared: Prepared,
+): Promise<{ id: string } | undefined> {
+  const location = prepared.directory ? { location: { directory: prepared.directory } } : undefined
+  if (input.conversation !== undefined) {
+    const list = await client.grist.conversation.list(location)
+    const found = list.conversations.find((conversation) => conversation.id === input.conversation)
+    if (!found) fail(`Conversation not found: ${input.conversation} (see: grist conversation list)`)
+    return { id: found.id }
+  }
+  if (input.session !== undefined || input.continue || input.fork) return undefined
+  const created = await client.grist.conversation.create({
+    ...(location ?? {}),
+    title: input.title ?? conversationTitle(prepared.message),
+  })
+  return { id: created.id }
+}
+
+/** A conversation's title is its goal in human-readable words: the first line of the opening message. */
+function conversationTitle(message: string): string {
+  const line = message.split("\n").find((part) => part.trim().length > 0)?.trim() ?? ""
+  return line.length > 80 ? line.slice(0, 77) + "..." : line
 }
 
 async function prepareFile(input: string, directory: string, options: ExecutionOptions): Promise<FilePart> {
