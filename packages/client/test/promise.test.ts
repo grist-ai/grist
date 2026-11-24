@@ -32,6 +32,7 @@ test("exposes every standard HTTP API group", () => {
     "reference",
     "worktree",
     "vcs",
+    "grist",
     "debug",
     "migration",
     "websearch",
@@ -48,7 +49,7 @@ test("exposes every standard HTTP API group", () => {
   expect(Object.keys(client.websearch)).toEqual(["providers", "query"])
   expect(Object.keys(client.voice)).toEqual(["session"])
   expect(Object.keys(client.file)).toEqual(["read", "list", "find", "write"])
-  expect(Object.keys(client.vcs)).toEqual(["init", "get", "base", "status", "branch", "diff"])
+  expect(Object.keys(client.vcs)).toEqual(["init", "get", "base", "status", "branch", "diff", "apply", "commit"])
   expect(Object.keys(client.pty)).toEqual(["list", "create", "get", "update", "remove", "connect"])
   expect(Object.keys(client.pty.connect)).toEqual(["token"])
   expect(Object.keys(client.experimental)).toEqual(["persistentPty"])
@@ -56,6 +57,8 @@ test("exposes every standard HTTP API group", () => {
   expect(Object.keys(client.shell)).toEqual(["list", "create", "get", "output", "remove"])
   expect(Object.keys(client.project)).toEqual(["list", "update"])
   expect(Object.keys(client.worktree)).toEqual(["list", "create", "remove", "refresh"])
+  expect(Object.keys(client.grist)).toEqual(["memory", "codeMap", "environment"])
+  expect(Object.keys(client.grist.environment)).toEqual(["list", "create", "remove"])
 })
 
 test("config.get returns ordered config entries for a location", async () => {
