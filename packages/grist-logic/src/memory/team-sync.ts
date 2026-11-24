@@ -49,7 +49,7 @@ export type TeamMirrorEntry = MemoryRecord & {
 }
 
 /** Object kinds in the team filesystem (filesystem spec v1 §3). Memory never lands here. */
-export type TeamObjectKind = "skill" | "agent_definition"
+export type TeamObjectKind = "skill" | "agent_definition" | "artifact"
 
 /** One object version as it travels the push/pull wire (filesystem spec v1 §6). */
 export type TeamObjectWire = {

@@ -32,6 +32,12 @@ import {
  * harness's markdown definition format — and the journal keeps only a
  * manifest (chain key → head id, seq, content hash, path).
  *
+ * Artifacts (S-FS3) ride the same stream but are evidence, not
+ * instruction: they materialize as plain verbatim files under the
+ * `artifact/` area, which no skill or agent loader scans, and nothing
+ * loads them by name — they are kept for browsing and for the run that
+ * later cites them.
+ *
  * Containers: a repo's own objects materialize under `.grist/team/`;
  * team-global objects (the reserved container below) under
  * `.grist/team-global/`, a lower-precedence root the loaders scan
@@ -49,9 +55,13 @@ import {
  */
 export const TEAM_GLOBAL_CONTAINER = "team:global"
 
-/** Gateway push batch cap and per-object body cap (filesystem spec v1 §§5–6). */
+/** Gateway push batch cap and per-kind body caps (filesystem spec v1 §§5–6). */
 const PUSH_BATCH = 50
-const MAX_BODY_BYTES = 32 * 1024
+const BODY_CAPS: Record<TeamObjectKind, number> = {
+  skill: 32 * 1024,
+  agent_definition: 32 * 1024,
+  artifact: 64 * 1024,
+}
 /** Slug rule, mirrored from the gateway's admission (TEAM_OBJECT_NAME). */
 const OBJECT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
@@ -98,7 +108,8 @@ function rootForContainer(cwd: string, container: string, ownContainer: string):
 /**
  * Where one chain's head materializes. Skills are directories holding a
  * SKILL.md (the shape the skill loader scans); agent definitions are
- * single markdown files in the harness's definition format.
+ * single markdown files in the harness's definition format; artifacts
+ * are plain files in their own area, which no loader scans.
  */
 export function teamObjectPath(
   cwd: string,
@@ -106,9 +117,9 @@ export function teamObjectPath(
   object: { kind: TeamObjectKind; container: string; name: string },
 ): string {
   const root = rootForContainer(cwd, object.container, ownContainer)
-  return object.kind === "skill"
-    ? path.join(root, "skill", object.name, "SKILL.md")
-    : path.join(root, "agent_definition", `${object.name}.md`)
+  if (object.kind === "skill") return path.join(root, "skill", object.name, "SKILL.md")
+  if (object.kind === "agent_definition") return path.join(root, "agent_definition", `${object.name}.md`)
+  return path.join(root, "artifact", object.name)
 }
 
 export function hashTeamObjectContent(content: string): string {
@@ -202,19 +213,54 @@ function parseDefinitionFrontmatter(content: string): {
  * queued. Verified-kinds-only does NOT apply — that rule is memory's
  * (D-FS4); documents are admitted on schema validity + secrets scan.
  */
+/**
+ * Plain text, mirroring the gateway's artifact check: no C0 control
+ * characters other than tab, newline, form feed, and carriage return;
+ * no DEL; and no U+FFFD — the mark of binary data forced through a
+ * UTF-8 decode.
+ */
+function isPlainText(body: string): boolean {
+  for (const char of body) {
+    if (char === "\uFFFD") return false
+    const code = char.codePointAt(0) ?? 0
+    if (code === 0x7f) return false
+    if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0c && code !== 0x0d) {
+      return false
+    }
+  }
+  return true
+}
+
 export function validateTeamObject(object: TeamObjectWire): string | undefined {
-  if (object.kind !== "skill" && object.kind !== "agent_definition") return "invalid_kind"
+  if (object.kind !== "skill" && object.kind !== "agent_definition" && object.kind !== "artifact") {
+    return "invalid_kind"
+  }
   if (typeof object.container !== "string" || object.container.length === 0 || object.container.length > 256) {
     return "invalid_entry"
   }
   if (!OBJECT_NAME.test(object.name)) return "invalid_name"
   if (typeof object.body !== "string" || object.body.length === 0) return "invalid_entry"
-  if (new TextEncoder().encode(object.body).length > MAX_BODY_BYTES) return "oversize"
+  if (new TextEncoder().encode(object.body).length > BODY_CAPS[object.kind]) return "oversize"
   if (!object.metadata || typeof object.metadata !== "object" || Array.isArray(object.metadata)) {
     return "invalid_metadata"
   }
   if (findSecretKind(object.body) || findSecretKind(JSON.stringify(object.metadata))) {
     return "secret_detected"
+  }
+  if (object.kind === "artifact") {
+    // Provenance shape only (filesystem spec v1 §5): that the named
+    // memory entry / session exists for the team is the gateway's
+    // check (provenance_not_found) — it holds the store, this side
+    // does not. The reasons here mirror the gateway's exactly.
+    if (!isPlainText(object.body)) return "not_text"
+    const named = (value: unknown) =>
+      typeof value === "string" && value.length > 0 && value.length <= 128
+    const entry = object.metadata.memory_entry_id
+    const session = object.metadata.session_id
+    if (entry !== undefined && !named(entry)) return "missing_provenance"
+    if (session !== undefined && !named(session)) return "missing_provenance"
+    if (entry === undefined && session === undefined) return "missing_provenance"
+    return undefined
   }
   if (object.kind === "skill") {
     const frontmatter = parseObjectFrontmatter(object.body)
@@ -300,6 +346,37 @@ export function buildAgentDefinitionObject(input: {
   }
 }
 
+/**
+ * Build an artifact object from captured run output (filesystem spec
+ * v1 §5): the body is the text verbatim — the diff that fixed it, the
+ * test that proved it — and provenance rides in metadata: the memory
+ * entry it belongs to and/or the session that produced it. Artifacts
+ * are captured by the harness, not hand-authored, so there is no file
+ * format to parse: the caller names the object and its provenance.
+ */
+export function buildArtifactObject(input: {
+  content: string
+  name: string
+  container: string
+  id: string
+  supersedes?: string | null
+  memoryEntryId?: string
+  sessionId?: string
+}): TeamObjectWire {
+  const metadata: Record<string, unknown> = {}
+  if (input.memoryEntryId) metadata.memory_entry_id = input.memoryEntryId
+  if (input.sessionId) metadata.session_id = input.sessionId
+  return {
+    id: input.id,
+    kind: "artifact",
+    container: input.container,
+    name: input.name,
+    body: input.content,
+    metadata,
+    supersedes: input.supersedes ?? null,
+  }
+}
+
 const AGENT_MODES = ["subagent", "primary", "all"] as const
 
 function yamlScalar(value: string): string {
@@ -359,7 +436,11 @@ export function renderTeamObjectFile(object: {
   body: string
   metadata: Record<string, unknown>
 }): string {
-  return object.kind === "skill" ? renderSkillFile(object) : renderAgentDefinitionFile(object)
+  if (object.kind === "skill") return renderSkillFile(object)
+  if (object.kind === "agent_definition") return renderAgentDefinitionFile(object)
+  // Artifacts materialize verbatim: no loader reads them, so no
+  // loader shape (frontmatter) is synthesized around the evidence.
+  return object.body
 }
 
 /**
@@ -597,7 +678,7 @@ export async function pullTeamObjects(cwd: string, deps?: TeamObjectDeps): Promi
     let pulled = 0
     for (const wire of body.objects ?? []) {
       if (!wire || typeof wire.id !== "string" || typeof wire.body !== "string") continue
-      if (wire.kind !== "skill" && wire.kind !== "agent_definition") continue
+      if (wire.kind !== "skill" && wire.kind !== "agent_definition" && wire.kind !== "artifact") continue
       if (wire.status && wire.status !== "active") continue
       const key = teamObjectChainKey(wire.kind, wire.container, wire.name)
       const file = teamObjectPath(cwd, ownContainer, wire)
