@@ -35,6 +35,7 @@ const session = (
   project_id: Project.ID.global,
   workspace_id: null,
   environment_id: null,
+  conversation_id: null,
   parent_id: null,
   fork_session_id: null,
   fork_boundary: null,

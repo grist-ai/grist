@@ -20,6 +20,7 @@ import { SessionSchema } from "./session/schema.js"
 import { RelativePath } from "./schema.js"
 import { Agent } from "@opencode/schema/agent"
 import type { Environment } from "@opencode/schema/environment"
+import type { Conversation } from "@opencode/schema/conversation"
 import type { Permission } from "@opencode/schema/permission"
 import { App } from "./app.js"
 import { Slug } from "./util/slug.js"
@@ -90,6 +91,8 @@ type CreateBaseInput = {
   permissions?: Permission.Ruleset
   /** The environment the session runs in; absent (or inherited from the parent) means environment zero (local). */
   environmentID?: Environment.ID
+  /** The conversation the session belongs to; absent (or inherited from the parent) means unlinked. */
+  conversationID?: Conversation.ID
 }
 type CreateInput = CreateBaseInput &
   ({ location: Location.Ref; parentID?: never } | { parentID: SessionSchema.ID; location?: never })
@@ -283,6 +286,9 @@ const layer = Layer.effect(
               // Children inherit the environment the way they inherit location,
               // metadata, and permissions: a session family runs in one place.
               environmentID: input.environmentID ?? parent?.environmentID,
+              // Children inherit the conversation the same way: a session family
+              // works on one goal, so it posts into one conversation.
+              conversationID: input.conversationID ?? parent?.conversationID,
               parentID: input.parentID,
               location,
               subpath: RelativePath.make(path.relative(project.directory, location.directory).replaceAll("\\", "/")),

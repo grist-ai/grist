@@ -12,6 +12,7 @@ import type { Workspace } from "@opencode/schema/workspace"
 import { Timestamps } from "../database/schema.sql.js"
 import type { Instruction } from "@opencode/schema/instruction"
 import type { Environment } from "@opencode/schema/environment"
+import type { Conversation } from "@opencode/schema/conversation"
 import type { Session } from "@opencode/schema/session"
 import type { CompactionPayload, MovePayload, SyntheticPayload, UserPayload } from "@opencode/schema/session-inbox"
 import type { RevertV1 } from "@opencode/schema/session-revert"
@@ -31,6 +32,8 @@ export const SessionTable = sqliteTable(
     workspace_id: text().$type<Workspace.ID>(),
     /** The environment the session runs in; null means environment zero (local). */
     environment_id: text().$type<Environment.ID>(),
+    /** The conversation the session belongs to; null means unlinked (the degenerate one-session case). */
+    conversation_id: text().$type<Conversation.ID>(),
     parent_id: text().$type<SessionSchema.ID>(),
     fork_session_id: text().$type<SessionSchema.ID>(),
     fork_boundary: text({ mode: "json" }).$type<Session.ForkBoundary>(),

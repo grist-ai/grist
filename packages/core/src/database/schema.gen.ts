@@ -38,6 +38,18 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`conversation\` (
+          \`id\` text PRIMARY KEY,
+          \`project_id\` text NOT NULL,
+          \`title\` text NOT NULL,
+          \`created_by\` text,
+          \`status\` text NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_conversation_project_id_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`project\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`credential\` (
           \`id\` text PRIMARY KEY,
           \`integration_id\` text,
@@ -201,6 +213,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`project_id\` text NOT NULL,
           \`workspace_id\` text,
           \`environment_id\` text,
+          \`conversation_id\` text,
           \`parent_id\` text,
           \`fork_session_id\` text,
           \`fork_boundary\` text,
