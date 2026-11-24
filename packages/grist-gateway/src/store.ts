@@ -25,6 +25,7 @@ import {
   generateUserId,
   hashApiKey,
 } from "./codes.js"
+import { parseListenerDefinition, parseListenerEnvelope } from "./listeners.js"
 
 export type AccountRow = {
   firebase_uid: string
@@ -315,6 +316,35 @@ export type ListenerRunRequestRow = {
   expires_at: number
   completed_at: number | null
 }
+
+/**
+ * Why a claim refused a queued request (next-block spec §6.3). Every
+ * refusal is mechanical: the request moves to `refused`, the audit
+ * trail gains a `refused_cap` row carrying the reason as its detail,
+ * and the listener's creator is notified. `listener_disabled` is the
+ * kill switch landing — a new version with `enabled: false` (or a
+ * remove, which reads as `listener_removed`) stops the very next claim.
+ */
+export type ListenerRefusalReason =
+  | "listener_disabled"
+  | "listener_removed"
+  | "listener_invalid"
+  | "creator_not_member"
+  | "max_runs_per_day"
+  | "max_spend_per_day"
+
+export type ListenerClaimResult =
+  | { status: "claimed"; request: ListenerRunRequestRow }
+  | { status: "refused"; reason: ListenerRefusalReason; request: ListenerRunRequestRow }
+  | { status: "expired"; request: ListenerRunRequestRow }
+  | { status: "not_claimable"; state: ListenerRunState }
+  | { status: "not_found" }
+
+export type ListenerCompleteResult =
+  | { status: "completed"; request: ListenerRunRequestRow; overRunCap: boolean }
+  | { status: "not_claimable"; state: ListenerRunState }
+  | { status: "not_claimant" }
+  | { status: "not_found" }
 
 export type CliLoginRow = {
   device_code: string
@@ -871,6 +901,37 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `UPDATE listener_run_requests SET state = 'expired', updated_at = ?
      WHERE team_id = ? AND id = ? AND state = 'queued'`,
   )
+  // Runner lifecycle (S-LIS2): every transition is a state-guarded
+  // UPDATE, so a claim is atomic — two runners racing one request
+  // cannot both move it out of `queued`.
+  const claimListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'claimed', claimed_by = ?, updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'queued'`,
+  )
+  const refuseListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'refused', updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'queued'`,
+  )
+  const completeListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'completed', spend_usd = ?, completed_at = ?, updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'claimed'`,
+  )
+  const requeueListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'queued', claimed_by = NULL, updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'claimed'`,
+  )
+  const expireClaimedListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'expired', updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'claimed'`,
+  )
+  const selectStaleClaimedListenerRunRequests = db.prepare(
+    `SELECT * FROM listener_run_requests
+     WHERE state = 'claimed' AND updated_at <= ? ORDER BY updated_at ASC`,
+  )
+  const countListenerClaimsForRequest = db.prepare(
+    `SELECT COUNT(*) AS n FROM team_memory_audit
+     WHERE team_id = ? AND kind = 'listener' AND action = 'claimed' AND entry_id = ?`,
+  )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
     `INSERT INTO api_keys (id, invite_code, hash, prefix, name, kind, created_at, last_used_at, revoked)
@@ -974,9 +1035,93 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     return tip
   }
 
+  /**
+   * Expire one queued request with its `expired` audit row and creator
+   * notification (next-block spec §6.1: expiry is never silent). Shared
+   * by the TTL sweep and the claim path, which expires a past-TTL
+   * request inline rather than claiming it.
+   */
+  function expireQueuedListenerRequest(row: ListenerRunRequestRow, now: number) {
+    expireListenerRunRequest.run(now, row.team_id, row.id)
+    insertTeamMemoryAudit.run(row.team_id, "listener", "gateway", "expired", row.id, null, now)
+    notify(row.creator_uid, "listener_request_expired", {
+      request_id: row.id,
+      listener_id: row.listener_id,
+      listener_name: row.listener_name,
+    })
+  }
+
+  /**
+   * The mechanical claim-time envelope decision for one queued request
+   * (next-block spec §6.3, S-LIS2): undefined admits the claim,
+   * anything else is the refusal reason. Liveness comes from the
+   * listener's current chain head; the numbers come from the envelope
+   * snapshot the request carries from fire time. Day boundaries are
+   * UTC — one boundary for every runner, stated here rather than
+   * implied.
+   */
+  function listenerClaimRefusal(
+    row: ListenerRunRequestRow,
+    now: number,
+  ): ListenerRefusalReason | undefined {
+    const fired = selectTeamObjectById.get(row.team_id, row.listener_id) as
+      | TeamObjectRow
+      | undefined
+    if (!fired) return "listener_removed"
+    const chain = selectTeamObjectChain.all(
+      row.team_id,
+      fired.container,
+      "listener",
+      fired.name,
+    ) as TeamObjectRow[]
+    const tip = chainTip(chain)
+    if (!tip || tip.status !== "active") return "listener_removed"
+    const definition = parseListenerDefinition(tip.body)
+    if (!definition) return "listener_invalid"
+    if (!definition.enabled) return "listener_disabled"
+    const membership = selectMembership.get(row.creator_uid) as TeamMemberRow | undefined
+    if (!membership || membership.team_id !== row.team_id) return "creator_not_member"
+    const envelope = parseListenerEnvelope(JSON.parse(row.envelope) as unknown)
+    if (!envelope) return "listener_invalid"
+    const chainIds = chain.map((entry) => entry.id)
+    if (chainIds.length === 0) return undefined
+    const marks = chainIds.map(() => "?").join(", ")
+    const dayStart = Math.floor(now / 86_400_000) * 86_400_000
+    const claimedToday = (
+      db
+        .prepare(
+          `SELECT COUNT(DISTINCT a.entry_id) AS n FROM team_memory_audit a
+           JOIN listener_run_requests r ON r.id = a.entry_id AND r.team_id = a.team_id
+           WHERE a.team_id = ? AND a.kind = 'listener' AND a.action = 'claimed' AND a.at >= ?
+             AND r.listener_id IN (${marks})`,
+        )
+        .get(row.team_id, dayStart, ...chainIds) as { n: number }
+    ).n
+    if (claimedToday >= envelope.max_runs_per_day) return "max_runs_per_day"
+    const spentToday = (
+      db
+        .prepare(
+          `SELECT COALESCE(SUM(spend_usd), 0) AS total FROM listener_run_requests
+           WHERE team_id = ? AND state = 'completed' AND completed_at >= ?
+             AND listener_id IN (${marks})`,
+        )
+        .get(row.team_id, dayStart, ...chainIds) as { total: number }
+    ).total
+    const outstanding = (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM listener_run_requests
+           WHERE team_id = ? AND state = 'claimed' AND listener_id IN (${marks})`,
+        )
+        .get(row.team_id, ...chainIds) as { n: number }
+    ).n
+    const exposure = spentToday + (outstanding + 1) * envelope.max_spend_per_run_usd
+    if (exposure > envelope.max_spend_per_day_usd + 1e-9) return "max_spend_per_day"
+    return undefined
+  }
+
   /** The team's webhook intake config from its settings row. */
-  function teamWebhookConfig(teamId: string): TeamWebhookConfig | undefined {
-    const row = getSetting.get(`team_webhook:${teamId}`) as { value: string } | undefined
+  function teamWebhookConfig(teamId: string): TeamWebhookConfig | undefined {    const row = getSetting.get(`team_webhook:${teamId}`) as { value: string } | undefined
     if (!row) return undefined
     try {
       const parsed = JSON.parse(row.value) as Partial<TeamWebhookConfig>
@@ -2094,25 +2239,240 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       const rows = selectExpiredListenerRunRequests.all(input.now) as ListenerRunRequestRow[]
       if (rows.length === 0) return []
       db.transaction(() => {
-        for (const row of rows) {
-          expireListenerRunRequest.run(input.now, row.team_id, row.id)
+        for (const row of rows) expireQueuedListenerRequest(row, input.now)
+      })()
+      return rows.map((row) => ({ ...row, state: "expired" as const, updated_at: input.now }))
+    },
+
+    /** One queue row by id, tenancy-scoped — the claim/complete surface. */
+    getListenerRunRequest(teamId: string, requestId: string): ListenerRunRequestRow | undefined {
+      return selectListenerRunRequest.get(teamId, requestId) as ListenerRunRequestRow | undefined
+    },
+
+    /**
+     * Claim one queued request for a runner (next-block spec §6.3,
+     * S-LIS2). The whole decision is mechanical and happens in one
+     * transaction, in this order:
+     *
+     * 1. A request past its queue TTL expires inline (same audit +
+     *    notification as the sweep) instead of being claimed.
+     * 2. The listener's CURRENT chain head governs liveness: archived
+     *    or missing reads as removed; `enabled: false` is the kill
+     *    switch and refuses this claim — the very next one after the
+     *    disabling version lands.
+     * 3. The creator must still belong to the team (re-read per claim,
+     *    as intake re-reads per delivery).
+     * 4. Runs/day counts today's `claimed` audit rows for the
+     *    listener's chain (distinct requests — a re-claimed request is
+     *    one run, not two).
+     * 5. Spend/day counts what the data honestly supports: completed
+     *    rows' recorded spend landed today, plus every outstanding
+     *    claim (including this one) at its full per-run cap — the
+     *    worst case each claim commits the envelope to. The per-run
+     *    cap itself can only be judged at completion (the money is
+     *    spent by then); completion records and flags an overage
+     *    rather than pretending claim time could have prevented it.
+     *
+     * Any refusal moves the request to `refused` with a `refused_cap`
+     * audit row (detail = the reason) and a creator notification —
+     * until S-INBOX1, over-envelope requests are refused, never parked
+     * (§6.3 interim behavior). The claim itself is a state-guarded
+     * UPDATE: exactly one runner can win a request.
+     */
+    claimListenerRunRequest(input: {
+      teamId: string
+      requestId: string
+      claimantUid: string
+      now?: number
+    }): ListenerClaimResult {
+      const now = input.now ?? Date.now()
+      const row = selectListenerRunRequest.get(input.teamId, input.requestId) as
+        | ListenerRunRequestRow
+        | undefined
+      if (!row) return { status: "not_found" }
+      if (row.state !== "queued") return { status: "not_claimable", state: row.state }
+      let result: ListenerClaimResult | undefined
+      db.transaction(() => {
+        if (row.expires_at <= now) {
+          expireQueuedListenerRequest(row, now)
+          result = {
+            status: "expired",
+            request: selectListenerRunRequest.get(input.teamId, row.id) as ListenerRunRequestRow,
+          }
+          return
+        }
+        const refusal = listenerClaimRefusal(row, now)
+        if (refusal) {
+          refuseListenerRunRequest.run(now, input.teamId, row.id)
+          insertTeamMemoryAudit.run(
+            input.teamId,
+            "listener",
+            "gateway",
+            "refused_cap",
+            row.id,
+            refusal,
+            now,
+          )
+          notify(row.creator_uid, "listener_request_refused", {
+            request_id: row.id,
+            listener_id: row.listener_id,
+            listener_name: row.listener_name,
+            reason: refusal,
+          })
+          result = {
+            status: "refused",
+            reason: refusal,
+            request: selectListenerRunRequest.get(input.teamId, row.id) as ListenerRunRequestRow,
+          }
+          return
+        }
+        const claimed = claimListenerRunRequest.run(input.claimantUid, now, input.teamId, row.id)
+        if (claimed.changes === 0) {
+          const fresh = selectListenerRunRequest.get(input.teamId, row.id) as ListenerRunRequestRow
+          result = { status: "not_claimable", state: fresh.state }
+          return
+        }
+        insertTeamMemoryAudit.run(
+          input.teamId,
+          "listener",
+          input.claimantUid,
+          "claimed",
+          row.id,
+          null,
+          now,
+        )
+        result = {
+          status: "claimed",
+          request: selectListenerRunRequest.get(input.teamId, row.id) as ListenerRunRequestRow,
+        }
+      })()
+      if (!result) throw new Error("listener claim produced no result")
+      return result
+    },
+
+    /**
+     * Report a claimed run's end (next-block spec §6.2: the audit loop
+     * closes claimed → completed, with spend). Only the runner that
+     * claimed the request may report it. A failed run is still a
+     * completed lifecycle — the state models no separate failure
+     * terminal — with the outcome (and the runner's error, truncated)
+     * carried in the audit detail and the creator notification, so a
+     * failure is never dressed up as a success. Spend above the
+     * per-run cap is recorded as reported and flagged
+     * `over_run_cap`: the gateway cannot un-spend money, so the
+     * overage is made visible instead of hidden.
+     */
+    completeListenerRunRequest(input: {
+      teamId: string
+      requestId: string
+      claimantUid: string
+      spendUsd: number
+      outcome: "succeeded" | "failed"
+      sessionId?: string
+      error?: string
+      now?: number
+    }): ListenerCompleteResult {
+      const now = input.now ?? Date.now()
+      const row = selectListenerRunRequest.get(input.teamId, input.requestId) as
+        | ListenerRunRequestRow
+        | undefined
+      if (!row) return { status: "not_found" }
+      if (row.state !== "claimed") return { status: "not_claimable", state: row.state }
+      if (row.claimed_by !== input.claimantUid) return { status: "not_claimant" }
+      const envelope = parseListenerEnvelope(JSON.parse(row.envelope) as unknown)
+      const overRunCap = envelope ? input.spendUsd > envelope.max_spend_per_run_usd + 1e-9 : false
+      db.transaction(() => {
+        completeListenerRunRequest.run(input.spendUsd, now, now, input.teamId, row.id)
+        const detail: Record<string, unknown> = {
+          spend_usd: input.spendUsd,
+          outcome: input.outcome,
+        }
+        if (input.sessionId) detail.session_id = input.sessionId
+        if (input.error) detail.error = input.error.slice(0, 500)
+        if (overRunCap) detail.over_run_cap = true
+        insertTeamMemoryAudit.run(
+          input.teamId,
+          "listener",
+          input.claimantUid,
+          "completed",
+          row.id,
+          JSON.stringify(detail),
+          now,
+        )
+        notify(row.creator_uid, "listener_request_completed", {
+          request_id: row.id,
+          listener_id: row.listener_id,
+          listener_name: row.listener_name,
+          spend_usd: input.spendUsd,
+          outcome: input.outcome,
+          ...(overRunCap ? { over_run_cap: true } : {}),
+        })
+      })()
+      return {
+        status: "completed",
+        request: selectListenerRunRequest.get(input.teamId, row.id) as ListenerRunRequestRow,
+        overRunCap,
+      }
+    },
+
+    /**
+     * Claim-lease sweep (S-LIS2): a claimed row whose runner never
+     * reports must not wedge forever. A row claimed longer than the
+     * lease is REQUEUED ONCE (a crashed runner gets one retry; the
+     * queue TTL still bounds the request's total life) — a row whose
+     * lease lapses a second time EXPIRES, audited and notified like
+     * any expiry. Attempt counting rides the audit trail: one
+     * `claimed` row per claim, so no extra bookkeeping column exists.
+     * Driven by the policy timer (policy.ts); idempotent, since only
+     * `claimed` rows past the lease move.
+     */
+    sweepListenerClaimLeases(input: { now: number; leaseMs: number }): {
+      requeued: ListenerRunRequestRow[]
+      expired: ListenerRunRequestRow[]
+    } {
+      const stale = selectStaleClaimedListenerRunRequests.all(
+        input.now - input.leaseMs,
+      ) as ListenerRunRequestRow[]
+      const requeued: ListenerRunRequestRow[] = []
+      const expired: ListenerRunRequestRow[] = []
+      if (stale.length === 0) return { requeued, expired }
+      db.transaction(() => {
+        for (const row of stale) {
+          const claims = (countListenerClaimsForRequest.get(row.team_id, row.id) as { n: number }).n
+          if (claims <= 1) {
+            requeueListenerRunRequest.run(input.now, row.team_id, row.id)
+            insertTeamMemoryAudit.run(
+              row.team_id,
+              "listener",
+              "gateway",
+              "queued",
+              row.id,
+              "requeue: claim lease expired",
+              input.now,
+            )
+            requeued.push({ ...row, state: "queued", claimed_by: null, updated_at: input.now })
+            continue
+          }
+          expireClaimedListenerRunRequest.run(input.now, row.team_id, row.id)
           insertTeamMemoryAudit.run(
             row.team_id,
             "listener",
             "gateway",
             "expired",
             row.id,
-            null,
+            "claim_lease_expired",
             input.now,
           )
           notify(row.creator_uid, "listener_request_expired", {
             request_id: row.id,
             listener_id: row.listener_id,
             listener_name: row.listener_name,
+            reason: "claim_lease_expired",
           })
+          expired.push({ ...row, state: "expired", updated_at: input.now })
         }
       })()
-      return rows.map((row) => ({ ...row, state: "expired" as const, updated_at: input.now }))
+      return { requeued, expired }
     },
 
     /**

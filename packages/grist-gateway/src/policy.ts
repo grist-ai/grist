@@ -85,6 +85,31 @@ export function runListenerExpirySweep(
   return { expired: rows.length }
 }
 
+export const DEFAULT_CLAIM_LEASE_MS = 30 * 60_000
+
+/** The claim lease (S-LIS2): how long a claimed request may go
+ * unreported before the sweep requeues it (once) or expires it.
+ * Env-tunable like the other knobs: GRIST_LISTENER_CLAIM_LEASE_MS. */
+export function listenerClaimLeaseMs(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const parsed = Number(env.GRIST_LISTENER_CLAIM_LEASE_MS)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CLAIM_LEASE_MS
+}
+
+/** Run one claim-lease pass now (S-LIS2): stale claims are requeued
+ * once, then expired — audited and notified either way. */
+export function runListenerClaimLeaseSweep(
+  store: GatewayStore,
+  opts?: { now?: number; leaseMs?: number },
+): { requeued: number; expired: number } {
+  const result = store.sweepListenerClaimLeases({
+    now: opts?.now ?? Date.now(),
+    leaseMs: opts?.leaseMs ?? listenerClaimLeaseMs(),
+  })
+  return { requeued: result.requeued.length, expired: result.expired.length }
+}
+
 /** Run one sweep now. Unset knobs fall back to the env configuration. */
 export function runTeamMemoryPolicySweep(
   store: GatewayStore,
@@ -127,12 +152,14 @@ export function startTeamMemoryPolicy(
       })
       const objects = runTeamObjectPolicySweep(store)
       const listeners = runListenerExpirySweep(store)
+      const leases = runListenerClaimLeaseSweep(store)
       console.info(
         `[grist-gateway] team memory policy sweep: ${teams.length} team(s), ` +
           `merged ${totals.merged}, flagged ${totals.flagged}, ` +
           `decayed ${totals.decayed}, archived ${totals.archived}; ` +
           `objects archived ${objects.totals.archived}, objects flagged ${objects.totals.flagged}; ` +
-          `listener requests expired ${listeners.expired}`,
+          `listener requests expired ${listeners.expired}, claims requeued ${leases.requeued}, ` +
+          `stale claims expired ${leases.expired}`,
       )
     } catch (error) {
       console.error("[grist-gateway] team memory policy sweep failed", error)
