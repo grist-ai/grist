@@ -5,6 +5,7 @@ import path from "node:path"
 import type { InviteConfig } from "../invite-config.js"
 import {
   buildAgentDefinitionObject,
+  buildArtifactObject,
   buildSkillObject,
   flushTeamObjectPushes,
   hashTeamObjectContent,
@@ -13,9 +14,11 @@ import {
   queueTeamObjectPush,
   renderAgentDefinitionFile,
   renderSkillFile,
+  renderTeamObjectFile,
   syncTeamObjects,
   TEAM_GLOBAL_CONTAINER,
   teamObjectChainKey,
+  teamObjectPath,
   validateTeamObject,
   type TeamObjectDeps,
 } from "./team-objects.js"
@@ -542,5 +545,103 @@ describe("local authoring parse + render", () => {
     const def = renderAgentDefinitionFile({ name: "r", body: "Prompt.", metadata: {} })
     expect(def).toContain("mode: subagent")
     expect(def).toContain("Prompt.")
+  })
+})
+
+describe("artifacts (filesystem spec v1 §5, S-FS3)", () => {
+  function artifact(overrides?: Partial<TeamObjectWire>): TeamObjectWire {
+    return {
+      id: "art_1",
+      kind: "artifact",
+      container: "repo-x",
+      name: "fix-diff",
+      body: "diff --git a/src/a.ts b/src/a.ts\n-old line\n+new line\n",
+      metadata: { session_id: "sess_1" },
+      supersedes: null,
+      ...overrides,
+    }
+  }
+
+  test("buildArtifactObject carries provenance in metadata, body verbatim", () => {
+    const object = buildArtifactObject({
+      content: "the diff",
+      name: "fix-diff",
+      container: "repo-x",
+      id: "art_1",
+      memoryEntryId: "mem_1",
+      sessionId: "sess_1",
+    })
+    expect(object.kind).toBe("artifact")
+    expect(object.body).toBe("the diff")
+    expect(object.metadata).toEqual({ memory_entry_id: "mem_1", session_id: "sess_1" })
+    expect(object.supersedes).toBeNull()
+  })
+
+  test("local admission mirrors the gateway's artifact reasons", () => {
+    expect(validateTeamObject(artifact())).toBeUndefined()
+    expect(validateTeamObject(artifact({ metadata: { memory_entry_id: "mem_1" } }))).toBeUndefined()
+    expect(validateTeamObject(artifact({ metadata: {} }))).toBe("missing_provenance")
+    expect(validateTeamObject(artifact({ metadata: { session_id: "" } }))).toBe("missing_provenance")
+    expect(validateTeamObject(artifact({ metadata: { memory_entry_id: 42 } }))).toBe("missing_provenance")
+    expect(validateTeamObject(artifact({ body: "bytes \u0003\u0004 here" }))).toBe("not_text")
+    // The artifact cap is 64 KB, not the 32 KB document cap.
+    expect(validateTeamObject(artifact({ body: "x".repeat(40 * 1024) }))).toBeUndefined()
+    expect(validateTeamObject(artifact({ body: "x".repeat(64 * 1024 + 1) }))).toBe("oversize")
+  })
+
+  test("an artifact without provenance is held locally and never sent", async () => {
+    const cwd = tempRepo()
+    const gw = stubGateway()
+    await setTeamMemoryEnabled(cwd, true)
+    const held = await publishTeamObject(cwd, artifact({ metadata: {} }), gw.deps)
+    expect(held.queue).toBe("rejected")
+    const state = await loadTeamSyncState(cwd)
+    expect(state.objects.rejected.art_1?.reason).toBe("missing_provenance")
+    expect(gw.calls).toHaveLength(0)
+  })
+
+  test("a pulled artifact materializes as a plain verbatim file outside the loadable paths", async () => {
+    const cwd = tempRepo()
+    await setTeamMemoryEnabled(cwd, true)
+    const body = "diff --git a/src/a.ts b/src/a.ts\n-old line\n+new line\n"
+    const gw = stubGateway({
+      heads: [
+        served({
+          id: "art_1",
+          kind: "artifact",
+          name: "fix-diff",
+          body,
+          metadata: { session_id: "sess_1" },
+          seq: 1,
+        }),
+      ],
+      nextSeq: 1,
+    })
+    const pull = await pullTeamObjects(cwd, gw.deps)
+    expect(pull).toMatchObject({ pulled: 1, tombstoned: 0, cursor: 1 })
+
+    const file = path.join(cwd, ".grist", "team", "artifact", "fix-diff")
+    // Verbatim: no frontmatter is synthesized around evidence.
+    expect(fs.readFileSync(file, "utf-8")).toBe(body)
+    // Nothing landed in the areas the skill / agent loaders scan.
+    expect(fs.existsSync(path.join(cwd, ".grist", "team", "skill"))).toBe(false)
+    expect(fs.existsSync(path.join(cwd, ".grist", "team", "agent_definition"))).toBe(false)
+
+    const state = await loadTeamSyncState(cwd)
+    const entry = state.objects.manifest[teamObjectChainKey("artifact", "repo-x", "fix-diff")]
+    expect(entry?.kind).toBe("artifact")
+    expect(entry?.id).toBe("art_1")
+    expect(entry?.path).toBe(path.join(".grist", "team", "artifact", "fix-diff"))
+    expect(entry?.hash).toBe(hashTeamObjectContent(body))
+  })
+
+  test("artifact paths and rendering stay out of the loaders' shapes", () => {
+    const cwd = "/repo"
+    expect(teamObjectPath(cwd, "repo", { kind: "artifact", container: "repo", name: "fix-diff" })).toBe(
+      path.join(cwd, ".grist", "team", "artifact", "fix-diff"),
+    )
+    expect(
+      renderTeamObjectFile({ kind: "artifact", name: "fix-diff", body: "raw text", metadata: {} }),
+    ).toBe("raw text")
   })
 })
