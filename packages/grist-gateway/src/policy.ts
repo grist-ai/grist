@@ -1,7 +1,8 @@
-import type { GatewayStore, TeamMemoryPolicyCounts } from "./store.js"
+import type { GatewayStore, TeamMemoryPolicyCounts, TeamObjectPolicyCounts } from "./store.js"
 
 /**
- * Team memory policy job (spec v2 §§9–10 — the hosted Dreaming loop).
+ * Team filesystem policy job (spec v2 §§9–10, filesystem spec v1 §7 —
+ * the hosted Dreaming loop).
  *
  * The gateway is a single Bun.serve process with no cron infrastructure,
  * so the sweep runs in-process on a timer: once shortly after boot, then
@@ -11,9 +12,12 @@ import type { GatewayStore, TeamMemoryPolicyCounts } from "./store.js"
  * GRIST_MEMORY_RETENTION_DAYS (default 90) and
  * GRIST_MEMORY_DECAY_FACTOR (default 0.9, one step per window at most).
  *
- * The sweep itself is mechanical and audit-logged — see
- * `runTeamMemoryPolicy` in store.ts. This module is only scheduling and
- * configuration; it holds no policy rules.
+ * One timer drives both streams, partitioned by kind (filesystem spec
+ * v1 §7): memory keeps its evidence rules (merge, decay, staleness);
+ * objects get archive-superseded + chain integrity only. The sweeps
+ * themselves are mechanical and audit-logged — see `runTeamMemoryPolicy`
+ * and `runTeamObjectPolicy` in store.ts. This module is only scheduling
+ * and configuration; it holds no policy rules.
  */
 
 export type TeamMemoryPolicyConfig = {
@@ -49,6 +53,25 @@ export function teamMemoryPolicyConfig(
 export type TeamMemorySweepResult = {
   teams: Array<{ teamId: string } & TeamMemoryPolicyCounts>
   totals: TeamMemoryPolicyCounts
+}
+
+export type TeamObjectSweepResult = {
+  teams: Array<{ teamId: string } & TeamObjectPolicyCounts>
+  totals: { archived: number; flagged: number }
+}
+
+/** Run one object sweep now (filesystem spec v1 §7 partition). */
+export function runTeamObjectPolicySweep(
+  store: GatewayStore,
+  opts?: { now?: number },
+): TeamObjectSweepResult {
+  const teams = store.runTeamObjectPolicy({ now: opts?.now ?? Date.now() })
+  const totals = { archived: 0, flagged: 0 }
+  for (const team of teams) {
+    totals.archived += team.archived
+    totals.flagged += team.flagged
+  }
+  return { teams, totals }
 }
 
 /** Run one sweep now. Unset knobs fall back to the env configuration. */
@@ -91,10 +114,12 @@ export function startTeamMemoryPolicy(
         retentionMs: config.retentionMs,
         decayFactor: config.decayFactor,
       })
+      const objects = runTeamObjectPolicySweep(store)
       console.info(
         `[grist-gateway] team memory policy sweep: ${teams.length} team(s), ` +
           `merged ${totals.merged}, flagged ${totals.flagged}, ` +
-          `decayed ${totals.decayed}, archived ${totals.archived}`,
+          `decayed ${totals.decayed}, archived ${totals.archived}; ` +
+          `objects archived ${objects.totals.archived}, objects flagged ${objects.totals.flagged}`,
       )
     } catch (error) {
       console.error("[grist-gateway] team memory policy sweep failed", error)

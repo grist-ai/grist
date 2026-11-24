@@ -160,9 +160,33 @@ export type TeamMemoryCounts = {
   byStatus: Record<string, number>
 }
 
+/** Team-wide object counts for the dashboard browser (filesystem spec
+ * v1 §9): totals across all statuses, split by kind. */
+export type TeamObjectCounts = {
+  total: number
+  byKind: Record<string, number>
+  byStatus: Record<string, number>
+}
+
+/**
+ * Action counts from one object policy sweep over one team (filesystem
+ * spec v1 §7). The sweep partitions by kind: objects get the
+ * filesystem-wide rules (archive-superseded, chain integrity) and none
+ * of memory's evidence rules (merge, decay, staleness) — those key on
+ * weight and normalized content, which documents do not have.
+ */
+export type TeamObjectPolicyCounts = {
+  archived: number
+  flagged: number
+  byKind: Record<string, { archived: number; flagged: number }>
+}
+
+/** The last object policy run for a team, as the dashboard shows it. */
+export type TeamObjectDreamingRun = TeamObjectPolicyCounts & { at: number }
+
 /** Object kinds in the team filesystem v1 (filesystem spec v1 §3).
- * `artifact` joins in S-FS3; memory never lands in `team_objects`. */
-export type TeamObjectKind = "skill" | "agent_definition"
+ * Memory never lands in `team_objects`. */
+export type TeamObjectKind = "skill" | "agent_definition" | "artifact"
 
 export type TeamObjectStatus = "active" | "flagged" | "archived"
 
@@ -688,6 +712,30 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   )
   const maxTeamObjectSeq = db.prepare(
     `SELECT COALESCE(MAX(seq), 0) AS max_seq FROM team_objects WHERE team_id = ?`,
+  )
+  const allTeamObjectsForTeam = db.prepare(
+    `SELECT * FROM team_objects WHERE team_id = ? ORDER BY seq ASC`,
+  )
+  const flagTeamObject = db.prepare(
+    `UPDATE team_objects SET status = 'flagged', updated_at = ?, seq = ?
+     WHERE team_id = ? AND id = ?`,
+  )
+  const countTeamObjectsByKind = db.prepare(
+    `SELECT kind, COUNT(*) AS n FROM team_objects WHERE team_id = ? GROUP BY kind`,
+  )
+  const countTeamObjectsByStatus = db.prepare(
+    `SELECT status, COUNT(*) AS n FROM team_objects WHERE team_id = ? GROUP BY status`,
+  )
+  const countTeamObjectsTotal = db.prepare(
+    `SELECT COUNT(*) AS n FROM team_objects WHERE team_id = ?`,
+  )
+  // A session "exists for a team" (artifact provenance, filesystem spec
+  // v1 §5) when a memory entry the team holds was captured in it — the
+  // session id rides in the entry's metadata (spec v2 §5). The gateway
+  // keeps no session registry of its own.
+  const selectTeamMemorySession = db.prepare(
+    `SELECT 1 FROM team_memory_entries
+     WHERE team_id = ? AND json_extract(metadata, '$.session_id') = ? LIMIT 1`,
   )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
@@ -1678,6 +1726,140 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
         )
         .all(...params, limit) as TeamObjectListRow[]
       return rows.filter((row) => teamObjectVisibleTo(row, actor))
+    },
+
+    /** Team-wide object counts for the dashboard browser (filesystem
+     * spec v1 §9): totals across all statuses, not just the list window. */
+    teamObjectCounts(teamId: string): TeamObjectCounts {
+      const byKind: Record<string, number> = {}
+      for (const row of countTeamObjectsByKind.all(teamId) as { kind: string; n: number }[]) {
+        byKind[row.kind] = row.n
+      }
+      const byStatus: Record<string, number> = {}
+      for (const row of countTeamObjectsByStatus.all(teamId) as { status: string; n: number }[]) {
+        byStatus[row.status] = row.n
+      }
+      return {
+        total: (countTeamObjectsTotal.get(teamId) as { n: number }).n,
+        byKind,
+        byStatus,
+      }
+    },
+
+    /**
+     * Artifact provenance probes (filesystem spec v1 §5): an artifact
+     * must name a memory entry or a session that exists for the team.
+     * The entry probe accepts any status — the row is retained
+     * server-side forever, so the link target either exists or it does
+     * not, regardless of the entry's lifecycle state.
+     */
+    hasTeamMemoryEntry(teamId: string, entryId: string): boolean {
+      return selectTeamMemoryById.get(teamId, entryId) != null
+    },
+
+    hasTeamMemorySession(teamId: string, sessionId: string): boolean {
+      return selectTeamMemorySession.get(teamId, sessionId) != null
+    },
+
+    /** The team's last object policy run summary, if any. Stored as a
+     * settings row beside the memory run's, so it survives restarts. */
+    getObjectDreamingRun(teamId: string): TeamObjectDreamingRun | undefined {
+      const row = getSetting.get(`dreaming-objects:${teamId}`) as { value: string } | undefined
+      if (!row) return undefined
+      try {
+        const parsed = JSON.parse(row.value) as Partial<TeamObjectDreamingRun>
+        if (typeof parsed.at !== "number") return undefined
+        return {
+          at: parsed.at,
+          archived: parsed.archived ?? 0,
+          flagged: parsed.flagged ?? 0,
+          byKind: parsed.byKind ?? {},
+        }
+      } catch {
+        return undefined
+      }
+    },
+
+    /**
+     * One policy sweep over every team's OBJECTS (filesystem spec v1
+     * §7 — the Dreaming sweep partitioned by kind). Objects get only
+     * the filesystem-wide rules; memory's evidence rules never touch
+     * documents: the near-duplicate merge keys on normalized content
+     * text and would merge distinct skills with similar bodies, and
+     * weight decay / staleness are evidence concepts documents do not
+     * carry. What applies here:
+     *
+     * 1. Archive superseded — a row another row supersedes never stays
+     *    active. Archiving gives it a fresh seq, so the removal travels
+     *    the pull feed as a tombstone and mirrors converge. (Push
+     *    deliberately leaves superseded heads active; this closes the
+     *    loop, exactly as the memory sweep archives superseded entries.)
+     * 2. Chain integrity — an active row whose `supersedes` target is
+     *    missing from the team is flagged, not silently trusted. Push
+     *    rejects dangling pointers, so this fires only on corruption —
+     *    which is exactly when a flag beats silence.
+     *
+     * Fully mechanical, nothing is ever deleted, and every action
+     * writes an audit row under the actor `dreaming` tagged with the
+     * object's own kind on the one shared trail. Decisions are computed
+     * from a per-team snapshot, so a repeat sweep changes nothing
+     * (idempotent). Each team's run summary is recorded for the
+     * dashboard, with counts split by kind.
+     */
+    runTeamObjectPolicy(input: {
+      now: number
+    }): Array<{ teamId: string } & TeamObjectPolicyCounts> {
+      const results: Array<{ teamId: string } & TeamObjectPolicyCounts> = []
+      const teamIds = (allTeamIds.all() as { id: string }[]).map((row) => row.id)
+      for (const teamId of teamIds) {
+        const counts: TeamObjectPolicyCounts = { archived: 0, flagged: 0, byKind: {} }
+        const bump = (kind: string, field: "archived" | "flagged") => {
+          counts[field]++
+          const per = counts.byKind[kind] ?? { archived: 0, flagged: 0 }
+          per[field]++
+          counts.byKind[kind] = per
+        }
+        db.transaction(() => {
+          const rows = (allTeamObjectsForTeam.all(teamId) as TeamObjectRow[]).map((row) => ({
+            ...row,
+          }))
+          const byId = new Map(rows.map((row) => [row.id, row]))
+          const audit = (kind: string, action: string, entryId: string) =>
+            insertTeamMemoryAudit.run(teamId, kind, "dreaming", action, entryId, input.now)
+          const supersededIds = new Set(
+            rows.map((row) => row.supersedes).filter((id): id is string => id !== null),
+          )
+
+          // 1. Archive superseded rows that are still active.
+          for (const row of rows) {
+            if (row.status !== "active" || !supersededIds.has(row.id)) continue
+            row.status = "archived"
+            row.updated_at = input.now
+            row.seq = nextTeamObjectSeq(teamId)
+            archiveTeamObject.run(row.updated_at, row.seq, teamId, row.id)
+            audit(row.kind, "archive", row.id)
+            bump(row.kind, "archived")
+          }
+
+          // 2. Flag active rows whose supersedes target is missing.
+          for (const row of rows) {
+            if (row.status !== "active" || !row.supersedes) continue
+            if (byId.has(row.supersedes)) continue
+            row.status = "flagged"
+            row.updated_at = input.now
+            row.seq = nextTeamObjectSeq(teamId)
+            flagTeamObject.run(row.updated_at, row.seq, teamId, row.id)
+            audit(row.kind, "flag", row.id)
+            bump(row.kind, "flagged")
+          }
+        })()
+        setSetting.run(
+          `dreaming-objects:${teamId}`,
+          JSON.stringify({ at: input.now, ...counts }),
+        )
+        results.push({ teamId, ...counts })
+      }
+      return results
     },
 
     /** Every team id — the policy sweep's work list. */

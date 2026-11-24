@@ -168,16 +168,21 @@ const TEAM_MEMORY_MAX_CONTENT_BYTES = 4 * 1024
 const TEAM_MEMORY_PUSH_MAX_BYTES = 512 * 1024
 /**
  * Team objects (filesystem spec v1 §§5–6): at most 50 objects per push,
- * bodies capped at 32 KB per kind (skill and agent_definition alike), so
- * a full batch of max-size objects plus JSON overhead bounds the body.
- * Object names are slugs: how the harness addresses a skill or def on
- * disk and in pickers, so they stay lowercase, path-safe, and short.
+ * with per-kind body caps — documents (skill, agent_definition) at
+ * 32 KB, artifacts at 64 KB — so a full batch of max-size artifacts
+ * plus JSON overhead bounds the request body. Object names are slugs:
+ * how the harness addresses an object on disk and in pickers, so they
+ * stay lowercase, path-safe, and short.
  */
 const TEAM_OBJECTS_MAX_ENTRIES = 50
-const TEAM_OBJECT_MAX_BODY_BYTES = 32 * 1024
-const TEAM_OBJECTS_PUSH_MAX_BYTES = 2 * 1024 * 1024
+const TEAM_OBJECT_BODY_CAPS: Record<TeamObjectKind, number> = {
+  skill: 32 * 1024,
+  agent_definition: 32 * 1024,
+  artifact: 64 * 1024,
+}
+const TEAM_OBJECTS_PUSH_MAX_BYTES = 4 * 1024 * 1024
 const TEAM_OBJECT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/
-const TEAM_OBJECT_KINDS: readonly TeamObjectKind[] = ["skill", "agent_definition"]
+const TEAM_OBJECT_KINDS: readonly TeamObjectKind[] = ["skill", "agent_definition", "artifact"]
 const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
@@ -1232,12 +1237,14 @@ export function createGateway(opts: GatewayOptions = {}) {
 
   /**
    * Validate one pushed object at the boundary (filesystem spec v1 §5):
-   * shape, the kind allowlist for this slice, a legal slug name, the
-   * 32 KB body cap, the secrets re-scan over body and metadata, then the
-   * per-kind schema. Admission lives here, not in the store — the same
-   * layering as team memory. Verified-kinds-only does NOT apply: that
-   * rule is memory's, and extending it to documents would dilute it
-   * exactly where it matters (D-FS4).
+   * shape, the kind allowlist, a legal slug name, the per-kind body
+   * cap, the secrets re-scan over body and metadata, then the per-kind
+   * schema. Admission lives here, not in the store — the same layering
+   * as team memory. Verified-kinds-only does NOT apply: that rule is
+   * memory's, and extending it to documents would dilute it exactly
+   * where it matters (D-FS4). Artifact provenance is shape-checked
+   * here; that the named entry/session exists for the team is checked
+   * against the store in the push handler, which has both.
    */
   function parseObjectEntry(raw: unknown): ParsedObjectEntry {
     if (!raw || typeof raw !== "object") return { ok: false, id: null, reason: "invalid_entry" }
@@ -1270,7 +1277,7 @@ export function createGateway(opts: GatewayOptions = {}) {
     const name = entry.name
     const body = entry.body
     if (typeof body !== "string" || body.length === 0) return fail("invalid_entry", container)
-    if (new TextEncoder().encode(body).length > TEAM_OBJECT_MAX_BODY_BYTES) {
+    if (new TextEncoder().encode(body).length > TEAM_OBJECT_BODY_CAPS[kind]) {
       return fail("oversize", container)
     }
     let metadata: Record<string, unknown> = {}
@@ -1293,7 +1300,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     const schemaError =
       kind === "skill"
         ? skillSchemaError(name, body, metadata)
-        : agentDefinitionSchemaError(metadata)
+        : kind === "agent_definition"
+          ? agentDefinitionSchemaError(metadata)
+          : artifactSchemaError(body, metadata)
     if (schemaError) return fail(schemaError, container)
     return { ok: true, input: { id, kind, container, name, body, metadata, supersedes } }
   }
@@ -1382,6 +1391,20 @@ export function createGateway(opts: GatewayOptions = {}) {
           }
           return { id: parsed.id, result: "rejected" as const, reason: parsed.reason }
         }
+        if (parsed.input.kind === "artifact") {
+          // Artifact provenance (filesystem spec v1 §5): the named
+          // memory entry / session must exist for this team — an
+          // artifact that points at nothing is an orphan, and orphans
+          // are rejected rather than stored as evidence of nothing.
+          const entryId = parsed.input.metadata.memory_entry_id
+          const sessionId = parsed.input.metadata.session_id
+          const unresolved =
+            (typeof entryId === "string" && !store.hasTeamMemoryEntry(mine.team.id, entryId)) ||
+            (typeof sessionId === "string" && !store.hasTeamMemorySession(mine.team.id, sessionId))
+          if (unresolved) {
+            return { id: parsed.input.id, result: "rejected" as const, reason: "provenance_not_found" }
+          }
+        }
         const applied = store.pushTeamObject(mine.team.id, pushActor, parsed.input)
         if (applied.status === "rejected") {
           return { id: parsed.input.id, result: "rejected" as const, reason: applied.reason }
@@ -1418,8 +1441,13 @@ export function createGateway(opts: GatewayOptions = {}) {
         headOnly: body?.head_only === true,
         limit: typeof body?.limit === "number" ? body.limit : undefined,
       })
+      // The dashboard browser (filesystem spec v1 §9) also carries
+      // team-wide counts and the last object policy run — totals across
+      // all kinds and statuses, mirroring the memory list's shape.
       return json(200, {
         objects: rows.map((row) => publicTeamObject(row, row.is_head === 1)),
+        counts: store.teamObjectCounts(mine.team.id),
+        dreaming: store.getObjectDreamingRun(mine.team.id) ?? null,
       })
     }
 
@@ -1963,6 +1991,45 @@ function agentDefinitionSchemaError(metadata: Record<string, unknown>): string |
     }
   }
   return undefined
+}
+
+/**
+ * Artifact admission (filesystem spec v1 §5): an artifact is evidence,
+ * not instruction — the diff that fixed it, the test that proved it.
+ * Two rules beyond the shared ones: the body must be plain text (no
+ * binary blobs in v1), and it must name its provenance in metadata —
+ * `memory_entry_id` and/or `session_id`. This is the shape check only;
+ * that the named entry/session exists for the team is verified against
+ * the store in the push handler. Returns the rejection reason, or
+ * undefined when the artifact is valid.
+ */
+function artifactSchemaError(body: string, metadata: Record<string, unknown>): string | undefined {
+  if (!isPlainText(body)) return "not_text"
+  const named = (value: unknown) =>
+    typeof value === "string" && value.length > 0 && value.length <= 128
+  const entry = metadata.memory_entry_id
+  const session = metadata.session_id
+  if (entry !== undefined && !named(entry)) return "missing_provenance"
+  if (session !== undefined && !named(session)) return "missing_provenance"
+  if (entry === undefined && session === undefined) return "missing_provenance"
+  return undefined
+}
+
+/**
+ * Plain text: no C0 control characters other than tab, newline, form
+ * feed, and carriage return; no DEL; and no U+FFFD — the mark of binary
+ * data forced through a UTF-8 decode.
+ */
+function isPlainText(body: string): boolean {
+  for (const char of body) {
+    if (char === "\uFFFD") return false
+    const code = char.codePointAt(0) ?? 0
+    if (code === 0x7f) return false
+    if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0c && code !== 0x0d) {
+      return false
+    }
+  }
+  return true
 }
 
 function inviteUsable(invite: InviteRow, t: number): boolean {
