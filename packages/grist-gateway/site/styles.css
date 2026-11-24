@@ -1727,6 +1727,45 @@ pre {
   color: var(--muted);
 }
 
+.fs-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1.2rem;
+}
+
+.fs-tab {
+  font: inherit;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.fs-tab.is-active {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.object-body summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.object-body pre {
+  margin: 0.5rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  max-height: 24rem;
+  overflow: auto;
+}
+
 .arch-section {
   max-width: 1120px;
   margin: 0 auto;

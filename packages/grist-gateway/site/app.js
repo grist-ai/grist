@@ -998,6 +998,7 @@ async function loadTeam() {
     const usage = await teamCall("/v1/teams/usage")
     if (gen !== teamLoad) return
     void loadTeamMemory()
+    void loadTeamObjects()
     document.getElementById("team-usage-total").textContent =
       `$${Number(usage.data.total_spent_usd ?? 0).toFixed(2)} spent by the team in total.`
     document.getElementById("team-usage").innerHTML = (usage.data.members ?? [])
@@ -1026,6 +1027,22 @@ async function loadTeam() {
     : `<p class="muted">Nothing yet.</p>`
 }
 
+/**
+ * Team filesystem counts header (filesystem spec v1 §9): one line over
+ * every kind, fed by whichever list responses have landed — memory's
+ * counts ride its list call, object kinds ride the objects list call.
+ */
+const fsCounts = { memory: 0, skill: 0, agent_definition: 0, artifact: 0 }
+
+function renderFsSummary() {
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
+  document.getElementById("team-fs-summary").textContent =
+    `${plural(fsCounts.memory, "memory entry", "memory entries")} · ` +
+    `${plural(fsCounts.skill, "skill", "skills")} · ` +
+    `${plural(fsCounts.agent_definition, "agent definition", "agent definitions")} · ` +
+    `${plural(fsCounts.artifact, "artifact", "artifacts")}.`
+}
+
 let teamMemoryLoad = 0
 
 async function loadTeamMemory() {
@@ -1046,6 +1063,8 @@ async function loadTeamMemory() {
   }
   msg.textContent = ""
   const counts = result.data.counts ?? { total: 0, byOutcome: {} }
+  fsCounts.memory = counts.total ?? 0
+  renderFsSummary()
   const outcomeText = Object.entries(counts.byOutcome ?? {})
     .map(([kind, n]) => `${n} ${kind.replaceAll("_", " ")}`)
     .join(" · ")
@@ -1098,6 +1117,147 @@ document.getElementById("team-memory-list")?.addEventListener("click", async (ev
   }
   document.getElementById("team-memory-msg").textContent =
     result.data.error ?? "Couldn’t remove that entry."
+})
+
+/**
+ * Team filesystem browser (filesystem spec v1 §9): the Team-tab browser
+ * generalized with a kind switcher. Memory keeps its own panel and
+ * behavior above; the three object kinds share this one, over
+ * /v1/team-objects/list — heads and retained history alike, each row
+ * tagged with its chain position, the head's body viewable, remove
+ * through the same endpoint semantics as memory.
+ */
+let teamFsKind = "memory"
+let teamObjectsLoad = 0
+
+const FS_OBJECT_LABELS = {
+  skill: "skill",
+  agent_definition: "agent definition",
+  artifact: "artifact",
+}
+const FS_OBJECT_TITLES = {
+  skill: "Team skills",
+  agent_definition: "Team agent definitions",
+  artifact: "Team artifacts",
+}
+const FS_OBJECT_EMPTY = {
+  skill: "No skills match. Team skills appear here as members publish them.",
+  agent_definition:
+    "No agent definitions match. Team definitions appear here as members publish them.",
+  artifact: "No artifacts match. Artifacts appear here as members' harnesses capture run evidence.",
+}
+
+function setTeamFsKind(kind) {
+  teamFsKind = kind
+  for (const button of document.querySelectorAll("[data-fs-kind]")) {
+    button.classList.toggle("is-active", button.getAttribute("data-fs-kind") === kind)
+  }
+  document.getElementById("team-memory-panel").hidden = kind !== "memory"
+  document.getElementById("team-objects-panel").hidden = kind === "memory"
+  if (kind === "memory") {
+    void loadTeamMemory()
+    return
+  }
+  document.getElementById("team-objects-title").textContent =
+    FS_OBJECT_TITLES[kind] ?? "Team objects"
+  void loadTeamObjects()
+}
+
+for (const button of document.querySelectorAll("[data-fs-kind]")) {
+  button.addEventListener("click", () => setTeamFsKind(button.getAttribute("data-fs-kind")))
+}
+
+async function loadTeamObjects() {
+  const gen = ++teamObjectsLoad
+  const kind = teamFsKind === "memory" ? "skill" : teamFsKind
+  const body = { kind }
+  const container = document.getElementById("team-objects-container").value.trim()
+  if (container) body.container = container
+  const name = document.getElementById("team-objects-name").value.trim()
+  if (name) body.name = name
+  const author = document.getElementById("team-objects-author").value.trim()
+  if (author) body.author_user_id = author
+  if (document.getElementById("team-objects-heads").checked) body.head_only = true
+  const result = await teamCall("/v1/team-objects/list", body)
+  if (gen !== teamObjectsLoad) return
+  const msg = document.getElementById("team-objects-msg")
+  if (result.status !== 200) {
+    msg.textContent = result.data.error ?? "Couldn’t load team objects."
+    return
+  }
+  msg.textContent = ""
+  const counts = result.data.counts ?? { total: 0, byKind: {}, byStatus: {} }
+  for (const kindName of Object.keys(FS_OBJECT_LABELS)) {
+    fsCounts[kindName] = counts.byKind?.[kindName] ?? 0
+  }
+  renderFsSummary()
+  const label = FS_OBJECT_LABELS[kind] ?? "object"
+  const kindTotal = counts.byKind?.[kind] ?? 0
+  document.getElementById("team-objects-summary").textContent = kindTotal
+    ? `${kindTotal} ${kindTotal === 1 ? label : `${label}s`} team-wide, across all versions and statuses.`
+    : ""
+  const dreaming = result.data.dreaming
+  document.getElementById("team-objects-dreaming").textContent = dreaming
+    ? `Last curation run ${new Date(dreaming.at).toLocaleString()}: archived ${dreaming.archived}, flagged ${dreaming.flagged} (objects).`
+    : "No curation run yet."
+  const objects = result.data.objects ?? []
+  const byId = new Map(objects.map((object) => [object.id, object]))
+  // Chain position from the root, when the whole ancestry is on this
+  // page; a version whose parent is filtered out just reads "history".
+  const depthOf = (object) => {
+    let depth = 1
+    let cursor = object
+    const seen = new Set([object.id])
+    while (cursor.supersedes) {
+      if (!byId.has(cursor.supersedes) || seen.has(cursor.supersedes)) return undefined
+      seen.add(cursor.supersedes)
+      depth++
+      cursor = byId.get(cursor.supersedes)
+    }
+    return depth
+  }
+  document.getElementById("team-objects-list").innerHTML = objects.length
+    ? objects
+        .map((object) => {
+          const day = (ts) => new Date(ts).toLocaleDateString()
+          const depth = object.is_head ? undefined : depthOf(object)
+          return `<article class="memory-row${object.status === "archived" ? " is-archived" : ""}">
+          <div class="memory-meta">
+            <span class="pill">${escapeHtml(label)}</span>
+            <span class="pill pill-dim">${escapeHtml(object.status)}</span>
+            ${object.is_head ? `<span class="pill">current</span>` : `<span class="pill pill-dim">${depth ? `v${depth}` : "history"}</span>`}
+            <code>${escapeHtml(object.name)}</code>
+            <code>${escapeHtml(object.container)}</code>
+            <span>by <code>${escapeHtml(object.author_user_id ?? "—")}</code></span>
+            <span>created ${day(object.created_at)}</span>
+            <span>updated ${day(object.updated_at)}</span>
+            ${object.supersedes ? `<span>supersedes <code>${escapeHtml(object.supersedes)}</code></span>` : ""}
+          </div>
+          <details class="object-body"><summary>View body</summary><pre>${escapeHtml(object.body)}</pre></details>
+          ${object.status !== "archived" ? `<div><button class="text-btn" type="button" data-remove-object="${escapeHtml(object.id)}">Remove</button></div>` : ""}
+        </article>`
+        })
+        .join("")
+    : `<p class="muted">${FS_OBJECT_EMPTY[kind] ?? "Nothing here yet."}</p>`
+}
+
+document.getElementById("team-objects-filter")?.addEventListener("submit", (event) => {
+  event.preventDefault()
+  void loadTeamObjects()
+})
+
+document.getElementById("team-objects-list")?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-remove-object]")
+  if (!button) return
+  const result = await teamCall("/v1/team-objects/remove", {
+    id: button.getAttribute("data-remove-object"),
+  })
+  if (result.status === 200) {
+    void loadTeamObjects()
+    return
+  }
+  document.getElementById("team-objects-msg").textContent =
+    result.data.error ?? "Couldn’t remove that object."
 })
 
 async function loadModels() {

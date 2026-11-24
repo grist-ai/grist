@@ -1255,6 +1255,20 @@ grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</
           <h2>Team spend</h2>
           <p class="muted" id="team-usage-total"></p>
           <section class="admin-list" id="team-usage"></section>
+          <h2>Team filesystem</h2>
+          <p class="muted">
+            Everything your team's agents share: verified memory, skills,
+            agent definitions, and run artifacts — versioned, authored,
+            and curated by the same mechanical policy.
+          </p>
+          <p class="muted" id="team-fs-summary"></p>
+          <div class="fs-switch" role="tablist" aria-label="Filesystem kind">
+            <button type="button" class="fs-tab is-active" data-fs-kind="memory">Memory</button>
+            <button type="button" class="fs-tab" data-fs-kind="skill">Skills</button>
+            <button type="button" class="fs-tab" data-fs-kind="agent_definition">Agents</button>
+            <button type="button" class="fs-tab" data-fs-kind="artifact">Artifacts</button>
+          </div>
+          <div id="team-memory-panel">
           <h2>Team memory</h2>
           <p class="muted">
             Verified lessons your team's harnesses captured and now share.
@@ -1287,6 +1301,33 @@ grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</
             <span class="muted" id="team-memory-msg" role="status"></span>
           </form>
           <section class="admin-list" id="team-memory-list"></section>
+          </div>
+          <div id="team-objects-panel" hidden>
+          <h2 id="team-objects-title">Team skills</h2>
+          <p class="muted" id="team-objects-summary"></p>
+          <p class="muted" id="team-objects-dreaming"></p>
+          <form id="team-objects-filter" class="key-form">
+            <div>
+              <label for="team-objects-container">Container</label>
+              <input id="team-objects-container" maxlength="120" placeholder="repo…" autocomplete="off" />
+            </div>
+            <div>
+              <label for="team-objects-name">Name</label>
+              <input id="team-objects-name" maxlength="64" placeholder="name…" autocomplete="off" />
+            </div>
+            <div>
+              <label for="team-objects-author">Author user ID</label>
+              <input id="team-objects-author" maxlength="32" placeholder="gu_…" autocomplete="off" />
+            </div>
+            <div>
+              <label for="team-objects-heads">Heads only</label>
+              <input id="team-objects-heads" type="checkbox" />
+            </div>
+            <button class="btn" type="submit">Filter</button>
+            <span class="muted" id="team-objects-msg" role="status"></span>
+          </form>
+          <section class="admin-list" id="team-objects-list"></section>
+          </div>
         </section>
         <section class="install">
           <h2>Notifications</h2>
