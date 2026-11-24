@@ -1,5 +1,5 @@
 import path from "path"
-import { createHash } from "node:crypto"
+import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 import { composeMechanisms, loadMechanismProfile } from "@grist-ai/logic"
 import { composeRung, scoreTask } from "@grist-ai/logic"
 import { publicModelRef, PUBLIC_RUNGS, PUBLIC_RUNG_NAME, type Rung } from "@grist-ai/logic"
@@ -17,6 +17,7 @@ import {
   type ApiKeyKind,
   type GatewayStore,
   type InviteRow,
+  type ListenerRunRequestRow,
   type NotificationRow,
   type TeamMemoryPushInput,
   type TeamMemoryRow,
@@ -24,6 +25,16 @@ import {
   type TeamObjectPushInput,
   type TeamObjectRow,
 } from "./store.js"
+import {
+  envelopeExceedsCeiling,
+  listenerEventSummary,
+  listenerTriggerMatches,
+  normalizeGenericEvent,
+  normalizeGithubEvent,
+  parseListenerDefinition,
+  parseListenerEnvelope,
+  type ListenerSource,
+} from "./listeners.js"
 import { findSecretKind } from "./secrets-scan.js"
 import { canonicalApiKey } from "./codes.js"
 import { parseMasterKey } from "./provider-keys.js"
@@ -179,10 +190,28 @@ const TEAM_OBJECT_BODY_CAPS: Record<TeamObjectKind, number> = {
   skill: 32 * 1024,
   agent_definition: 32 * 1024,
   artifact: 64 * 1024,
+  // Listener definitions are documents too (next-block spec §6.4: size
+  // caps aligned with the other definition kinds).
+  listener: 32 * 1024,
 }
 const TEAM_OBJECTS_PUSH_MAX_BYTES = 4 * 1024 * 1024
 const TEAM_OBJECT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/
-const TEAM_OBJECT_KINDS: readonly TeamObjectKind[] = ["skill", "agent_definition", "artifact"]
+const TEAM_OBJECT_KINDS: readonly TeamObjectKind[] = [
+  "skill",
+  "agent_definition",
+  "artifact",
+  "listener",
+]
+/**
+ * Webhook intake (next-block spec §6.1): deliveries are capped at 1 MB
+ * (GitHub payloads for the D8 event families are far smaller), rate
+ * limited per team + source as a flood guard in front of signature
+ * verification, and queued run requests carry a TTL — 72 hours by
+ * default, env-tunable — after which the policy sweep expires them.
+ */
+const WEBHOOK_MAX_BYTES = 1024 * 1024
+const WEBHOOK_RATE_LIMIT = { limit: 600, windowMs: 3_600_000 }
+const DEFAULT_LISTENER_REQUEST_TTL_MS = 72 * 3_600_000
 const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
@@ -410,6 +439,11 @@ export function createGateway(opts: GatewayOptions = {}) {
   const globalBudget = opts.globalBudgetUsd ?? Number(process.env.GRIST_GLOBAL_BUDGET_USD ?? DEFAULT_GLOBAL_BUDGET)
   const trustedProxies = parseTrustedProxies(opts.trustedProxies ?? process.env.GRIST_TRUSTED_PROXIES ?? "")
   const limits = { ...RATE_LIMITS, ...opts.rateLimits }
+  const parsedListenerTtl = Number(process.env.GRIST_LISTENER_REQUEST_TTL_MS)
+  const listenerRequestTtlMs =
+    Number.isFinite(parsedListenerTtl) && parsedListenerTtl > 0
+      ? parsedListenerTtl
+      : DEFAULT_LISTENER_REQUEST_TTL_MS
   const alert =
     opts.alert ??
     ((message: string) => {
@@ -518,6 +552,12 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (pathname === "/v1/team-objects" || pathname.startsWith("/v1/team-objects/")) {
       return teamObjects(req, pathname)
+    }
+    if (pathname === "/v1/webhooks" || pathname.startsWith("/v1/webhooks/")) {
+      return webhooks(req, pathname)
+    }
+    if (pathname === "/v1/listeners" || pathname.startsWith("/v1/listeners/")) {
+      return listenerRequests(req, pathname)
     }
 
     if (pathname === "/v1/rung-models") {
@@ -793,6 +833,48 @@ export function createGateway(opts: GatewayOptions = {}) {
 
     const mine = store.getTeamForUser(uid)
     if (!mine) return json(409, { error: "not in a team" })
+
+    if (pathname === "/v1/teams/listener-ceiling") {
+      // The team-admin ceiling on listener envelopes (next-block spec
+      // §6.4, D16): read by any member; set by owners/admins only. A
+      // team with no ceiling cannot enable a listener at all.
+      if (body?.ceiling === undefined) {
+        return json(200, { ceiling: store.getListenerCeiling(mine.team.id) ?? null })
+      }
+      if (mine.membership.role !== "owner" && mine.membership.role !== "admin") {
+        return json(403, { error: "only team owners and admins can set the listener ceiling" })
+      }
+      const ceiling = parseListenerEnvelope(body.ceiling)
+      if (!ceiling) {
+        return json(400, {
+          error:
+            "ceiling requires positive max_runs_per_day, max_spend_per_day_usd and max_spend_per_run_usd",
+        })
+      }
+      store.setListenerCeiling(mine.team.id, ceiling)
+      return json(200, { ceiling })
+    }
+
+    if (pathname === "/v1/teams/webhooks" || pathname === "/v1/teams/webhooks/rotate") {
+      // Webhook intake setup (next-block spec §6.1): the per-team secret
+      // is an owner/admin surface — it must be configured on the
+      // sender's side, so it is shown to the people who run the team,
+      // and to nobody else. Members never see it.
+      if (mine.membership.role !== "owner" && mine.membership.role !== "admin") {
+        return json(403, { error: "only team owners and admins can manage webhook intake" })
+      }
+      const config =
+        pathname === "/v1/teams/webhooks/rotate"
+          ? { ...store.rotateTeamWebhookSecret(mine.team.id), created: false }
+          : store.ensureTeamWebhookSecret(mine.team.id)
+      return json(200, {
+        team_id: mine.team.id,
+        secret: config.secret,
+        created: config.created,
+        github_path: `/v1/webhooks/github/${mine.team.id}`,
+        generic_path: `/v1/webhooks/generic/${mine.team.id}`,
+      })
+    }
 
     if (pathname === "/v1/teams/usage") {
       const rows = store.teamUsage(mine.team.id)
@@ -1302,7 +1384,9 @@ export function createGateway(opts: GatewayOptions = {}) {
         ? skillSchemaError(name, body, metadata)
         : kind === "agent_definition"
           ? agentDefinitionSchemaError(metadata)
-          : artifactSchemaError(body, metadata)
+          : kind === "artifact"
+            ? artifactSchemaError(body, metadata)
+            : listenerSchemaError(body)
     if (schemaError) return fail(schemaError, container)
     return { ok: true, input: { id, kind, container, name, body, metadata, supersedes } }
   }
@@ -1405,6 +1489,38 @@ export function createGateway(opts: GatewayOptions = {}) {
             return { id: parsed.input.id, result: "rejected" as const, reason: "provenance_not_found" }
           }
         }
+        if (parsed.input.kind === "listener") {
+          // Listener policy (next-block spec §§6.3–6.5, D16), checked
+          // against the store like artifact provenance: the envelope
+          // must fit the team-admin ceiling whenever one is set; a
+          // listener may be ENABLED only when a ceiling exists; and an
+          // enabling push must be authenticated as the account holder —
+          // a delegated API key (an agent's credential) can propose a
+          // listener in its disabled state, but a human's publish is
+          // what makes it live (§6.5).
+          const definition = parseListenerDefinition(parsed.input.body)
+          if (!definition) {
+            return { id: parsed.input.id, result: "rejected" as const, reason: "invalid_schema" }
+          }
+          const ceiling = store.getListenerCeiling(mine.team.id)
+          if (ceiling && envelopeExceedsCeiling(definition.envelope, ceiling)) {
+            return {
+              id: parsed.input.id,
+              result: "rejected" as const,
+              reason: "envelope_exceeds_ceiling",
+            }
+          }
+          if (definition.enabled && !ceiling) {
+            return { id: parsed.input.id, result: "rejected" as const, reason: "ceiling_required" }
+          }
+          if (definition.enabled && invite.keyId !== null) {
+            return {
+              id: parsed.input.id,
+              result: "rejected" as const,
+              reason: "enabling_requires_account_auth",
+            }
+          }
+        }
         const applied = store.pushTeamObject(mine.team.id, pushActor, parsed.input)
         if (applied.status === "rejected") {
           return { id: parsed.input.id, result: "rejected" as const, reason: applied.reason }
@@ -1451,6 +1567,185 @@ export function createGateway(opts: GatewayOptions = {}) {
       })
     }
 
+    return json(404, { error: "not found" })
+  }
+
+  /**
+   * Webhook intake (next-block spec §6.1). The gateway is the only
+   * always-on surface, so it validates deliveries and queues run
+   * requests — and executes nothing. The order of checks matters and
+   * is the security of the endpoint:
+   *
+   * 1. The delivery names a team (path) that exists; otherwise 404,
+   *    with no tenancy to audit under.
+   * 2. Per-team flood guard, then the raw body is read.
+   * 3. The team must have configured intake (a webhook secret) — a
+   *    team that has not connected anything creates nothing.
+   * 4. HMAC-SHA256 signature over the raw body (GitHub's
+   *    X-Hub-Signature-256; X-Grist-Signature-256 for the generic
+   *    door) — unsigned or bad-signature deliveries are refused and
+   *    the drop is audited.
+   * 5. Delivery-id dedupe (X-GitHub-Delivery / X-Grist-Delivery) — a
+   *    replay creates nothing and is audited as a drop.
+   * 6. The normalized event is matched deterministically against the
+   *    team's enabled listener chain heads; every match queues exactly
+   *    one run request. A delivery with no live match audits as a drop
+   *    with the reason.
+   */
+  async function webhooks(req: Request, pathname: string): Promise<Response> {
+    if (req.method !== "POST") return json(405, { error: "method not allowed" })
+    const match = /^\/v1\/webhooks\/(github|generic)\/(gt_[0-9A-HJKMNPQRSTVWXYZ]{12})$/.exec(pathname)
+    if (!match?.[1] || !match[2]) return json(404, { error: "not found" })
+    const source = match[1] as ListenerSource
+    const teamId = match[2]
+    const team = store.getTeam(teamId)
+    if (!team) return json(404, { error: "not found" })
+    if (
+      !allowWindow(
+        `webhook:${teamId}:${source}`,
+        WEBHOOK_RATE_LIMIT.limit,
+        WEBHOOK_RATE_LIMIT.windowMs,
+      )
+    ) {
+      return json(429, { error: "too many webhook deliveries — try again later" })
+    }
+    const raw = await readRawText(req, WEBHOOK_MAX_BYTES)
+    const deliveryId =
+      source === "github"
+        ? req.headers.get("x-github-delivery")?.trim()
+        : req.headers.get("x-grist-delivery")?.trim()
+    const drop = (detail: string) =>
+      store.appendTeamAudit({
+        teamId,
+        kind: "listener",
+        actorUid: "webhook",
+        action: "dropped",
+        entryId: deliveryId ?? "",
+        detail,
+      })
+    const config = store.getTeamWebhookConfig(teamId)
+    if (!config) {
+      drop("no_webhook_config")
+      return json(404, { error: "webhook intake is not configured for this team" })
+    }
+    const signature =
+      source === "github"
+        ? req.headers.get("x-hub-signature-256")
+        : req.headers.get("x-grist-signature-256")
+    if (!validWebhookSignature(config.secret, raw, signature)) {
+      drop("bad_signature")
+      return json(401, { error: "invalid signature" })
+    }
+    if (!deliveryId) {
+      drop("malformed")
+      return json(400, { error: "a delivery id is required" })
+    }
+    if (!store.recordWebhookDelivery({ teamId, source, deliveryId, at: now() })) {
+      drop("replay")
+      return json(200, { ok: true, deduped: true, queued: 0 })
+    }
+    let payload: Record<string, unknown> | undefined
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        payload = parsed as Record<string, unknown>
+      }
+    } catch {
+      // Falls through to the malformed drop below.
+    }
+    if (!payload) {
+      drop("malformed")
+      return json(400, { error: "malformed payload" })
+    }
+    // GitHub's handshake when a hook is first created — acknowledge it,
+    // with nothing to match and nothing to audit.
+    if (source === "github" && req.headers.get("x-github-event") === "ping") {
+      return json(200, { ok: true, ping: true, queued: 0 })
+    }
+    const event =
+      source === "github"
+        ? normalizeGithubEvent(req.headers.get("x-github-event") ?? "", payload)
+        : normalizeGenericEvent(payload)
+    const digest = createHash("sha256").update(raw).digest("hex")
+    const heads = store.listTeamObjects(
+      teamId,
+      { uid: "webhook" },
+      { kind: "listener", headOnly: true, limit: 200 },
+    )
+    let queued = 0
+    const requestIds: string[] = []
+    let sawTriggerMatch = false
+    let sawCreatorGone = false
+    for (const row of heads) {
+      if (row.status !== "active") continue
+      const definition = parseListenerDefinition(row.body)
+      if (!definition) continue
+      if (!listenerTriggerMatches(definition, event)) continue
+      sawTriggerMatch = true
+      if (!definition.enabled) continue
+      // Membership is re-read per delivery: a listener whose creator
+      // has left the team is a standing spend authorization whose
+      // author is gone — it fires nothing.
+      const creatorTeam = store.getTeamForUser(row.author_uid)
+      if (!creatorTeam || creatorTeam.team.id !== teamId) {
+        sawCreatorGone = true
+        continue
+      }
+      const creator = store.getAccount(row.author_uid)
+      const request = store.enqueueListenerRun({
+        teamId,
+        listenerId: row.id,
+        listenerName: row.name,
+        creatorUid: row.author_uid,
+        creatorUserId: creator?.user_id ?? row.author_user_id,
+        source,
+        deliveryId,
+        eventKind: event.kind,
+        eventSummary: listenerEventSummary(event),
+        payloadDigest: digest,
+        target: definition.target,
+        envelope: definition.envelope,
+        expiresAt: now() + listenerRequestTtlMs,
+      })
+      queued += 1
+      requestIds.push(request.id)
+    }
+    if (queued === 0) {
+      const reason = sawCreatorGone
+        ? "creator_not_member"
+        : sawTriggerMatch
+          ? "listener_disabled"
+          : "no_match"
+      drop(reason)
+      return json(200, { ok: true, queued: 0 })
+    }
+    return json(200, { ok: true, queued, request_ids: requestIds })
+  }
+
+  /**
+   * Listener run-request queue reads (next-block spec §6.7, S-LIS1).
+   * Same auth and tenancy as the team streams: resolveInvite, the
+   * caller's team from membership, connector keys read-only by
+   * construction. The claim endpoint is S-LIS2's — this slice exposes
+   * the queue for inspection only.
+   */
+  async function listenerRequests(req: Request, pathname: string): Promise<Response> {
+    if (req.method !== "POST") return json(405, { error: "method not allowed" })
+    const invite = await resolveInvite(req)
+    if (invite instanceof Response) return invite
+    const account = store.getAccountByInvite(invite.code)
+    if (!account) return json(403, { error: "an account is required for listener requests" })
+    const mine = store.getTeamForUser(account.firebase_uid)
+    if (pathname === "/v1/listeners/requests/list") {
+      if (!mine) return json(409, { error: "not in a team" })
+      const body = await readJson(req)
+      const rows = store.listListenerRunRequests(mine.team.id, {
+        state: typeof body?.state === "string" ? body.state : undefined,
+        listenerId: typeof body?.listener_id === "string" ? body.listener_id : undefined,
+        limit: typeof body?.limit === "number" ? body.limit : undefined,
+      })
+      return json(200, { requests: rows.map(publicListenerRunRequest) })
+    }
     return json(404, { error: "not found" })
   }
 
@@ -2016,6 +2311,18 @@ function artifactSchemaError(body: string, metadata: Record<string, unknown>): s
 }
 
 /**
+ * Listener admission (next-block spec §6.4): the body is the definition
+ * — a JSON document carrying trigger, filter, target, and the required
+ * envelope. Shape validity is the whole check here; that the envelope
+ * fits the team's ceiling, and that an enabling push is an account
+ * holder's (D16/§6.5), is enforced in the push handler against the
+ * store, like artifact provenance.
+ */
+function listenerSchemaError(body: string): string | undefined {
+  return parseListenerDefinition(body) ? undefined : "invalid_schema"
+}
+
+/**
  * Plain text: no C0 control characters other than tab, newline, form
  * feed, and carriage return; no DEL; and no U+FFFD — the mark of binary
  * data forced through a UTF-8 decode.
@@ -2379,6 +2686,58 @@ async function readJson(
     return parsed as Record<string, unknown>
   } catch {
     return
+  }
+}
+
+/**
+ * Read a raw request body as text (webhook intake: the HMAC is computed
+ * over the exact bytes, so the body cannot go through a JSON round-trip
+ * first). Same size discipline as `readJson`.
+ */
+async function readRawText(req: Request, maxBytes: number): Promise<string> {
+  const declared = Number(req.headers.get("content-length"))
+  if (Number.isFinite(declared) && declared > maxBytes) throw new PayloadTooLargeError()
+  const text = await req.text()
+  if (new TextEncoder().encode(text).length > maxBytes) throw new PayloadTooLargeError()
+  return text
+}
+
+/**
+ * Verify a webhook signature header (`sha256=<hex HMAC-SHA256 of the
+ * raw body under the team's secret>` — GitHub's scheme, used for both
+ * intake doors). Compared in constant time; a malformed header is
+ * simply a bad signature.
+ */
+function validWebhookSignature(secret: string, rawBody: string, header: string | null): boolean {
+  if (!header?.startsWith("sha256=")) return false
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex")
+  const given = header.slice("sha256=".length).trim().toLowerCase()
+  if (given.length !== expected.length) return false
+  return timingSafeEqual(Buffer.from(given), Buffer.from(expected))
+}
+
+/**
+ * A run-request row as the queue surface returns it: JSON fields
+ * parsed, creator attribution by public user ID — firebase_uid never
+ * leaves the server.
+ */
+function publicListenerRunRequest(row: ListenerRunRequestRow) {
+  return {
+    id: row.id,
+    listener_id: row.listener_id,
+    listener_name: row.listener_name,
+    creator_user_id: row.creator_user_id,
+    source: row.source,
+    delivery_id: row.delivery_id,
+    event_kind: row.event_kind,
+    event: JSON.parse(row.event_summary) as Record<string, unknown>,
+    payload_digest: row.payload_digest,
+    target: JSON.parse(row.target) as Record<string, unknown>,
+    envelope: JSON.parse(row.envelope) as Record<string, unknown>,
+    state: row.state,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    expires_at: row.expires_at,
   }
 }
 
