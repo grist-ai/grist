@@ -34,6 +34,7 @@ import {
   recallTeamMemory,
   recordTaskUsage,
   syncTeamMemory,
+  syncTeamObjects,
   taskUsageFromStepEnded,
   type MemoryRecord,
   type MemoryStore,
@@ -347,6 +348,14 @@ export function registerGristHooks(
             if (directory && teamState?.enabled && !teamState.revoked) {
               await syncTeamMemory(directory).catch((error) =>
                 gristWarn("[grist:team-memory] sync failed; continuing", error),
+              )
+              // Team objects (filesystem spec v1 §6, D-FS6): same
+              // opt-in and hook point — flush queued publishes, pull
+              // new heads, and materialize them under .grist/team/ so
+              // the config loaders pick them up. Independent cursor;
+              // best-effort like the memory stream.
+              await syncTeamObjects(directory, { container: recallSink.container }).catch((error) =>
+                gristWarn("[grist:team-objects] sync failed; continuing", error),
               )
               teamState = await loadTeamSyncState(directory).catch(() => teamState)
             }
