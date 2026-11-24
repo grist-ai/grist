@@ -269,6 +269,12 @@ import type {
   GristMemoryForgetOutput,
   GristCodeMapGetInput,
   GristCodeMapGetOutput,
+  GristEnvironmentListInput,
+  GristEnvironmentListOutput,
+  GristEnvironmentCreateInput,
+  GristEnvironmentCreateOutput,
+  GristEnvironmentRemoveInput,
+  GristEnvironmentRemoveOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -425,6 +431,7 @@ const EndpointSessionCreate = (raw: RawClient["server.session"]) => (input?: Ses
         agent: input?.["agent"],
         model: input?.["model"],
         location: input?.["location"],
+        environmentID: input?.["environmentID"],
         metadata: input?.["metadata"],
         permissions: input?.["permissions"],
       },
@@ -1612,9 +1619,35 @@ const EndpointGristCodeMapGet = (raw: RawClient["server.grist"]) => (input?: Gri
     raw["grist.codeMap.get"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointGristEnvironmentList = (raw: RawClient["server.grist"]) => (input?: GristEnvironmentListInput) =>
+  preserveEffect<GristEnvironmentListOutput>()(
+    raw["grist.environment.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGristEnvironmentCreate = (raw: RawClient["server.grist"]) => (input: GristEnvironmentCreateInput) =>
+  preserveEffect<GristEnvironmentCreateOutput>()(
+    raw["grist.environment.create"]({
+      query: { location: input["location"] },
+      payload: { name: input["name"], kind: input["kind"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGristEnvironmentRemove = (raw: RawClient["server.grist"]) => (input: GristEnvironmentRemoveInput) =>
+  preserveEffect<GristEnvironmentRemoveOutput>()(
+    raw["grist.environment.remove"]({
+      query: { location: input["location"] },
+      payload: { name: input["name"], force: input["force"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const adaptGroupGrist = (raw: RawClient["server.grist"]) => ({
   memory: { list: EndpointGristMemoryList(raw), forget: EndpointGristMemoryForget(raw) },
   codeMap: { get: EndpointGristCodeMapGet(raw) },
+  environment: {
+    list: EndpointGristEnvironmentList(raw),
+    create: EndpointGristEnvironmentCreate(raw),
+    remove: EndpointGristEnvironmentRemove(raw),
+  },
 })
 
 const EndpointDebugLocationList = (raw: RawClient["server.debug"]) => () =>

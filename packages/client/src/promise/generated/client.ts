@@ -267,6 +267,12 @@ import type {
   GristMemoryForgetOutput,
   GristCodeMapGetInput,
   GristCodeMapGetOutput,
+  GristEnvironmentListInput,
+  GristEnvironmentListOutput,
+  GristEnvironmentCreateInput,
+  GristEnvironmentCreateOutput,
+  GristEnvironmentRemoveInput,
+  GristEnvironmentRemoveOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -599,6 +605,7 @@ export function make(options: ClientOptions) {
               agent: input?.["agent"],
               model: input?.["model"],
               location: input?.["location"],
+              environmentID: input?.["environmentID"],
               metadata: input?.["metadata"],
               permissions: input?.["permissions"],
             },
@@ -2231,6 +2238,46 @@ export function make(options: ClientOptions) {
               successStatus: 200,
               declaredStatuses: [400, 401, 404],
               empty: false,
+            },
+            requestOptions,
+          ),
+      },
+      environment: {
+        list: (input?: GristEnvironmentListInput, requestOptions?: RequestOptions) =>
+          request<GristEnvironmentListOutput>(
+            {
+              method: "GET",
+              path: `/api/grist/environments`,
+              query: { location: input?.["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        create: (input: GristEnvironmentCreateInput, requestOptions?: RequestOptions) =>
+          request<GristEnvironmentCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/grist/environments/create`,
+              query: { location: input["location"] },
+              body: { name: input["name"], kind: input["kind"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        remove: (input: GristEnvironmentRemoveInput, requestOptions?: RequestOptions) =>
+          request<GristEnvironmentRemoveOutput>(
+            {
+              method: "POST",
+              path: `/api/grist/environments/remove`,
+              query: { location: input["location"] },
+              body: { name: input["name"], force: input["force"] },
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
             },
             requestOptions,
           ),

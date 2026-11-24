@@ -44,6 +44,8 @@ export type SessionID = string
 
 export type SessionMessageID = string
 
+export type EnvironmentID = string
+
 export type MoneyUSD = number
 
 export type TokenUsageInfo = {
@@ -312,6 +314,10 @@ export type GristCodeMapSummary = {
   edges: number
   top: Array<{ id: string; label: string; degree: number }>
 }
+
+export type EnvironmentKind = "local" | "worktree" | "sandbox"
+
+export type EnvironmentStatus = "active" | "missing"
 
 export type WebSearchID = string
 
@@ -872,6 +878,19 @@ export type FormAnswer2 = { [x: string]: FormValue1 }
 export type VcsInfo = { provider?: string; branch: VcsBranch }
 
 export type GristMemoryList = { backend: string; records: Array<GristMemoryRecord> }
+
+export type EnvironmentInfo = {
+  id: EnvironmentID
+  projectID: ProjectID
+  name: string
+  kind: EnvironmentKind
+  directory?: AbsolutePath
+  branch?: string
+  machine?: string
+  owner?: string
+  status: EnvironmentStatus
+  time: { created: number; updated: number; used?: number }
+}
 
 export type WebSearchProvider = { id: WebSearchID; name: string }
 
@@ -2023,6 +2042,8 @@ export type FormReplied = {
   data: { id: FormID; sessionID: string; answer: FormAnswer2 }
 }
 
+export type GristEnvironmentList = { environments: Array<EnvironmentInfo> }
+
 export type SessionInboxMove = {
   id: SessionMessageID
   sessionID: SessionID
@@ -2131,6 +2152,7 @@ export type SessionInfo = {
   parentID?: SessionID
   fork?: { sessionID: SessionID; boundary: SessionForkBoundary }
   projectID: ProjectID
+  environmentID?: EnvironmentID
   agent?: AgentID
   model?: ModelRef
   cost: MoneyUSD
@@ -2155,6 +2177,7 @@ export type SessionCreated = {
   data: {
     sessionID: SessionID
     projectID: ProjectID
+    environmentID?: EnvironmentID
     location: LocationRef
     subpath?: RelativePath
     parentID?: SessionID
@@ -3108,6 +3131,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3122,6 +3146,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3136,6 +3161,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3150,6 +3176,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3164,6 +3191,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3178,6 +3206,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3185,6 +3214,21 @@ export type SessionCreateInput = {
       readonly effect: "allow" | "deny" | "ask"
     }> | null
   }["location"]
+  readonly environmentID?: {
+    readonly id?: string | null
+    readonly parentID?: string | null
+    readonly title?: string | null
+    readonly agent?: string | null
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
+    readonly metadata?: { readonly [x: string]: JsonValue } | null
+    readonly permissions?: ReadonlyArray<{
+      readonly action: string
+      readonly resource: string
+      readonly effect: "allow" | "deny" | "ask"
+    }> | null
+  }["environmentID"]
   readonly metadata?: {
     readonly id?: string | null
     readonly parentID?: string | null
@@ -3192,6 +3236,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3206,6 +3251,7 @@ export type SessionCreateInput = {
     readonly agent?: string | null
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3229,6 +3275,7 @@ export type SessionImportInput = {
           | { readonly type: "through"; readonly messageID: string }
       }
       readonly projectID: string
+      readonly environmentID?: string
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
@@ -3572,6 +3619,7 @@ export type SessionImportInput = {
           | { readonly type: "through"; readonly messageID: string }
       }
       readonly projectID: string
+      readonly environmentID?: string
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
@@ -3915,6 +3963,7 @@ export type SessionImportInput = {
           | { readonly type: "through"; readonly messageID: string }
       }
       readonly projectID: string
+      readonly environmentID?: string
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
@@ -6899,6 +6948,28 @@ export type GristCodeMapGetInput = {
 }
 
 export type GristCodeMapGetOutput = GristCodeMapSummary
+
+export type GristEnvironmentListInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type GristEnvironmentListOutput = GristEnvironmentList
+
+export type GristEnvironmentCreateInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly name: { readonly name: string; readonly kind: "local" | "worktree" | "sandbox" }["name"]
+  readonly kind: { readonly name: string; readonly kind: "local" | "worktree" | "sandbox" }["kind"]
+}
+
+export type GristEnvironmentCreateOutput = EnvironmentInfo
+
+export type GristEnvironmentRemoveInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly name: { readonly name: string; readonly force?: boolean }["name"]
+  readonly force?: { readonly name: string; readonly force?: boolean }["force"]
+}
+
+export type GristEnvironmentRemoveOutput = void
 
 export type DebugLocationListOutput = Array<LocationPublicRef>
 

@@ -11,6 +11,7 @@ import type { SessionsCursor } from "@opencode/protocol/groups/session"
 import type { Money } from "@opencode/schema/money"
 import type { Model } from "@opencode/schema/model"
 import type { DateTime } from "effect"
+import type { Environment } from "@opencode/schema/environment"
 import type { Permission } from "@opencode/schema/permission"
 import type { SessionMessage } from "@opencode/schema/session-message"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
@@ -205,6 +206,7 @@ export type SessionCreateInput = {
   readonly agent?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
   readonly location?: Location.PublicRef | undefined
+  readonly environmentID?: Environment.ID | undefined
   readonly metadata?: Session.Metadata | undefined
   readonly permissions?: Permission.Ruleset | undefined
 }
@@ -439,6 +441,7 @@ export type SessionLogOutput =
           readonly data: {
             readonly sessionID: Session.ID
             readonly projectID: Project.ID
+            readonly environmentID?: Environment.ID | undefined
             readonly location: { readonly directory: AbsolutePath; readonly workspaceID?: Workspace.ID | undefined }
             readonly subpath?: RelativePath | undefined
             readonly parentID?: Session.ID | undefined
@@ -2266,9 +2269,40 @@ export type GristCodeMapGetOperation<E = never> = (
   input?: GristCodeMapGetInput,
 ) => Effect.Effect<GristCodeMapGetOutput, E>
 
+export type GristEnvironmentListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GristEnvironmentListOutput = { readonly environments: ReadonlyArray<Environment.Info> }
+export type GristEnvironmentListOperation<E = never> = (
+  input?: GristEnvironmentListInput,
+) => Effect.Effect<GristEnvironmentListOutput, E>
+
+export type GristEnvironmentCreateInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly name: Environment.Name
+  readonly kind: Environment.Kind
+}
+export type GristEnvironmentCreateOutput = Environment.Info
+export type GristEnvironmentCreateOperation<E = never> = (
+  input: GristEnvironmentCreateInput,
+) => Effect.Effect<GristEnvironmentCreateOutput, E>
+
+export type GristEnvironmentRemoveInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly name: Environment.Name
+  readonly force?: boolean | undefined
+}
+export type GristEnvironmentRemoveOutput = void
+export type GristEnvironmentRemoveOperation<E = never> = (
+  input: GristEnvironmentRemoveInput,
+) => Effect.Effect<GristEnvironmentRemoveOutput, E>
+
 export interface GristApi<E = never> {
   readonly memory: { readonly list: GristMemoryListOperation<E>; readonly forget: GristMemoryForgetOperation<E> }
   readonly codeMap: { readonly get: GristCodeMapGetOperation<E> }
+  readonly environment: {
+    readonly list: GristEnvironmentListOperation<E>
+    readonly create: GristEnvironmentCreateOperation<E>
+    readonly remove: GristEnvironmentRemoveOperation<E>
+  }
 }
 
 export type DebugLocationListOutput = ReadonlyArray<Location.PublicRef>

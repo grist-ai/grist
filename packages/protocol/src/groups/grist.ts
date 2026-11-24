@@ -1,4 +1,5 @@
 import { optional } from "@opencode/schema/schema"
+import { Environment } from "@opencode/schema/environment"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
 import { LocationQuery, locationQueryOpenApi } from "./location.js"
@@ -39,6 +40,20 @@ export const GristCodeMapSummary = Schema.Struct({
 
 const ForgetPayload = Schema.Struct({
   id: Schema.String,
+})
+
+export const GristEnvironmentList = Schema.Struct({
+  environments: Schema.Array(Environment.Info),
+}).annotate({ identifier: "Grist.EnvironmentList" })
+
+const EnvironmentCreatePayload = Schema.Struct({
+  name: Environment.Name,
+  kind: Environment.Kind,
+})
+
+const EnvironmentRemovePayload = Schema.Struct({
+  name: Environment.Name,
+  force: optional(Schema.Boolean),
 })
 
 export const GristGroup = HttpApiGroup.make("server.grist")
@@ -85,6 +100,55 @@ export const GristGroup = HttpApiGroup.make("server.grist")
           summary: "Code map summary",
           description:
             "Whole-graph summary of the requested location's code map (Graphify graph): availability, node/edge counts, and the most-connected landmark nodes.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.get("grist.environment.list", "/api/grist/environments", {
+      query: LocationQuery,
+      success: GristEnvironmentList,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "grist.environment.list",
+          summary: "List environments",
+          description:
+            "All environments for the requested location's project: the implicit local environment first, then stored worktree environments.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("grist.environment.create", "/api/grist/environments/create", {
+      query: LocationQuery,
+      payload: EnvironmentCreatePayload,
+      success: Environment.Info,
+      error: InvalidRequestError,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "grist.environment.create",
+          summary: "Create environment",
+          description:
+            "Create a worktree environment for the requested location's project: a git worktree on a grist/<name>-<id> branch with its own .grist state directory. The local environment is implicit and cannot be created; the sandbox kind is not yet available.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("grist.environment.remove", "/api/grist/environments/remove", {
+      query: LocationQuery,
+      payload: EnvironmentRemovePayload,
+      success: HttpApiSchema.NoContent,
+      error: InvalidRequestError,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "grist.environment.remove",
+          summary: "Remove environment",
+          description:
+            "Remove a worktree environment and its git worktree. The local environment cannot be removed.",
         }),
       ),
   )
