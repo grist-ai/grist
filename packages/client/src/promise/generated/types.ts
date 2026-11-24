@@ -46,6 +46,8 @@ export type SessionMessageID = string
 
 export type EnvironmentID = string
 
+export type ConversationID = string
+
 export type MoneyUSD = number
 
 export type TokenUsageInfo = {
@@ -321,6 +323,8 @@ export type EnvironmentPolicySurface = { status: "full" | "degraded" | "unavaila
 
 export type EnvironmentStatus = "active" | "missing"
 
+export type ConversationStatus = "active" | "done" | "archived"
+
 export type WebSearchID = string
 
 export type WebSearchResult = { url: string; title?: string; content?: string; time: { published?: number } }
@@ -388,6 +392,17 @@ export type ConfigModelSettings = { compaction?: ProviderCompaction; encoding?: 
 export type PermissionRule = { action: string; resource: string; effect: PermissionEffect }
 
 export type PluginInfo = { id?: string; source: PluginSource; features: PluginFeatures; state: PluginState }
+
+export type GristPostedItem = {
+  sessionID: SessionID
+  kind: "user" | "message" | "outcome" | "question" | "files" | "lifecycle"
+  text?: string
+  status?: "succeeded" | "failed" | "interrupted"
+  files?: Array<string>
+  event?: string
+  reason?: string
+  rung?: string
+}
 
 export type SessionForkBoundary =
   | { type: "before"; messageID: SessionMessageID }
@@ -888,6 +903,16 @@ export type EnvironmentPolicySummary = {
   environment: EnvironmentPolicySurface
   limits: EnvironmentPolicySurface
   egressAllowlist: Array<string>
+}
+
+export type ConversationInfo = {
+  id: ConversationID
+  projectID: ProjectID
+  title: string
+  createdBy?: string
+  status: ConversationStatus
+  sessionIDs: Array<SessionID>
+  time: { created: number; updated: number }
 }
 
 export type WebSearchProvider = { id: WebSearchID; name: string }
@@ -2054,6 +2079,14 @@ export type EnvironmentInfo = {
   time: { created: number; updated: number; used?: number }
 }
 
+export type GristConversationList = { conversations: Array<ConversationInfo> }
+
+export type GristConversationView = {
+  conversation: ConversationInfo
+  stream: Array<GristPostedItem>
+  memory: Array<GristMemoryRecord>
+}
+
 export type SessionInboxMove = {
   id: SessionMessageID
   sessionID: SessionID
@@ -2163,6 +2196,7 @@ export type SessionInfo = {
   fork?: { sessionID: SessionID; boundary: SessionForkBoundary }
   projectID: ProjectID
   environmentID?: EnvironmentID
+  conversationID?: ConversationID
   agent?: AgentID
   model?: ModelRef
   cost: MoneyUSD
@@ -2188,6 +2222,7 @@ export type SessionCreated = {
     sessionID: SessionID
     projectID: ProjectID
     environmentID?: EnvironmentID
+    conversationID?: ConversationID
     location: LocationRef
     subpath?: RelativePath
     parentID?: SessionID
@@ -3144,6 +3179,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3159,6 +3195,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3174,6 +3211,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3189,6 +3227,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3204,6 +3243,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3219,6 +3259,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3234,6 +3275,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3241,6 +3283,22 @@ export type SessionCreateInput = {
       readonly effect: "allow" | "deny" | "ask"
     }> | null
   }["environmentID"]
+  readonly conversationID?: {
+    readonly id?: string | null
+    readonly parentID?: string | null
+    readonly title?: string | null
+    readonly agent?: string | null
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly location?: { readonly directory: string } | null
+    readonly environmentID?: string | null
+    readonly conversationID?: string | null
+    readonly metadata?: { readonly [x: string]: JsonValue } | null
+    readonly permissions?: ReadonlyArray<{
+      readonly action: string
+      readonly resource: string
+      readonly effect: "allow" | "deny" | "ask"
+    }> | null
+  }["conversationID"]
   readonly metadata?: {
     readonly id?: string | null
     readonly parentID?: string | null
@@ -3249,6 +3307,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3264,6 +3323,7 @@ export type SessionCreateInput = {
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly location?: { readonly directory: string } | null
     readonly environmentID?: string | null
+    readonly conversationID?: string | null
     readonly metadata?: { readonly [x: string]: JsonValue } | null
     readonly permissions?: ReadonlyArray<{
       readonly action: string
@@ -3288,6 +3348,7 @@ export type SessionImportInput = {
       }
       readonly projectID: string
       readonly environmentID?: string
+      readonly conversationID?: string
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
@@ -3632,6 +3693,7 @@ export type SessionImportInput = {
       }
       readonly projectID: string
       readonly environmentID?: string
+      readonly conversationID?: string
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
@@ -3976,6 +4038,7 @@ export type SessionImportInput = {
       }
       readonly projectID: string
       readonly environmentID?: string
+      readonly conversationID?: string
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
@@ -6982,6 +7045,27 @@ export type GristEnvironmentRemoveInput = {
 }
 
 export type GristEnvironmentRemoveOutput = void
+
+export type GristConversationListInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type GristConversationListOutput = GristConversationList
+
+export type GristConversationCreateInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly title?: { readonly title?: string; readonly createdBy?: string }["title"]
+  readonly createdBy?: { readonly title?: string; readonly createdBy?: string }["createdBy"]
+}
+
+export type GristConversationCreateOutput = ConversationInfo
+
+export type GristConversationShowInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type GristConversationShowOutput = GristConversationView
 
 export type DebugLocationListOutput = Array<LocationPublicRef>
 

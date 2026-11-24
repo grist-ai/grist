@@ -36,6 +36,7 @@ import {
 } from "../errors.js"
 import { Agent } from "@opencode/schema/agent"
 import { Environment } from "@opencode/schema/environment"
+import { Conversation } from "@opencode/schema/conversation"
 import { Skill } from "@opencode/schema/skill"
 import { Model } from "@opencode/schema/model"
 import { Permission } from "@opencode/schema/permission"
@@ -228,6 +229,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           model: Model.Ref.pipe(Schema.optional),
           location: Location.PublicRef.pipe(Schema.optional),
           environmentID: Environment.ID.pipe(Schema.optional),
+          conversationID: Conversation.ID.pipe(Schema.optional),
           metadata: Session.Metadata.pipe(Schema.optional),
           permissions: Permission.Ruleset.pipe(Schema.optional),
         }),

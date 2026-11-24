@@ -273,6 +273,12 @@ import type {
   GristEnvironmentCreateOutput,
   GristEnvironmentRemoveInput,
   GristEnvironmentRemoveOutput,
+  GristConversationListInput,
+  GristConversationListOutput,
+  GristConversationCreateInput,
+  GristConversationCreateOutput,
+  GristConversationShowInput,
+  GristConversationShowOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -606,6 +612,7 @@ export function make(options: ClientOptions) {
               model: input?.["model"],
               location: input?.["location"],
               environmentID: input?.["environmentID"],
+              conversationID: input?.["conversationID"],
               metadata: input?.["metadata"],
               permissions: input?.["permissions"],
             },
@@ -2278,6 +2285,45 @@ export function make(options: ClientOptions) {
               successStatus: 204,
               declaredStatuses: [400, 401, 404],
               empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      conversation: {
+        list: (input?: GristConversationListInput, requestOptions?: RequestOptions) =>
+          request<GristConversationListOutput>(
+            {
+              method: "GET",
+              path: `/api/grist/conversations`,
+              query: { location: input?.["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        create: (input?: GristConversationCreateInput, requestOptions?: RequestOptions) =>
+          request<GristConversationCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/grist/conversations/create`,
+              query: { location: input?.["location"] },
+              body: { title: input?.["title"], createdBy: input?.["createdBy"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        show: (input: GristConversationShowInput, requestOptions?: RequestOptions) =>
+          request<GristConversationShowOutput>(
+            {
+              method: "GET",
+              path: `/api/grist/conversations/${encodeURIComponent(input.id)}`,
+              query: { location: input["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
             },
             requestOptions,
           ),

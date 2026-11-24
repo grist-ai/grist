@@ -275,6 +275,12 @@ import type {
   GristEnvironmentCreateOutput,
   GristEnvironmentRemoveInput,
   GristEnvironmentRemoveOutput,
+  GristConversationListInput,
+  GristConversationListOutput,
+  GristConversationCreateInput,
+  GristConversationCreateOutput,
+  GristConversationShowInput,
+  GristConversationShowOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -432,6 +438,7 @@ const EndpointSessionCreate = (raw: RawClient["server.session"]) => (input?: Ses
         model: input?.["model"],
         location: input?.["location"],
         environmentID: input?.["environmentID"],
+        conversationID: input?.["conversationID"],
         metadata: input?.["metadata"],
         permissions: input?.["permissions"],
       },
@@ -1640,6 +1647,26 @@ const EndpointGristEnvironmentRemove = (raw: RawClient["server.grist"]) => (inpu
     }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointGristConversationList = (raw: RawClient["server.grist"]) => (input?: GristConversationListInput) =>
+  preserveEffect<GristConversationListOutput>()(
+    raw["grist.conversation.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGristConversationCreate = (raw: RawClient["server.grist"]) => (input?: GristConversationCreateInput) =>
+  preserveEffect<GristConversationCreateOutput>()(
+    raw["grist.conversation.create"]({
+      query: { location: input?.["location"] },
+      payload: { title: input?.["title"], createdBy: input?.["createdBy"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGristConversationShow = (raw: RawClient["server.grist"]) => (input: GristConversationShowInput) =>
+  preserveEffect<GristConversationShowOutput>()(
+    raw["grist.conversation.show"]({ params: { id: input["id"] }, query: { location: input["location"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
 const adaptGroupGrist = (raw: RawClient["server.grist"]) => ({
   memory: { list: EndpointGristMemoryList(raw), forget: EndpointGristMemoryForget(raw) },
   codeMap: { get: EndpointGristCodeMapGet(raw) },
@@ -1647,6 +1674,11 @@ const adaptGroupGrist = (raw: RawClient["server.grist"]) => ({
     list: EndpointGristEnvironmentList(raw),
     create: EndpointGristEnvironmentCreate(raw),
     remove: EndpointGristEnvironmentRemove(raw),
+  },
+  conversation: {
+    list: EndpointGristConversationList(raw),
+    create: EndpointGristConversationCreate(raw),
+    show: EndpointGristConversationShow(raw),
   },
 })
 

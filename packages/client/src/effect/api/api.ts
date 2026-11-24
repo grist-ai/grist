@@ -12,6 +12,7 @@ import type { Money } from "@opencode/schema/money"
 import type { Model } from "@opencode/schema/model"
 import type { DateTime } from "effect"
 import type { Environment } from "@opencode/schema/environment"
+import type { Conversation } from "@opencode/schema/conversation"
 import type { Permission } from "@opencode/schema/permission"
 import type { SessionMessage } from "@opencode/schema/session-message"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
@@ -207,6 +208,7 @@ export type SessionCreateInput = {
   readonly model?: Model.Ref | undefined
   readonly location?: Location.PublicRef | undefined
   readonly environmentID?: Environment.ID | undefined
+  readonly conversationID?: Conversation.ID | undefined
   readonly metadata?: Session.Metadata | undefined
   readonly permissions?: Permission.Ruleset | undefined
 }
@@ -442,6 +444,7 @@ export type SessionLogOutput =
             readonly sessionID: Session.ID
             readonly projectID: Project.ID
             readonly environmentID?: Environment.ID | undefined
+            readonly conversationID?: Conversation.ID | undefined
             readonly location: { readonly directory: AbsolutePath; readonly workspaceID?: Workspace.ID | undefined }
             readonly subpath?: RelativePath | undefined
             readonly parentID?: Session.ID | undefined
@@ -2295,6 +2298,53 @@ export type GristEnvironmentRemoveOperation<E = never> = (
   input: GristEnvironmentRemoveInput,
 ) => Effect.Effect<GristEnvironmentRemoveOutput, E>
 
+export type GristConversationListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GristConversationListOutput = { readonly conversations: ReadonlyArray<Conversation.Info> }
+export type GristConversationListOperation<E = never> = (
+  input?: GristConversationListInput,
+) => Effect.Effect<GristConversationListOutput, E>
+
+export type GristConversationCreateInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly title?: string | undefined
+  readonly createdBy?: string | undefined
+}
+export type GristConversationCreateOutput = Conversation.Info
+export type GristConversationCreateOperation<E = never> = (
+  input?: GristConversationCreateInput,
+) => Effect.Effect<GristConversationCreateOutput, E>
+
+export type GristConversationShowInput = {
+  readonly id: Conversation.ID
+  readonly location?: { readonly directory?: string | undefined } | undefined
+}
+export type GristConversationShowOutput = {
+  readonly conversation: Conversation.Info
+  readonly stream: ReadonlyArray<{
+    readonly sessionID: Session.ID
+    readonly kind: "user" | "message" | "outcome" | "question" | "files" | "lifecycle"
+    readonly text?: string | undefined
+    readonly status?: "succeeded" | "failed" | "interrupted" | undefined
+    readonly files?: ReadonlyArray<string> | undefined
+    readonly event?: string | undefined
+    readonly reason?: string | undefined
+    readonly rung?: string | undefined
+  }>
+  readonly memory: ReadonlyArray<{
+    readonly id: string
+    readonly content: string
+    readonly container: string
+    readonly outcome: "tests_passed" | "user_approved" | "user_corrected" | "check_failed"
+    readonly weight: number
+    readonly createdAt: number
+    readonly sessionID?: string | undefined
+    readonly metadata?: { readonly [x: string]: string } | undefined
+  }>
+}
+export type GristConversationShowOperation<E = never> = (
+  input: GristConversationShowInput,
+) => Effect.Effect<GristConversationShowOutput, E>
+
 export interface GristApi<E = never> {
   readonly memory: { readonly list: GristMemoryListOperation<E>; readonly forget: GristMemoryForgetOperation<E> }
   readonly codeMap: { readonly get: GristCodeMapGetOperation<E> }
@@ -2302,6 +2352,11 @@ export interface GristApi<E = never> {
     readonly list: GristEnvironmentListOperation<E>
     readonly create: GristEnvironmentCreateOperation<E>
     readonly remove: GristEnvironmentRemoveOperation<E>
+  }
+  readonly conversation: {
+    readonly list: GristConversationListOperation<E>
+    readonly create: GristConversationCreateOperation<E>
+    readonly show: GristConversationShowOperation<E>
   }
 }
 
