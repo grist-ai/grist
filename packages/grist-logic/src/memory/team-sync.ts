@@ -26,6 +26,10 @@ import { decayScore } from "./verified.js"
  *                 terminal — never retried blindly
  * - `revoked`   — the gateway said this account has no team (spec §7):
  *                 mirror wiped, sync paused until re-enabled
+ * - `objects`   — the team-filesystem journal (filesystem spec v1 §6,
+ *                 slice S-FS2, logic in team-objects.ts): a second
+ *                 stream with its own cursor; bodies are materialized
+ *                 as files, only the manifest rides here
  */
 
 /** Decision D5: total injected memory context budget, local + team. */
@@ -44,6 +48,65 @@ export type TeamMirrorEntry = MemoryRecord & {
   seq: number
 }
 
+/** Object kinds in the team filesystem (filesystem spec v1 §3). Memory never lands here. */
+export type TeamObjectKind = "skill" | "agent_definition"
+
+/** One object version as it travels the push/pull wire (filesystem spec v1 §6). */
+export type TeamObjectWire = {
+  id: string
+  kind: TeamObjectKind
+  container: string
+  name: string
+  body: string
+  metadata: Record<string, unknown>
+  supersedes?: string | null
+}
+
+/**
+ * The materialized mirror's index entry for one chain (filesystem spec
+ * v1 §6): the state file stores only this manifest — never object
+ * bodies. Bodies live as files under the materialization roots
+ * (`.grist/team/…`, `.grist/team-global/…`); `path` is repo-relative.
+ */
+export type TeamObjectManifestEntry = {
+  kind: TeamObjectKind
+  container: string
+  name: string
+  /** Current head object id. */
+  id: string
+  seq: number
+  /** sha256 hex of the materialized file's content. */
+  hash: string
+  path: string
+  authorUserId: string
+}
+
+/**
+ * The objects section of the sync journal (filesystem spec v1 §6): a
+ * second stream riding the same state file and the same opt-in switch.
+ * Its cursor lives in the objects' own per-team seq space — it must
+ * never share or move the memory `cursor` above, nor be moved by it.
+ * Keys for `pushedHeads` and `manifest` are chain keys
+ * (`<kind>:<container>:<name>`, see team-objects.ts).
+ */
+export type TeamObjectJournal = {
+  cursor: number
+  pending: TeamObjectWire[]
+  pushed: Record<string, { at: number }>
+  rejected: Record<string, { reason: string; at: number }>
+  /** Chain key → object id of the last head this repo pushed (supersedes wiring for edits). */
+  pushedHeads: Record<string, string>
+  /** Chain key → what is currently materialized on disk. */
+  manifest: Record<string, TeamObjectManifestEntry>
+  lastPushAt?: number
+  lastPullAt?: number
+  lastError?: string
+}
+
+export function defaultTeamObjectJournal(): TeamObjectJournal {
+  return { cursor: 0, pending: [], pushed: {}, rejected: {}, pushedHeads: {}, manifest: {} }
+}
+
 export type TeamSyncState = {
   version: 1
   enabled: boolean
@@ -53,6 +116,7 @@ export type TeamSyncState = {
   pending: MemoryRecord[]
   pushed: Record<string, { signature?: string; at: number }>
   rejected: Record<string, { reason: string; at: number }>
+  objects: TeamObjectJournal
   lastPushAt?: number
   lastPullAt?: number
   lastError?: string
@@ -81,6 +145,23 @@ function defaultState(): TeamSyncState {
     pending: [],
     pushed: {},
     rejected: {},
+    objects: defaultTeamObjectJournal(),
+  }
+}
+
+function normalizeObjectJournal(raw: unknown): TeamObjectJournal {
+  if (!raw || typeof raw !== "object") return defaultTeamObjectJournal()
+  const journal = raw as Partial<TeamObjectJournal>
+  return {
+    cursor: typeof journal.cursor === "number" && Number.isFinite(journal.cursor) ? journal.cursor : 0,
+    pending: Array.isArray(journal.pending) ? journal.pending : [],
+    pushed: journal.pushed && typeof journal.pushed === "object" ? journal.pushed : {},
+    rejected: journal.rejected && typeof journal.rejected === "object" ? journal.rejected : {},
+    pushedHeads: journal.pushedHeads && typeof journal.pushedHeads === "object" ? journal.pushedHeads : {},
+    manifest: journal.manifest && typeof journal.manifest === "object" ? journal.manifest : {},
+    lastPushAt: typeof journal.lastPushAt === "number" ? journal.lastPushAt : undefined,
+    lastPullAt: typeof journal.lastPullAt === "number" ? journal.lastPullAt : undefined,
+    lastError: typeof journal.lastError === "string" ? journal.lastError : undefined,
   }
 }
 
@@ -96,6 +177,7 @@ function normalizeState(parsed: unknown): TeamSyncState {
     pending: Array.isArray(raw.pending) ? raw.pending : [],
     pushed: raw.pushed && typeof raw.pushed === "object" ? raw.pushed : {},
     rejected: raw.rejected && typeof raw.rejected === "object" ? raw.rejected : {},
+    objects: normalizeObjectJournal(raw.objects),
     lastPushAt: typeof raw.lastPushAt === "number" ? raw.lastPushAt : undefined,
     lastPullAt: typeof raw.lastPullAt === "number" ? raw.lastPullAt : undefined,
     lastError: typeof raw.lastError === "string" ? raw.lastError : undefined,

@@ -76,6 +76,7 @@ export { formatHits } from "./format.js"
 export { findSecretKind } from "./secrets-scan.js"
 export {
   TEAM_RECALL_TOKEN_BUDGET,
+  defaultTeamObjectJournal,
   flushTeamMemoryPushes,
   loadTeamSyncState,
   mergeRecallHits,
@@ -93,9 +94,40 @@ export {
   type PushSummary,
   type QueueResult,
   type TeamMirrorEntry,
+  type TeamObjectJournal,
+  type TeamObjectKind,
+  type TeamObjectManifestEntry,
+  type TeamObjectWire,
   type TeamSyncDeps,
   type TeamSyncState,
   type TeamSyncStatus,
 } from "./team-sync.js"
+export {
+  TEAM_GLOBAL_CONTAINER,
+  buildAgentDefinitionObject,
+  buildSkillObject,
+  containerForDirectory,
+  flushTeamObjectPushes,
+  hashTeamObjectContent,
+  newTeamObjectId,
+  parseObjectFrontmatter,
+  publishTeamObject,
+  pullTeamObjects,
+  queueTeamObjectPush,
+  renderAgentDefinitionFile,
+  renderSkillFile,
+  renderTeamObjectFile,
+  summarizeTeamObjects,
+  syncTeamObjects,
+  teamGlobalObjectsRoot,
+  teamObjectChainKey,
+  teamObjectPath,
+  teamObjectsRoot,
+  validateTeamObject,
+  type ObjectPullSummary,
+  type ObjectPushSummary,
+  type TeamObjectDeps,
+  type TeamObjectStatus,
+} from "./team-objects.js"
 export { renderMemoryRepo, parseMemoryRepo, type MemoryRepoFile, type ImportedMemory } from "./interchange.js"
 export { planDream, applyDream, type DreamPlan } from "./dreaming.js"
