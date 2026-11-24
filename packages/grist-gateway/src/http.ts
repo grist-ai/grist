@@ -1192,7 +1192,14 @@ export function createGateway(opts: GatewayOptions = {}) {
         authorUserId: typeof body?.author_user_id === "string" ? body.author_user_id : undefined,
         limit: typeof body?.limit === "number" ? body.limit : undefined,
       })
-      return json(200, { entries: rows.map(publicTeamMemoryEntry) })
+      // The dashboard browser (spec v2 §11) also carries team-wide counts
+      // and the last policy ("Dreaming") run — totals across all entries,
+      // not just this page of the list.
+      return json(200, {
+        entries: rows.map(publicTeamMemoryEntry),
+        counts: store.teamMemoryCounts(mine.team.id),
+        dreaming: store.getDreamingRun(mine.team.id) ?? null,
+      })
     }
 
     return json(404, { error: "not found" })
@@ -1633,6 +1640,7 @@ function publicTeamMemoryEntry(row: TeamMemoryRow) {
     status: row.status,
     seq: row.seq,
     superseded_by: row.superseded_by,
+    updated_at: row.updated_at,
   }
 }
 
