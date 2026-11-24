@@ -96,7 +96,7 @@ function environmentError(error: EnvironmentRegistry.Error): InvalidRequestError
           : "The local environment cannot be removed",
     })
   if (error instanceof EnvironmentRegistry.SandboxUnavailableError)
-    return new InvalidRequestError({ message: "Sandbox environments are not available yet" })
+    return new InvalidRequestError({ message: "Sandbox environments are not available on this machine" })
   return new InvalidRequestError({
     message:
       "message" in error && typeof error.message === "string" ? error.message : `Environment operation failed: ${error._tag}`,
