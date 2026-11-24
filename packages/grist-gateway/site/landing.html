@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grist — a complete coding-agent harness</title>
-<meta name="description" content="Grist is a complete coding-agent harness: confidence-gated model routing, verified memory, a code map, and specialist subagents — billed to your own provider key, running in your own tree.">
+<meta name="description" content="Grist is a complete coding-agent harness with verified memory: every fix proven by passing tests is stored and recalled — by your agent and your whole team's — so no one retries a failed approach. Sandboxed runs, conversations, and listeners, billed to your own provider key.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,6 +28,7 @@
       </a>
 <nav class="nav-links">
   <a href="#concepts">Concepts</a>
+  <a href="#platform">Platform</a>
   <a href="/docs">Docs</a>
   <a href="https://github.com/grist-ai/grist">GitHub</a><a class="star-chip" href="https://github.com/grist-ai/grist" aria-label="Star Grist on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l2.05 4.15 4.58.67-3.31 3.23.78 4.56L8 12.02l-4.1 2.09.78-4.56L1.37 6.32l4.58-.67L8 1.5z"/></svg><span data-gh-stars>star</span></a>
   <a class="btn ghost" href="/login">Sign in</a>
@@ -38,15 +39,15 @@
 <div class="wrap">
 <section class="hero">
   <p class="kicker">[ coding-agent harness ]</p>
-  <h1>Frontier when it has to be. <span class="hl">Cents when it doesn&rsquo;t.</span></h1>
-  <p class="lede">Grist is a complete coding-agent harness. A confidence gate routes every task to the cheapest capable rung, verified memory and a code map brief it on your codebase, and specialists do the work in your tree &mdash; inference billed to your own provider key.</p>
+  <h1>It never retries a <span class="hl">failed approach.</span></h1>
+  <p class="lede">Grist is a complete coding-agent harness with verified memory. Every fix proven by passing tests is stored and recalled &mdash; by your agent, and by your whole team&rsquo;s &mdash; so the same dead end is never explored twice. A confidence gate still routes each task to the cheapest capable rung, and inference bills to your own provider key.</p>
   <div class="hero-ctas">
     <span class="install"><span><span class="dollar">$</span> npm install -g grist-ai</span><button class="copy-btn" data-copy="npm install -g grist-ai">copy</button></span>
     <a class="btn" href="/login">Sign in with Google</a>
     <a class="btn ghost" href="/download/grist-desktop-mac-arm64.dmg"><svg class="apple" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>Download for macOS</a>
   </div>
   <div class="flow-card reveal">
-    <svg class="flow" viewBox="0 0 1040 132" role="img" aria-label="How a prompt becomes a diff: you prompt, the Jev gate routes, the ladder resolves, specialists execute, a diff lands in your tree">
+    <svg class="flow" viewBox="0 0 1040 132" role="img" aria-label="How a prompt becomes a diff: you prompt, memory recalls verified fixes, the Jev gate routes, specialists execute, and a proven diff is remembered">
       <path class="wire" d="M192 66 H232 M404 66 H444 M616 66 H656 M828 66 H868"/>
       <g>
         <rect class="node" x="20" y="38" width="172" height="56" rx="10"/>
@@ -55,13 +56,13 @@
       </g>
       <g>
         <rect class="node-accent" x="232" y="38" width="172" height="56" rx="10"/>
-        <text class="lbl" x="252" y="64">Jev gate routes</text>
-        <text class="sub" x="252" y="82">confidence &rarr; rung</text>
+        <text class="lbl" x="252" y="64">Memory recalls</text>
+        <text class="sub" x="252" y="82">verified fixes &middot; briefed</text>
       </g>
       <g>
         <rect class="node" x="444" y="38" width="172" height="56" rx="10"/>
-        <text class="lbl" x="464" y="64">Ladder resolves</text>
-        <text class="sub" x="464" y="82">rung &rarr; model</text>
+        <text class="lbl" x="464" y="64">Jev gate routes</text>
+        <text class="sub" x="464" y="82">confidence &rarr; rung</text>
       </g>
       <g>
         <rect class="node" x="656" y="38" width="172" height="56" rx="10"/>
@@ -71,15 +72,15 @@
       <g>
         <rect class="node" x="868" y="38" width="152" height="56" rx="10"/>
         <text class="lbl" x="888" y="64">Diff lands</text>
-        <text class="sub" x="888" y="82">tests &middot; $0.012</text>
+        <text class="sub" x="888" y="82">proven &rarr; remembered</text>
       </g>
       <circle class="pulse" r="5" style="offset-path: path('M 106 66 H 934')"/>
     </svg>
-    <p class="flow-cap">one request, five moves &mdash; your key pays for inference, your source never leaves the machine</p>
+    <p class="flow-cap">one request, five moves &mdash; what passes is remembered, what failed is never retried</p>
   </div>
 </section>
 </div>
-<div class="strip" aria-hidden="true"><span>Learns your codebase</span><i>&middot;</i><span>Self-improves</span><i>&middot;</i><span>SoL-Pi inside</span><i>&middot;</i><span>Open beta</span></div>
+<div class="strip" aria-hidden="true"><span>Verified memory</span><i>&middot;</i><span>Team memory</span><i>&middot;</i><span>Sandboxed runs</span><i>&middot;</i><span>Listeners</span><i>&middot;</i><span>Open beta</span></div>
 <div class="stats"><div class="wrap stats-in">
   <div class="stat"><b>4</b><span>cost-tiered rungs, cheapest first</span></div>
   <div class="stat"><b>0%</b><span>markup on your provider key</span></div>
@@ -99,8 +100,22 @@
     <div class="move"><span class="num">3</span><h3>Jev gate routes</h3><p>A confidence gate scores difficulty once per run, picks the cheapest rung that can handle it, and dials exploratory effort &mdash; trivial tasks get a tight budget, ambiguous ones get room to investigate.</p></div>
     <div class="move"><span class="num">4</span><h3>Ladder resolves</h3><p>The rung becomes a model &mdash; the best in its cost band. Defaults are ours; your dashboard can override any rung.</p></div>
     <div class="move"><span class="num">5</span><h3>Your key pays</h3><p>The provider call rides your BYOK key. Inference bills to your provider account; Grist never holds your budget.</p></div>
-    <div class="move"><span class="num">6</span><h3>Memory compounds</h3><p>Verified outcomes &mdash; tests passed, approved, corrected &mdash; are written to memory and the code map updates, so the next run starts briefed instead of blank.</p></div>
+    <div class="move"><span class="num">6</span><h3>Memory compounds</h3><p>Verified outcomes &mdash; tests passed, approved, corrected &mdash; are stored with provenance (the commit, who verified, when) and recalled next time. The code map updates too, so the next run starts briefed instead of blank.</p></div>
     <div class="move"><span class="num">7</span><h3>Specialists delegate</h3><p>The gate hands work to named specialists &mdash; explore, plan, review, verify &mdash; each running inside the assigned rung. Repeat calls resume warm, so context compounds within the session too.</p></div>
+  </div>
+</section>
+
+<section id="memory">
+  <div class="sec-head reveal">
+    <p class="kicker">[ verified memory ]</p>
+    <h2>Only what was proven gets remembered.</h2>
+    <p class="lede">Most agents forget everything between sessions &mdash; including which approaches already failed. Grist keeps a memory with an admission rule: nothing enters it on the agent&rsquo;s say-so.</p>
+  </div>
+  <div class="steps reveal">
+    <div class="step"><span class="num">01</span><h3>Capture</h3><p>A fix is stored only when a test-class check passes after the final edit &mdash; or when you approve or correct the outcome. Failures are stored too, marked as failures.</p></div>
+    <div class="step"><span class="num">02</span><h3>Recall</h3><p>Relevant entries are auto-recalled at the start of a run and injected as verified memory &mdash; the proven approach, and the dead ends to skip.</p></div>
+    <div class="step"><span class="num">03</span><h3>Strengthen</h3><p>When the same fix is re-proven at a newer commit, the entry&rsquo;s weight grows and its commit anchor advances. Memory that keeps working earns its place.</p></div>
+    <div class="step"><span class="num">04</span><h3>Go stale, honestly</h3><p>Every entry carries provenance &mdash; the commit it was verified at, who verified it, when. When the code moves on, the entry is flagged stale, never silently trusted.</p></div>
   </div>
 </section>
 
@@ -231,6 +246,88 @@
     </article>
   </div>
 </section>
+<section id="platform">
+  <div class="sec-head reveal">
+    <p class="kicker">[ the team platform ]</p>
+    <h2>One team&rsquo;s learning, shared by every agent.</h2>
+    <p class="lede">Memory was the start. The same verified-by-default discipline now covers what your team knows, where agents run, and what can wake them up.</p>
+  </div>
+  <div class="concepts">
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="kind ok">&#10003; tests passed</span><span class="note">proven on Ana&rsquo;s machine</span><span class="cost">recalled by yours</span></div>
+        <div class="row"><span class="kind ok">&#10003; you corrected</span><span class="note">attributed &middot; who &middot; when</span><span class="cost">team-wide</span></div>
+        <div class="row"><span class="kind bad">secret-shaped</span><span class="note">scanned at capture and at the gateway</span><span class="cost">rejected</span></div>
+      </div>
+      <h3>Team memory</h3>
+      <p>Verified fixes sync across the team: one person&rsquo;s proven fix is recalled by everyone&rsquo;s agent, with attribution. A mechanical policy sweep curates it &mdash; near-duplicates merge, stale entries flag, nothing is silently deleted &mdash; and sync is opt-in per repo.</p>
+      <p class="mono" style="font-size:13px;color:var(--muted)">grist team-memory enable</p>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="rung-chip">skill</span><span class="note">deploy-checklist</span><span class="cost">v3 &middot; full history</span></div>
+        <div class="row"><span class="rung-chip">agent</span><span class="note">grist-verify</span><span class="cost">v2</span></div>
+        <div class="row"><span class="rung-chip">artifact</span><span class="note">runbook.md</span><span class="cost">provenance-linked</span></div>
+      </div>
+      <h3>The team filesystem</h3>
+      <p>Skills, agent definitions, and artifacts live in one team filesystem, versioned in supersede chains &mdash; every edit a new version, the whole history kept. Pulled objects materialize into each repo under <span class="mono">.grist/team/</span>, and a repo-local definition always shadows the team one.</p>
+      <p class="mono" style="font-size:13px;color:var(--muted)">grist team-objects publish</p>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="note">you</span><span class="cost">gu_&hellip; &middot; your ID</span></div>
+        <div class="row"><span class="note">your team</span><span class="cost">one team per person</span></div>
+        <div class="row"><span class="note">owner&rsquo;s provider key</span><span class="cost">serves the whole team</span></div>
+        <div class="row"><span class="note">your spend</span><span class="cost">metered &middot; capped &middot; yours</span></div>
+      </div>
+      <h3>Teams</h3>
+      <p>Everyone gets a unique user ID (<span class="mono">gu_&hellip;</span>) and can create or join a team &mdash; one team per person. The team owner&rsquo;s provider key serves the whole team, while spend metering and caps stay individual, per member.</p>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="rung-chip">local</span><span class="note">your working tree, as today</span></div>
+        <div class="row"><span class="rung-chip">worktree</span><span class="note">isolated git worktree per run</span></div>
+        <div class="row"><span class="rung-chip">sandbox</span><span class="note">worktree + OS jail</span></div>
+      </div>
+      <h3>Environments</h3>
+      <p>Named environments per project: run in your tree, in an isolated git worktree, or in a sandbox. Sessions record which environment they ran in; targeting one that doesn&rsquo;t exist fails loudly &mdash; never a silent fallback.</p>
+      <p class="mono" style="font-size:13px;color:var(--muted)">grist env create api --kind worktree &middot; grist run --env api</p>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="kind bad">~/.ssh</span><span class="note">masked &mdash; the agent can&rsquo;t read it</span><span class="cost">denied</span></div>
+        <div class="row"><span class="kind bad">random host</span><span class="note">not on the allowlist</span><span class="cost">403</span></div>
+        <div class="row"><span class="kind ok">registry + provider</span><span class="note">allowlisted egress, via a filtering proxy</span><span class="cost">allowed</span></div>
+        <div class="row"><span class="kind ok">build + test</span><span class="note">runs normally in the worktree</span><span class="cost">passes</span></div>
+      </div>
+      <h3>Sandboxed runs</h3>
+      <p>An OS-level jail on your own machine: credential directories are masked, the environment is scrubbed, egress reaches only an allowlist through a filtering proxy, and resource limits apply. If the jail tooling isn&rsquo;t there, the run refuses &mdash; it never runs unjailed and calls it sandboxed.</p>
+      <p style="font-size:13px;color:var(--muted)">Per-OS honesty: Linux is the reference (full). macOS network and limits enforcement are coarser &mdash; the environment&rsquo;s policy summary says so. Windows sandboxing is not available yet; sandbox environments refuse there.</p>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="note">you: &ldquo;fix the flaky upload test&rdquo;</span><span class="cost">session 1</span></div>
+        <div class="row"><span class="note">result: fixed &middot; tests pass</span><span class="cost">stored</span></div>
+        <div class="row"><span class="note">you: &ldquo;now the retry case&rdquo;</span><span class="cost">session 2</span></div>
+        <div class="row"><span class="note">memory from both sessions</span><span class="cost">listed here</span></div>
+      </div>
+      <h3>Conversations</h3>
+      <p>Work is a thread, not a pile of sessions. A conversation links many sessions into one posted stream &mdash; asks, results, artifacts &mdash; with the raw tool calls one layer down, unchanged. Memory captured in any linked session is listed on the conversation.</p>
+      <p class="mono" style="font-size:13px;color:var(--muted)">grist run --conversation &lt;id&gt; &middot; grist conversation show</p>
+    </article>
+    <article class="concept reveal">
+      <div class="viz" aria-hidden="true">
+        <div class="row"><span class="dot run"></span><span class="note">CI failed on main</span><span class="cost">signed webhook</span></div>
+        <div class="row"><span class="note">filter matched &middot; envelope ok</span><span class="cost">queued</span></div>
+        <div class="row"><span class="note">your machine claims it</span><span class="cost">runs as its creator</span></div>
+        <div class="row"><span class="note">over the envelope</span><span class="cost">refused &middot; audited</span></div>
+      </div>
+      <h3>Listeners</h3>
+      <p>Signed webhooks &mdash; GitHub CI failures, issue and PR events, or a generic signed door &mdash; deterministically trigger agent runs on your team&rsquo;s own machines. Runners opt in per repo and per machine; hard spend envelopes (runs/day, spend/day, spend/run) are enforced mechanically, and every fire, claim, refusal, and completion is audited. Agents can propose listeners &mdash; only a human can enable one.</p>
+      <p class="mono" style="font-size:13px;color:var(--muted)">grist listener enable &middot; grist listener run-once</p>
+    </article>
+  </div>
+</section>
 <section id="local">
   <div class="sec-head reveal">
     <p class="kicker">[ local ]</p>
@@ -273,7 +370,7 @@
   <div class="sec-head reveal">
     <p class="kicker">[ for teams ]</p>
     <h2>Your key. Your cloud. Your codebase.</h2>
-    <p class="lede">Grist for enterprise is API-only: the harness runs in your VPC, inference bills to your provider account at zero markup, and the team shares one verified memory and code map. Per-key spend caps and attribution come built in.</p>
+    <p class="lede">Grist for enterprise is API-only: the harness runs in your VPC, inference bills to your provider account at zero markup, and the team shares one verified memory, filesystem, and code map. Per-key spend caps and attribution come built in.</p>
   </div>
   <a class="btn" href="/docs/enterprise">How enterprise deployment works &rarr;</a>
 </section>
@@ -313,10 +410,12 @@
   </div>
   <div class="faq reveal">
     <details><summary>Does my code leave my machine?</summary><p>No. Tools run in your local working tree. The prompt goes out to the model; your source does not. We never train on your code.</p></details>
-    <details><summary>What does Grist cost?</summary><p>The harness is free for personal and noncommercial use; commercial use needs a license. Inference bills to your own provider key at your provider's prices, with zero markup from us &mdash; and hard spend caps mean an over-cap request returns 402, not a bill.</p></details>
+    <details><summary>What does Grist cost?</summary><p>The harness is free for personal and noncommercial use; commercial use needs a license. Grist&rsquo;s own code is licensed under PolyForm Noncommercial 1.0.0; the upstream portions remain MIT. Inference bills to your own provider key at your provider's prices, with zero markup from us &mdash; and hard spend caps mean an over-cap request returns 402, not a bill.</p></details>
     <details><summary>Which model does Grist use?</summary><p>Whichever the task earns. The Jev gate routes across four cost-tiered rungs, each holding the best model in its band. You work with rung names, and your dashboard can override any rung's model.</p></details>
     <details><summary>How is this different from a plain agent CLI?</summary><p>A plain CLI spends the same on every task and forgets everything between sessions. Grist prices each task, remembers what was verified, navigates by a code map, and delegates to specialists &mdash; the harness is the product.</p></details>
-    <details><summary>Can my team use it?</summary><p>Yes &mdash; the enterprise deployment runs the harness in your own VPC on your own provider key, with shared team memory, a team code map, and per-key spend attribution. See the enterprise docs.</p></details>
+    <details><summary>Can my team use it?</summary><p>Yes. Create a team, add people by their <span class="mono">gu_</span> user ID, and verified memory and shared skills start flowing to everyone&rsquo;s agent &mdash; the owner&rsquo;s provider key serves the team, and spend stays metered per member. The enterprise deployment runs the same harness in your own VPC. See the enterprise docs.</p></details>
+    <details><summary>How sandboxed is a sandboxed run?</summary><p>On Linux, fully: namespaces isolate the filesystem and network, credential directories are masked, egress is allowlist-only through a filtering proxy, and the environment is scrubbed. On macOS the network and limits rules are coarser, and the environment&rsquo;s policy summary discloses that. On Windows sandboxing isn&rsquo;t available yet &mdash; a sandbox environment refuses to run rather than run unjailed.</p></details>
+    <details><summary>Can an agent start runs on its own?</summary><p>Only through a listener a human enabled, inside a hard spend envelope a human set. Listeners fire from signed webhooks, run on machines that opted in, and execute as the listener&rsquo;s creator. Anything over the envelope is refused mechanically and audited &mdash; there is no silent overspend.</p></details>
   </div>
 </section>
 <section class="cta" id="download">
