@@ -1,4 +1,5 @@
 import type { LocationGetOutput, ModelRef, OpenCodeClient, SessionInfo } from "@opencode/client/promise"
+import { Environment } from "@opencode/schema/environment"
 import { Model } from "@opencode/schema/model"
 import { errorMessage } from "./util/error"
 
@@ -38,16 +39,34 @@ export async function resolveSessionTarget(input: {
   model?: ModelRef
   agent?: string
   environment?: Readonly<Record<string, string>>
+  /**
+   * A named-environment target for a NEW session (S-ENV1): the session is
+   * created in the environment's directory and records its id. Resumed
+   * sessions keep their recorded environment; targeting one that names a
+   * different environment is an error, never a silent retarget.
+   */
+  environmentTarget?: { id: string; directory?: string }
   prepare: SessionTargetPreparation
   signal?: AbortSignal
 }): Promise<SessionTarget> {
   const selection = await selectSession(input)
   const selected = selection.session
+  if (selected && input.environmentTarget) {
+    const recorded = selected.environmentID ?? Environment.LOCAL_ENVIRONMENT_ID
+    if (recorded !== input.environmentTarget.id)
+      throw new Error(
+        `Session ${selected.id} runs in environment ${recorded}, not the targeted environment — start a new session to run there`,
+      )
+  }
   const location =
     selection.location ??
     (await resolveLocation(
       input.client,
-      selected ? { directory: selected.location.directory } : input.location,
+      selected
+        ? { directory: selected.location.directory }
+        : input.environmentTarget?.directory
+          ? { directory: input.environmentTarget.directory }
+          : input.location,
       input.signal,
     ))
   const prepared = await input.prepare({
@@ -67,6 +86,7 @@ export async function resolveSessionTarget(input: {
           agent: prepared.agent,
           model: prepared.model,
           location: { directory: location.directory },
+          environmentID: input.environmentTarget?.id,
         },
         ...requestOptions(input.signal),
       )

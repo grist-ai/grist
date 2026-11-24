@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { OpenCode, type LocationGetOutput, type ModelRef, type SessionInfo } from "@opencode/client/promise"
+import { Environment } from "@opencode/schema/environment"
 import { resolveSessionTarget, SessionTargetMutationError } from "../src/session-target"
 
 function location(directory: string): LocationGetOutput {
@@ -51,6 +52,41 @@ describe("session target resolver", () => {
     const target = await resolveSessionTarget({ client, session: "ses_chosen", prepare })
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: "ses_chosen" }))
     expect(target).toMatchObject({ session: { id: "ses_chosen" }, resume: false })
+  })
+
+  test("creates a new session in the targeted environment's directory", async () => {
+    const client = OpenCode.make({ baseUrl: "https://opencode.test" })
+    spyOn(client.location, "get").mockResolvedValue(location("/envs/alpha"))
+    const created = { ...session("ses_env", "/envs/alpha"), environmentID: Environment.ID.make("env_alpha") }
+    const create = spyOn(client.session, "create").mockResolvedValue(created)
+
+    const target = await resolveSessionTarget({
+      client,
+      location: { directory: "/project" },
+      environmentTarget: { id: "env_alpha", directory: "/envs/alpha" },
+      prepare,
+    })
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ environmentID: "env_alpha", location: { directory: "/envs/alpha" } }),
+    )
+    expect(target).toMatchObject({ session: { id: "ses_env", environmentID: "env_alpha" }, resume: false })
+  })
+
+  test("refuses to retarget a resumed session to a different environment", async () => {
+    const client = OpenCode.make({ baseUrl: "https://opencode.test" })
+    const selected = { ...session("ses_resume", "/envs/alpha"), environmentID: Environment.ID.make("env_alpha") }
+    spyOn(client.session, "get").mockResolvedValue(selected)
+    const create = spyOn(client.session, "create")
+
+    await expect(
+      resolveSessionTarget({
+        client,
+        session: selected.id,
+        environmentTarget: { id: "env_beta", directory: "/envs/beta" },
+        prepare,
+      }),
+    ).rejects.toThrow("runs in environment env_alpha")
+    expect(create).not.toHaveBeenCalled()
   })
 
   test("does not create a missing explicit Session to fork", async () => {

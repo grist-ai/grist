@@ -298,6 +298,45 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         }),
       ],
     }),
+    Spec.make("env", {
+      description: "Manage environments for this repository (local and git worktrees)",
+      commands: [
+        Spec.make("list", {
+          description: "List environments for the current project",
+          params: {
+            ...ServerParams,
+            format: Flag.Literals("format", ["table", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("table"),
+            ),
+          },
+        }),
+        Spec.make("create", {
+          description: "Create a worktree environment (a named git worktree of this repository)",
+          params: {
+            ...ServerParams,
+            name: Argument.String("name").pipe(
+              Argument.withDescription("Environment name (lowercase letters, digits, dashes)"),
+            ),
+            kind: Flag.Literals("kind", ["worktree", "sandbox"]).pipe(
+              Flag.withDescription("Environment kind (sandbox is not available yet)"),
+              Flag.withDefault("worktree"),
+            ),
+          },
+        }),
+        Spec.make("remove", {
+          description: "Remove a worktree environment and its git worktree",
+          params: {
+            ...ServerParams,
+            name: Argument.String("name").pipe(Argument.withDescription("Environment name to remove")),
+            force: Flag.Boolean("force").pipe(
+              Flag.withDescription("Remove even if the worktree has uncommitted changes"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+      ],
+    }),
     Spec.make("mcp", {
       description: "Manage MCP (Model Context Protocol) servers",
       commands: [
@@ -499,6 +538,10 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           Flag.atMost(100),
         ),
         title: Flag.String("title").pipe(Flag.withDescription("Session title"), Flag.optional),
+        env: Flag.String("env").pipe(
+          Flag.withDescription("Environment to run in, by name (see: grist env list); new sessions only"),
+          Flag.optional,
+        ),
         thinking: Flag.Boolean("thinking").pipe(Flag.withDescription("Show thinking blocks"), Flag.withDefault(false)),
         ...PermissionParams,
       },

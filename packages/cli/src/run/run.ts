@@ -23,6 +23,8 @@ export type RunCommandInput = {
   format: "default" | "json"
   file: string[]
   title?: string
+  /** Named environment to run in (S-ENV1); applies to new sessions. Absent = the implicit local environment. */
+  env?: string
   thinking?: boolean
   auto?: boolean
 }
@@ -89,9 +91,11 @@ async function execute(input: RunCommandInput, prepared: Prepared, endpoint: End
       fetch(request, { ...init, timeout: false } as BunFetchRequestInit)) as typeof fetch,
   })
   const explicit = parseRunModel(input.model)
+  const environmentTarget = input.env === undefined ? undefined : await resolveEnvironmentTarget(client, input.env, prepared.directory)
   const target = await resolveSessionTarget({
     client,
     location: prepared.directory ? { directory: prepared.directory } : undefined,
+    environmentTarget,
     continue: input.continue,
     session: input.session,
     fork: input.fork,
@@ -180,6 +184,27 @@ export function parseRunModel(value?: string) {
     model: { providerID: ref.providerID, modelID: ref.id },
     variant: ref.variant,
   }
+}
+
+/**
+ * Resolve a `--env <name>` target against the project's environment
+ * registry (S-ENV1). Unknown names fail loudly — a run never silently
+ * falls back to the local environment. The implicit local environment
+ * returns undefined, which is exactly the untargeted behavior.
+ */
+async function resolveEnvironmentTarget(
+  client: ReturnType<typeof OpenCode.make>,
+  name: string,
+  directory: string | undefined,
+): Promise<{ id: string; directory?: string } | undefined> {
+  const list = await client.grist.environment.list(directory ? { location: { directory } } : undefined)
+  const found = list.environments.find((environment) => environment.name === name)
+  if (!found) fail(`Environment not found: ${name} (see: grist env list)`)
+  if (found.kind === "local") return undefined
+  if (found.kind === "sandbox") fail(`Sandbox environments are not available yet: ${name}`)
+  if (found.status === "missing" || !found.directory)
+    fail(`Environment ${name} is missing its worktree directory${found.directory ? `: ${found.directory}` : ""}`)
+  return { id: found.id, directory: found.directory }
 }
 
 async function prepareFile(input: string, directory: string, options: ExecutionOptions): Promise<FilePart> {
