@@ -28,6 +28,7 @@ import { ConfigReferencePlugin } from "../config/plugin/reference.js"
 import { ConfigShellPlugin } from "../config/plugin/shell.js"
 import { ConfigSnapshotPlugin } from "../config/plugin/snapshot.js"
 import { ConfigSkillPlugin } from "../config/plugin/skill.js"
+import { ConfigTeamObjectsPlugin } from "../config/plugin/team-objects.js"
 import { ConfigCompatibilityPlugin } from "../config/plugin/compatibility.js"
 import { ConfigToolOutputPlugin } from "../config/plugin/tool-output.js"
 import { ConfigWebSearchPlugin } from "../config/plugin/websearch.js"
@@ -251,6 +252,10 @@ const pre = [
 const post = [
   ConfigInstructionPlugin.Plugin,
   ConfigReferencePlugin.Plugin,
+  // Team objects fill only ids the built-ins left empty and register
+  // before the repo-local loaders, so local definitions shadow team
+  // copies of the same name (filesystem spec v1, D-FS6).
+  ConfigTeamObjectsPlugin.Plugin,
   ConfigAgentPlugin.Plugin,
   BrowserPlugin,
   ConfigCommandPlugin.Plugin,
