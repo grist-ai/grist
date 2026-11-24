@@ -1,5 +1,6 @@
 import { Context, DateTime, Effect, Layer, Schema } from "effect"
 import { and, asc, eq } from "drizzle-orm"
+import { rm } from "node:fs/promises"
 import { hostname } from "node:os"
 import path from "node:path"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -12,6 +13,7 @@ import { Project } from "../project.js"
 import { ProjectTable } from "../project/sql.js"
 import { Worktree } from "../worktree.js"
 import { EnvironmentTable } from "./sql.js"
+import { Sandbox } from "./sandbox.js"
 
 export const ID = Environment.ID
 export type ID = typeof ID.Type
@@ -106,6 +108,10 @@ const layer = Layer.effect(
 
     const fromRow = Effect.fnUntraced(function* (row: EnvironmentRow) {
       const exists = row.directory ? yield* fs.isDir(AbsolutePath.make(row.directory)) : false
+      // Sandbox records carry their policy summary: what the jail enforces
+      // on this machine, computed from the record, never stored.
+      const policy =
+        row.kind === "sandbox" && row.directory ? yield* Sandbox.summaryFor({ directory: row.directory }) : undefined
       return Environment.Info.make({
         id: Environment.ID.make(row.id),
         projectID: Project.ID.make(row.project_id),
@@ -114,6 +120,7 @@ const layer = Layer.effect(
         directory: row.directory ? AbsolutePath.make(row.directory) : undefined,
         branch: row.branch ?? undefined,
         machine: row.machine ?? undefined,
+        policy,
         status: exists ? "active" : "missing",
         time: {
           created: DateTime.makeUnsafe(row.time_created),
@@ -167,7 +174,12 @@ const layer = Layer.effect(
         yield* project(input.projectID)
         if (input.kind === "local") return yield* new LocalImmutableError({ operation: "create" })
         if (input.name === "local") return yield* new NameTakenError({ projectID: input.projectID, name: input.name })
-        if (input.kind === "sandbox") return yield* new SandboxUnavailableError()
+        // Sandbox creation is refused outright when the backend cannot run
+        // on this machine — an environment record must never promise a jail
+        // the machine cannot provide (fail closed, spec §4.4).
+        const sandboxCapability =
+          input.kind === "sandbox" ? yield* Sandbox.capability(process.env) : undefined
+        if (sandboxCapability && !sandboxCapability.available) return yield* new SandboxUnavailableError()
         if (yield* find(input.projectID, input.name))
           return yield* new NameTakenError({ projectID: input.projectID, name: input.name })
         const id = Environment.ID.create()
@@ -178,6 +190,13 @@ const layer = Layer.effect(
         yield* fs
           .makeDirectory(AbsolutePath.make(path.join(created.directory, ".grist")), { recursive: true })
           .pipe(Effect.orDie)
+        // A sandbox environment additionally records its enforced policy
+        // (allowlist, limits, per-surface summary) in its scratch dir.
+        if (input.kind === "sandbox") {
+          const policy = Sandbox.policyFor({ directory: created.directory })
+          const summary = yield* Sandbox.summaryFor({ directory: created.directory })
+          yield* Sandbox.recordPolicy(policy, summary).pipe(Effect.orDie)
+        }
         const inserted = yield* db
           .insert(EnvironmentTable)
           .values({
@@ -208,8 +227,17 @@ const layer = Layer.effect(
         if (input.name === "local") return yield* new LocalImmutableError({ operation: "remove" })
         const row = yield* find(input.projectID, input.name)
         if (!row) return yield* new NotFoundError({ projectID: input.projectID, name: input.name })
-        if (row.directory)
+        if (row.directory) {
+          // A sandbox environment's own scratch (recorded policy, scratch
+          // home, proxy socket) is disposable by definition and must not
+          // make the environment unremovable; anything else the run left
+          // in the worktree still goes through the worktree engine's rules.
+          if (row.kind === "sandbox") {
+            const scratch = path.join(row.directory, ".grist", "sandbox")
+            yield* Effect.promise(() => rm(scratch, { recursive: true, force: true })).pipe(Effect.orDie)
+          }
           yield* worktrees.remove({ projectID: input.projectID, directory: AbsolutePath.make(row.directory), force: input.force })
+        }
         yield* db
           .delete(EnvironmentTable)
           .where(eq(EnvironmentTable.id, row.id))
