@@ -1,8 +1,17 @@
 import { Location } from "@opencode/core/location"
+import { Session } from "@opencode/schema/session"
 import { Project } from "@opencode/core/project"
+import { ConversationRegistry } from "@opencode/core/conversation/registry"
 import { EnvironmentRegistry } from "@opencode/core/environment/registry"
 import { InvalidRequestError } from "@opencode/protocol/errors"
-import { createFileStore, createGraphifyProvider, loadGraphifyDocument, summarizeGraph } from "@grist-ai/logic"
+import {
+  createFileStore,
+  createGraphifyProvider,
+  loadGraphifyDocument,
+  memoryForConversation,
+  postedStream,
+  summarizeGraph,
+} from "@grist-ai/logic"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api"
 import { readFile } from "node:fs/promises"
@@ -16,7 +25,50 @@ import { Api } from "../api"
 export const GristHandler = HttpApiBuilder.group(Api, "server.grist", (handlers) =>
   Effect.gen(function* () {
     const environments = yield* EnvironmentRegistry.Service
+    const conversations = yield* ConversationRegistry.Service
     return handlers
+      .handle("grist.conversation.list", () =>
+        Effect.gen(function* () {
+          const location = yield* Location.Service
+          const list = yield* conversations
+            .list({ projectID: location.project.id })
+            .pipe(Effect.mapError(conversationError))
+          return { conversations: list }
+        }),
+      )
+      .handle("grist.conversation.create", (ctx) =>
+        Effect.gen(function* () {
+          const location = yield* Location.Service
+          return yield* conversations
+            .create({ projectID: location.project.id, title: ctx.payload.title, createdBy: ctx.payload.createdBy })
+            .pipe(Effect.mapError(conversationError))
+        }),
+      )
+      .handle("grist.conversation.show", (ctx) =>
+        Effect.gen(function* () {
+          const location = yield* Location.Service
+          const conversation = yield* conversations.get(ctx.params.id)
+          if (!conversation)
+            return yield* new InvalidRequestError({
+              message: `Conversation not found: ${ctx.params.id}`,
+              field: "id",
+            })
+          // The posted stream is derived here, per read, from the linked
+          // sessions' stored messages via the thread-model classification —
+          // it is never stored. The memory join is the same read-side join:
+          // entries whose session is one of the conversation's sessions.
+          const sessions = yield* Effect.forEach(conversation.sessionIDs, (sessionID) =>
+            conversations.messages({ sessionID }).pipe(Effect.map((messages) => ({ sessionID, messages }))),
+          )
+          const store = createFileStore({ cwd: location.project.directory })
+          const records = yield* Effect.promise(() => store.list!())
+          return {
+            conversation,
+            stream: postedStream(sessions).map((item) => ({ ...item, sessionID: Session.ID.make(item.sessionID) })),
+            memory: memoryForConversation(records, conversation.sessionIDs),
+          }
+        }),
+      )
       .handle("grist.environment.list", () =>
         Effect.gen(function* () {
           const location = yield* Location.Service
@@ -80,6 +132,12 @@ export const GristHandler = HttpApiBuilder.group(Api, "server.grist", (handlers)
       )
   }),
 )
+
+function conversationError(error: ConversationRegistry.Error): InvalidRequestError {
+  if (error instanceof Project.NotFoundError)
+    return new InvalidRequestError({ message: `Project not found: ${error.projectID}` })
+  return new InvalidRequestError({ message: `Conversation not found: ${error.conversationID}`, field: "id" })
+}
 
 function environmentError(error: EnvironmentRegistry.Error): InvalidRequestError {
   if (error instanceof Project.NotFoundError)

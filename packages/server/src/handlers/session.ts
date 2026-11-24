@@ -136,6 +136,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               metadata: ctx.payload.metadata,
               permissions: ctx.payload.permissions,
               environmentID: ctx.payload.environmentID,
+              conversationID: ctx.payload.conversationID,
               ...(ctx.payload.parentID === undefined
                 ? { location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) } }
                 : { parentID: ctx.payload.parentID }),
