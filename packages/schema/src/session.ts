@@ -15,6 +15,7 @@ import { TokenUsage } from "./token-usage.js"
 import { Revert } from "./session-revert.js"
 import { SessionFork } from "./session-fork.js"
 import { EnvironmentID } from "./environment-id.js"
+import { ConversationID } from "./conversation-id.js"
 
 export const ID = SessionID
 export type ID = SessionID
@@ -39,6 +40,8 @@ export const Info = Schema.Struct({
   projectID: Project.ID,
   /** The environment the session runs in. Absent means environment zero (the local working copy). */
   environmentID: EnvironmentID.pipe(optional),
+  /** The conversation this session belongs to. Absent means the session is unlinked — the degenerate one-session case. */
+  conversationID: ConversationID.pipe(optional),
   agent: Agent.ID.pipe(optional),
   model: Model.Ref.pipe(optional),
   cost: Money.USD,
