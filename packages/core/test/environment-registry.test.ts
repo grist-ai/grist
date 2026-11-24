@@ -4,7 +4,7 @@ import fs from "fs/promises"
 import { mkdtempSync } from "fs"
 import os from "os"
 import path from "path"
-import { Cause, Effect, Exit, Layer, Option } from "effect"
+import { Cause, Effect, Exit, Option } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
@@ -54,7 +54,9 @@ const setup = Effect.fnUntraced(function* () {
 
 const failureTag = (exit: Exit.Exit<unknown, unknown>) => {
   if (Exit.isSuccess(exit)) return undefined
-  return Option.getOrUndefined(Cause.findErrorOption(exit.cause))?._tag
+  const error = Option.getOrUndefined(Cause.findErrorOption(exit.cause))
+  if (!error) return undefined
+  return (error as { _tag: string })._tag
 }
 
 describe("EnvironmentRegistry", () => {
@@ -122,8 +124,28 @@ describe("EnvironmentRegistry", () => {
       )
       expect(failureTag(local)).toBe("Environment.LocalImmutableError")
 
+      // Sandbox creation is refused when the backend cannot run on this
+      // machine. Force that state deterministically: an empty PATH stub
+      // leaves the jail tooling undiscoverable, whatever the host has.
+      const emptyBin = mkdtempSync(path.join(os.tmpdir(), "opencode-empty-bin-"))
       const sandbox = yield* Effect.exit(
-        registry.create({ projectID, name: Environment.Name.make("jailed"), kind: "sandbox" }),
+        Effect.acquireUseRelease(
+          Effect.sync(() => {
+            const original = process.env.PATH
+            process.env.PATH = emptyBin
+            return original
+          }),
+          () =>
+            registry.create({
+              projectID,
+              name: Environment.Name.make("jailed"),
+              kind: "sandbox",
+            }),
+          (original) =>
+            Effect.sync(() => {
+              process.env.PATH = original
+            }),
+        ),
       )
       expect(failureTag(sandbox)).toBe("Environment.SandboxUnavailableError")
     }),
