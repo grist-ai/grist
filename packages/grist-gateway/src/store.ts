@@ -20,6 +20,7 @@ import {
   generateDeviceUserCode,
   generateInviteCode,
   generateNotificationId,
+  generateRunRequestId,
   generateTeamId,
   generateUserId,
   hashApiKey,
@@ -133,11 +134,17 @@ export type TeamMemoryAuditRow = {
   team_id: string
   /** Content kind the action belongs to: `memory` for team memory rows,
    * the object kind (`skill`, `agent_definition`) for filesystem objects —
-   * one trail for the whole team filesystem (filesystem spec v1 §4). */
+   * one trail for the whole team filesystem (filesystem spec v1 §4).
+   * Listener lifecycle rows ride the same trail with kind `listener`
+   * (next-block spec §6.3). */
   kind: string
   actor_uid: string
   action: string
   entry_id: string
+  /** Free-form detail for actions that carry one: the reason on a
+   * listener `dropped` row, the spend on a `completed` row. Null for the
+   * plain verbs (store/edit/remove) that predate the column. */
+  detail: string | null
   at: number
 }
 
@@ -184,9 +191,11 @@ export type TeamObjectPolicyCounts = {
 /** The last object policy run for a team, as the dashboard shows it. */
 export type TeamObjectDreamingRun = TeamObjectPolicyCounts & { at: number }
 
-/** Object kinds in the team filesystem v1 (filesystem spec v1 §3).
- * Memory never lands in `team_objects`. */
-export type TeamObjectKind = "skill" | "agent_definition" | "artifact"
+/** Object kinds in the team filesystem v1 (filesystem spec v1 §3),
+ * plus `listener` (next-block spec §6.4 — a definition kind like the
+ * others: versioned, admitted, audited; the gateway's webhook intake
+ * evaluates the chain heads). Memory never lands in `team_objects`. */
+export type TeamObjectKind = "skill" | "agent_definition" | "artifact" | "listener"
 
 export type TeamObjectStatus = "active" | "flagged" | "archived"
 
@@ -239,6 +248,73 @@ export type TeamObjectPushResult =
 
 /** A list-surface object row: the row plus whether it is its chain's tip. */
 export type TeamObjectListRow = TeamObjectRow & { is_head: number }
+
+/**
+ * The team-admin ceiling on listener envelopes (next-block spec §6.4,
+ * D16): the maximums any single listener on the team may claim. Same
+ * numeric shape as a listener envelope; stored as a settings row.
+ */
+export type ListenerCeiling = {
+  max_runs_per_day: number
+  max_spend_per_day_usd: number
+  max_spend_per_run_usd: number
+}
+
+/** A team's webhook intake configuration: the per-team secret webhook
+ * senders sign with (next-block spec §6.1). Stored as a settings row;
+ * the secret is shown to team owners/admins only, who must configure it
+ * on the sender's side (GitHub repo webhook settings) for HMAC to work. */
+export type TeamWebhookConfig = {
+  secret: string
+  created_at: number
+}
+
+/**
+ * Run-request lifecycle (next-block spec §6.3): `queued` is the only
+ * state intake produces; `claimed`/`completed` arrive with the runner
+ * (S-LIS2), `refused` with mechanical envelope refusal, `expired` from
+ * the queue TTL sweep, and `awaiting_approval` is the committed D6
+ * sibling state (S-INBOX1) — the model accommodates it from the start
+ * so no later slice rewrites the table.
+ */
+export type ListenerRunState =
+  | "queued"
+  | "claimed"
+  | "awaiting_approval"
+  | "refused"
+  | "expired"
+  | "completed"
+
+/**
+ * One queued run request (next-block spec §6.2): everything a runner
+ * claim needs — the listener version that fired, the event facts (not
+ * the payload; its digest stands as evidence), the target and envelope
+ * snapshots from the definition at fire time, and the creator the run
+ * executes as (D14). `event_summary`, `target` and `envelope` are JSON
+ * text. Tenancy is structural: every read is scoped by team_id.
+ */
+export type ListenerRunRequestRow = {
+  id: string
+  team_id: string
+  listener_id: string
+  listener_name: string
+  creator_uid: string
+  creator_user_id: string | null
+  source: string
+  delivery_id: string
+  event_kind: string
+  event_summary: string
+  payload_digest: string
+  target: string
+  envelope: string
+  state: ListenerRunState
+  claimed_by: string | null
+  spend_usd: number | null
+  created_at: number
+  updated_at: number
+  expires_at: number
+  completed_at: number | null
+}
 
 export type CliLoginRow = {
   device_code: string
@@ -490,6 +566,37 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     CREATE INDEX IF NOT EXISTS team_objects_team_seq ON team_objects(team_id, seq);
     CREATE INDEX IF NOT EXISTS team_objects_chain
       ON team_objects(team_id, container, kind, name);
+    CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      team_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      delivery_id TEXT NOT NULL,
+      received_at INTEGER NOT NULL,
+      PRIMARY KEY (team_id, source, delivery_id)
+    );
+    CREATE TABLE IF NOT EXISTS listener_run_requests (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      listener_id TEXT NOT NULL,
+      listener_name TEXT NOT NULL,
+      creator_uid TEXT NOT NULL,
+      creator_user_id TEXT,
+      source TEXT NOT NULL,
+      delivery_id TEXT NOT NULL,
+      event_kind TEXT NOT NULL,
+      event_summary TEXT NOT NULL,
+      payload_digest TEXT NOT NULL,
+      target TEXT NOT NULL,
+      envelope TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'queued',
+      claimed_by TEXT,
+      spend_usd REAL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      completed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS listener_run_requests_team_state
+      ON listener_run_requests(team_id, state, created_at);
   `)
   // `CREATE TABLE IF NOT EXISTS` will not add the column to a database created
   // before per-key attribution existed, so backfill it in place.
@@ -520,6 +627,11 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   }[]
   if (!auditColumns.some((column) => column.name === "kind")) {
     db.exec("ALTER TABLE team_memory_audit ADD COLUMN kind TEXT NOT NULL DEFAULT 'memory'")
+  }
+  // Listener rows carry a detail (drop reason, completion spend) the
+  // original verbs never needed; additive and nullable, same pattern.
+  if (!auditColumns.some((column) => column.name === "detail")) {
+    db.exec("ALTER TABLE team_memory_audit ADD COLUMN detail TEXT")
   }
   // Public user IDs: the shareable handle teams add members by. Backfilled
   // for every account created before they existed, so an ID always resolves.
@@ -663,7 +775,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `SELECT COALESCE(MAX(seq), 0) AS max_seq FROM team_memory_entries WHERE team_id = ?`,
   )
   const insertTeamMemoryAudit = db.prepare(
-    `INSERT INTO team_memory_audit (team_id, kind, actor_uid, action, entry_id, at) VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO team_memory_audit (team_id, kind, actor_uid, action, entry_id, detail, at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
   const selectTeamMemoryAudit = db.prepare(
     `SELECT * FROM team_memory_audit WHERE team_id = ? ORDER BY id ASC`,
@@ -736,6 +848,28 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   const selectTeamMemorySession = db.prepare(
     `SELECT 1 FROM team_memory_entries
      WHERE team_id = ? AND json_extract(metadata, '$.session_id') = ? LIMIT 1`,
+  )
+  const insertWebhookDelivery = db.prepare(
+    `INSERT OR IGNORE INTO webhook_deliveries (team_id, source, delivery_id, received_at)
+     VALUES (?, ?, ?, ?)`,
+  )
+  const insertListenerRunRequest = db.prepare(
+    `INSERT INTO listener_run_requests
+       (id, team_id, listener_id, listener_name, creator_uid, creator_user_id, source,
+        delivery_id, event_kind, event_summary, payload_digest, target, envelope, state,
+        claimed_by, spend_usd, created_at, updated_at, expires_at, completed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', NULL, NULL, ?, ?, ?, NULL)`,
+  )
+  const selectListenerRunRequest = db.prepare(
+    `SELECT * FROM listener_run_requests WHERE team_id = ? AND id = ?`,
+  )
+  const selectExpiredListenerRunRequests = db.prepare(
+    `SELECT * FROM listener_run_requests
+     WHERE state = 'queued' AND expires_at <= ? ORDER BY created_at ASC`,
+  )
+  const expireListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'expired', updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'queued'`,
   )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
@@ -838,6 +972,21 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       if (!tip || row.seq > tip.seq) tip = row
     }
     return tip
+  }
+
+  /** The team's webhook intake config from its settings row. */
+  function teamWebhookConfig(teamId: string): TeamWebhookConfig | undefined {
+    const row = getSetting.get(`team_webhook:${teamId}`) as { value: string } | undefined
+    if (!row) return undefined
+    try {
+      const parsed = JSON.parse(row.value) as Partial<TeamWebhookConfig>
+      if (typeof parsed.secret !== "string" || typeof parsed.created_at !== "number") {
+        return undefined
+      }
+      return { secret: parsed.secret, created_at: parsed.created_at }
+    } catch {
+      return undefined
+    }
   }
 
   /** Resolve an API key to its invite code without touching last_used_at. */
@@ -1336,7 +1485,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
             teamId,
             bySignature.id,
           )
-          insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "strengthen", bySignature.id, at)
+          insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "strengthen", bySignature.id, null, at)
           result = {
             status: "strengthened",
             entry: selectTeamMemoryById.get(teamId, bySignature.id) as TeamMemoryRow,
@@ -1360,7 +1509,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           at,
           nextTeamMemorySeq(teamId),
         )
-        insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "store", input.id, at)
+        insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "store", input.id, null, at)
         result = {
           status: "stored",
           entry: selectTeamMemoryById.get(teamId, input.id) as TeamMemoryRow,
@@ -1442,7 +1591,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       const at = Date.now()
       db.transaction(() => {
         archiveTeamMemory.run(at, nextTeamMemorySeq(teamId), teamId, entryId)
-        insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "remove", entryId, at)
+        insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "remove", entryId, null, at)
       })()
       return { ok: true }
     },
@@ -1586,6 +1735,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           actor.uid,
           input.supersedes ? "edit" : "store",
           input.id,
+          null,
           at,
         )
         result = {
@@ -1664,7 +1814,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       const at = Date.now()
       db.transaction(() => {
         archiveTeamObject.run(at, nextTeamObjectSeq(teamId), teamId, objectId)
-        insertTeamMemoryAudit.run(teamId, row.kind, actor.uid, "remove", objectId, at)
+        insertTeamMemoryAudit.run(teamId, row.kind, actor.uid, "remove", objectId, null, at)
       })()
       return { ok: true }
     },
@@ -1746,6 +1896,225 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       }
     },
 
+    /** A team row by id — the webhook intake's tenancy anchor: the team
+     * a delivery is addressed to, before any credential exists. */
+    getTeam(teamId: string): TeamRow | undefined {
+      return selectTeam.get(teamId) as TeamRow | undefined
+    },
+
+    /**
+     * Append one row to the unified audit trail from outside the store's
+     * own mutation methods — the webhook intake's drops happen in the
+     * HTTP layer, where no store mutation exists to carry the audit.
+     * Kind `listener` rows follow next-block spec §6.3.
+     */
+    appendTeamAudit(input: {
+      teamId: string
+      kind: string
+      actorUid: string
+      action: string
+      entryId: string
+      detail?: string | null
+    }) {
+      insertTeamMemoryAudit.run(
+        input.teamId,
+        input.kind,
+        input.actorUid,
+        input.action,
+        input.entryId,
+        input.detail ?? null,
+        Date.now(),
+      )
+    },
+
+    /** The team's listener ceiling (next-block spec §6.4, D16), if an
+     * owner/admin has set one. Settings-backed, like the dreaming runs. */
+    getListenerCeiling(teamId: string): ListenerCeiling | undefined {
+      const row = getSetting.get(`listener_ceiling:${teamId}`) as { value: string } | undefined
+      if (!row) return undefined
+      try {
+        const parsed = JSON.parse(row.value) as Partial<ListenerCeiling>
+        if (
+          typeof parsed.max_runs_per_day !== "number" ||
+          typeof parsed.max_spend_per_day_usd !== "number" ||
+          typeof parsed.max_spend_per_run_usd !== "number"
+        ) {
+          return undefined
+        }
+        return {
+          max_runs_per_day: parsed.max_runs_per_day,
+          max_spend_per_day_usd: parsed.max_spend_per_day_usd,
+          max_spend_per_run_usd: parsed.max_spend_per_run_usd,
+        }
+      } catch {
+        return undefined
+      }
+    },
+
+    setListenerCeiling(teamId: string, ceiling: ListenerCeiling) {
+      setSetting.run(`listener_ceiling:${teamId}`, JSON.stringify(ceiling))
+    },
+
+    /** The team's webhook intake config, if intake was ever set up. */
+    getTeamWebhookConfig(teamId: string): TeamWebhookConfig | undefined {
+      return teamWebhookConfig(teamId)
+    },
+
+    /** Fetch the team's webhook secret, minting one on first setup. */
+    ensureTeamWebhookSecret(teamId: string): TeamWebhookConfig & { created: boolean } {
+      const existing = teamWebhookConfig(teamId)
+      if (existing) return { ...existing, created: false }
+      const config = { secret: generateDeviceSecret(), created_at: Date.now() }
+      setSetting.run(`team_webhook:${teamId}`, JSON.stringify(config))
+      return { ...config, created: true }
+    },
+
+    /** Replace the team's webhook secret (the old one dies immediately). */
+    rotateTeamWebhookSecret(teamId: string): TeamWebhookConfig {
+      const config = { secret: generateDeviceSecret(), created_at: Date.now() }
+      setSetting.run(`team_webhook:${teamId}`, JSON.stringify(config))
+      return config
+    },
+
+    /**
+     * Delivery-id dedupe (next-block spec §6.1): record a delivery the
+     * first time it is seen. Returns false when this (team, source,
+     * delivery id) was already recorded — a replay, which intake drops.
+     */
+    recordWebhookDelivery(input: {
+      teamId: string
+      source: string
+      deliveryId: string
+      at: number
+    }): boolean {
+      return (
+        insertWebhookDelivery.run(input.teamId, input.source, input.deliveryId, input.at)
+          .changes > 0
+      )
+    },
+
+    /**
+     * Queue one run request for a matched listener (next-block spec
+     * §6.2) and write the `fired` + `queued` audit rows in the same
+     * transaction — a request never exists without its trail. `fired`
+     * keys on the listener object id; `queued` keys on the request id,
+     * as do the lifecycle rows that follow it (claimed/completed/…).
+     */
+    enqueueListenerRun(input: {
+      teamId: string
+      listenerId: string
+      listenerName: string
+      creatorUid: string
+      creatorUserId: string | null
+      source: string
+      deliveryId: string
+      eventKind: string
+      eventSummary: Record<string, unknown>
+      payloadDigest: string
+      target: Record<string, unknown>
+      envelope: ListenerCeiling
+      expiresAt: number
+    }): ListenerRunRequestRow {
+      let id = generateRunRequestId()
+      while (selectListenerRunRequest.get(input.teamId, id)) id = generateRunRequestId()
+      const at = Date.now()
+      db.transaction(() => {
+        insertListenerRunRequest.run(
+          id,
+          input.teamId,
+          input.listenerId,
+          input.listenerName,
+          input.creatorUid,
+          input.creatorUserId,
+          input.source,
+          input.deliveryId,
+          input.eventKind,
+          JSON.stringify(input.eventSummary),
+          input.payloadDigest,
+          JSON.stringify(input.target),
+          JSON.stringify(input.envelope),
+          at,
+          at,
+          input.expiresAt,
+        )
+        insertTeamMemoryAudit.run(
+          input.teamId,
+          "listener",
+          input.creatorUid,
+          "fired",
+          input.listenerId,
+          null,
+          at,
+        )
+        insertTeamMemoryAudit.run(
+          input.teamId,
+          "listener",
+          input.creatorUid,
+          "queued",
+          id,
+          null,
+          at,
+        )
+      })()
+      return selectListenerRunRequest.get(input.teamId, id) as ListenerRunRequestRow
+    },
+
+    /** Browse a team's run-request queue, newest first — the surface a
+     * runner (S-LIS2) and the dashboard read; tenancy-scoped as always. */
+    listListenerRunRequests(
+      teamId: string,
+      filters?: { state?: string; listenerId?: string; limit?: number },
+    ): ListenerRunRequestRow[] {
+      const clauses = ["team_id = ?"]
+      const params: (string | number)[] = [teamId]
+      if (filters?.state) {
+        clauses.push("state = ?")
+        params.push(filters.state)
+      }
+      if (filters?.listenerId) {
+        clauses.push("listener_id = ?")
+        params.push(filters.listenerId)
+      }
+      const limit = Math.min(200, Math.max(1, Math.floor(filters?.limit ?? 100)))
+      return db
+        .prepare(
+          `SELECT * FROM listener_run_requests WHERE ${clauses.join(" AND ")}
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .all(...params, limit) as ListenerRunRequestRow[]
+    },
+
+    /**
+     * Expire queued requests past their TTL (next-block spec §6.1):
+     * nothing is lost silently — each expiry writes an `expired` audit
+     * row and notifies the listener's creator. Driven by the policy
+     * timer (policy.ts); idempotent, since only `queued` rows move.
+     */
+    expireListenerRunRequests(input: { now: number }): ListenerRunRequestRow[] {
+      const rows = selectExpiredListenerRunRequests.all(input.now) as ListenerRunRequestRow[]
+      if (rows.length === 0) return []
+      db.transaction(() => {
+        for (const row of rows) {
+          expireListenerRunRequest.run(input.now, row.team_id, row.id)
+          insertTeamMemoryAudit.run(
+            row.team_id,
+            "listener",
+            "gateway",
+            "expired",
+            row.id,
+            null,
+            input.now,
+          )
+          notify(row.creator_uid, "listener_request_expired", {
+            request_id: row.id,
+            listener_id: row.listener_id,
+            listener_name: row.listener_name,
+          })
+        }
+      })()
+      return rows.map((row) => ({ ...row, state: "expired" as const, updated_at: input.now }))
+    },
+
     /**
      * Artifact provenance probes (filesystem spec v1 §5): an artifact
      * must name a memory entry or a session that exists for the team.
@@ -1825,7 +2194,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           }))
           const byId = new Map(rows.map((row) => [row.id, row]))
           const audit = (kind: string, action: string, entryId: string) =>
-            insertTeamMemoryAudit.run(teamId, kind, "dreaming", action, entryId, input.now)
+            insertTeamMemoryAudit.run(teamId, kind, "dreaming", action, entryId, null, input.now)
           const supersededIds = new Set(
             rows.map((row) => row.supersedes).filter((id): id is string => id !== null),
           )
@@ -1947,7 +2316,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           const byId = new Map(rows.map((row) => [row.id, row]))
           const active = () => [...byId.values()].filter((row) => row.status === "active")
           const audit = (action: string, entryId: string) =>
-            insertTeamMemoryAudit.run(teamId, "memory", "dreaming", action, entryId, input.now)
+            insertTeamMemoryAudit.run(teamId, "memory", "dreaming", action, entryId, null, input.now)
 
           // 1. Merge near-duplicates.
           const groups = new Map<string, TeamMemoryRow[]>()

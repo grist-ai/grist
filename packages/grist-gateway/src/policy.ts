@@ -74,6 +74,17 @@ export function runTeamObjectPolicySweep(
   return { teams, totals }
 }
 
+/** Run one listener queue expiry pass now (next-block spec §6.1: queued
+ * run requests carry a TTL; expiry is audited and notified, never
+ * silent). Rides the same in-process timer as the memory/object sweeps. */
+export function runListenerExpirySweep(
+  store: GatewayStore,
+  opts?: { now?: number },
+): { expired: number } {
+  const rows = store.expireListenerRunRequests({ now: opts?.now ?? Date.now() })
+  return { expired: rows.length }
+}
+
 /** Run one sweep now. Unset knobs fall back to the env configuration. */
 export function runTeamMemoryPolicySweep(
   store: GatewayStore,
@@ -115,11 +126,13 @@ export function startTeamMemoryPolicy(
         decayFactor: config.decayFactor,
       })
       const objects = runTeamObjectPolicySweep(store)
+      const listeners = runListenerExpirySweep(store)
       console.info(
         `[grist-gateway] team memory policy sweep: ${teams.length} team(s), ` +
           `merged ${totals.merged}, flagged ${totals.flagged}, ` +
           `decayed ${totals.decayed}, archived ${totals.archived}; ` +
-          `objects archived ${objects.totals.archived}, objects flagged ${objects.totals.flagged}`,
+          `objects archived ${objects.totals.archived}, objects flagged ${objects.totals.flagged}; ` +
+          `listener requests expired ${listeners.expired}`,
       )
     } catch (error) {
       console.error("[grist-gateway] team memory policy sweep failed", error)

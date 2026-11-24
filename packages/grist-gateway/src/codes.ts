@@ -67,6 +67,11 @@ export function generateNotificationId(): string {
   return `gn_${randomCrockford(12)}`
 }
 
+/** Listener run-request IDs look like `glr_` plus 12 Crockford chars. */
+export function generateRunRequestId(): string {
+  return `glr_${randomCrockford(12)}`
+}
+
 /** Invite codes look like `grist-XXXX-XXXX`. */
 export function generateInviteCode(): string {
   const chars = randomCrockford(8)

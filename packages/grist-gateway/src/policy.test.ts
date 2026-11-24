@@ -180,6 +180,7 @@ describe("team memory policy sweep", () => {
         "action",
         "actor_uid",
         "at",
+        "detail",
         "entry_id",
         "id",
         "kind",
