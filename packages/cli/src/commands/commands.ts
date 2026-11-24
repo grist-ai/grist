@@ -260,6 +260,44 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         }),
       ],
     }),
+    Spec.make("team-objects", {
+      description: "Share team skills and agent definitions from this repository (rides the team sync opt-in)",
+      commands: [
+        Spec.make("publish", {
+          description: "Publish a local skill or agent definition to your team",
+          params: {
+            path: Argument.String("path").pipe(
+              Argument.withDescription("A SKILL.md file or skill directory, or an agent definition .md file"),
+            ),
+            kind: Flag.Literals("kind", ["skill", "agent_definition"]).pipe(
+              Flag.withDescription("Object kind (inferred from the path when omitted)"),
+              Flag.optional,
+            ),
+            description: Flag.String("description").pipe(
+              Flag.withDescription("Skill description, for files whose frontmatter has none"),
+              Flag.optional,
+            ),
+            global: Flag.Boolean("global").pipe(
+              Flag.withDescription("Publish to the team-global container instead of this repo's"),
+              Flag.withDefault(false),
+            ),
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+        Spec.make("status", {
+          description: "Show team object sync status for this repository",
+          params: {
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+      ],
+    }),
     Spec.make("mcp", {
       description: "Manage MCP (Model Context Protocol) servers",
       commands: [

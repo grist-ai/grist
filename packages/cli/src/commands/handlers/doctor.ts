@@ -5,6 +5,7 @@ import {
   gatewayAuthHeaders,
   loadInviteConfig,
   readTeamSyncStateSync,
+  summarizeTeamObjects,
   summarizeTeamSyncState,
   type InviteConfig,
 } from "@grist-ai/logic"
@@ -169,12 +170,20 @@ async function checkGateway(): Promise<CheckResult> {
  * state (D2) — reported as pass with the opt-in hint, never a failure.
  */
 export function checkTeamMemory(cwd: string = process.cwd()): CheckResult {
-  const status = summarizeTeamSyncState(readTeamSyncStateSync(cwd), cwd)
+  const state = readTeamSyncStateSync(cwd)
+  const status = summarizeTeamSyncState(state, cwd)
   if (!status.enabled) return ok("team memory", "not enabled for this repo — opt in: grist team-memory enable")
   if (status.revoked) {
     return warn("team memory", "paused — gateway reports no team for this account; rejoin, then: grist team-memory enable")
   }
-  const detail = `sync on · mirror ${status.mirrorCount} · queued ${status.pendingCount} · cursor ${status.cursor}`
+  let detail = `sync on · mirror ${status.mirrorCount} · queued ${status.pendingCount} · cursor ${status.cursor}`
+  // Team objects (filesystem spec v1 §6) ride the same opt-in; surface
+  // them on the same line once the stream has any activity.
+  const objects = summarizeTeamObjects(state, cwd)
+  if (objects.materialized.length > 0 || objects.pendingCount > 0 || objects.cursor > 0) {
+    detail += ` · objects ${objects.materialized.length} · objects queued ${objects.pendingCount} · objects cursor ${objects.cursor}`
+    if (objects.lastError) detail += ` · objects last error: ${objects.lastError}`
+  }
   if (status.lastError) return warn("team memory", `${detail} · last error: ${status.lastError}`)
   return ok("team memory", detail)
 }

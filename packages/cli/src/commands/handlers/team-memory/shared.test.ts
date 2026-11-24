@@ -72,6 +72,7 @@ describe("doctor team memory check", () => {
       pushed: {},
       rejected: {},
       lastError: "gateway pull failed: HTTP 500",
+      objects: { cursor: 0, pending: [], pushed: {}, rejected: {}, pushedHeads: {}, manifest: {} },
     }
     await saveTeamSyncState(cwd, state)
     const result = checkTeamMemory(cwd)
