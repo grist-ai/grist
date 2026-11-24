@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { OpenCode, type LocationGetOutput, type ModelRef, type SessionInfo } from "@opencode/client/promise"
+import { Conversation } from "@opencode/schema/conversation"
 import { Environment } from "@opencode/schema/environment"
 import { resolveSessionTarget, SessionTargetMutationError } from "../src/session-target"
 
@@ -86,6 +87,56 @@ describe("session target resolver", () => {
         prepare,
       }),
     ).rejects.toThrow("runs in environment env_alpha")
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  test("creates a new session linked to the targeted conversation", async () => {
+    const client = OpenCode.make({ baseUrl: "https://opencode.test" })
+    spyOn(client.location, "get").mockResolvedValue(location("/project"))
+    const created = { ...session("ses_conv", "/project"), conversationID: Conversation.ID.make("conv_alpha") }
+    const create = spyOn(client.session, "create").mockResolvedValue(created)
+
+    const target = await resolveSessionTarget({
+      client,
+      location: { directory: "/project" },
+      conversationTarget: { id: "conv_alpha" },
+      prepare,
+    })
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ conversationID: "conv_alpha" }))
+    expect(target).toMatchObject({ session: { id: "ses_conv", conversationID: "conv_alpha" }, resume: false })
+  })
+
+  test("refuses to retarget a resumed session to a different conversation", async () => {
+    const client = OpenCode.make({ baseUrl: "https://opencode.test" })
+    const selected = { ...session("ses_resume", "/project"), conversationID: Conversation.ID.make("conv_alpha") }
+    spyOn(client.session, "get").mockResolvedValue(selected)
+    const create = spyOn(client.session, "create")
+
+    await expect(
+      resolveSessionTarget({
+        client,
+        session: selected.id,
+        conversationTarget: { id: "conv_beta" },
+        prepare,
+      }),
+    ).rejects.toThrow("is not part of conversation conv_beta")
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  test("refuses to attach a conversation target to a resumed unlinked session", async () => {
+    const client = OpenCode.make({ baseUrl: "https://opencode.test" })
+    const selected = session("ses_resume", "/project")
+    spyOn(client.session, "get").mockResolvedValue(selected)
+    const create = spyOn(client.session, "create")
+
+    await expect(
+      resolveSessionTarget({
+        client,
+        session: selected.id,
+        conversationTarget: { id: "conv_alpha" },
+        prepare,
+      }),
+    ).rejects.toThrow("is not part of conversation conv_alpha")
     expect(create).not.toHaveBeenCalled()
   })
 
