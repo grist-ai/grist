@@ -15,6 +15,7 @@ import { PtyTicket } from "@opencode/core/pty/ticket"
 import { PersistentPty } from "@opencode/core/persistent-pty"
 import { Project } from "@opencode/core/project"
 import { Worktree } from "@opencode/core/worktree"
+import { EnvironmentRegistry } from "@opencode/core/environment/registry"
 import { Session } from "@opencode/core/session"
 import { Instance } from "@opencode/core/instance/service"
 import { SessionTransfer } from "@opencode/core/session/transfer"
@@ -59,6 +60,7 @@ const applicationServiceNodes = [
   Project.node,
   Project.sweepNode,
   Worktree.node,
+  EnvironmentRegistry.node,
   Session.node,
   Instance.node,
   SessionTransfer.node,

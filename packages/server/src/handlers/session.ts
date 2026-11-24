@@ -1,4 +1,5 @@
 import { Session } from "@opencode/core/session"
+import { EnvironmentRegistry } from "@opencode/core/environment/registry"
 import { SessionStats } from "@opencode/core/session/stats"
 import { SessionTitle } from "@opencode/core/session/title"
 import { SessionTransfer } from "@opencode/core/session/transfer"
@@ -36,6 +37,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
   Effect.gen(function* () {
     const session = yield* Session.Service
     const transfer = yield* SessionTransfer.Service
+    const environments = yield* EnvironmentRegistry.Service
     const requireOwnedForm = Effect.fnUntraced(function* (sessionID: Form.Info["sessionID"], formID: Form.ID) {
       const form = yield* Form.Service
       const info = yield* form.get(formID).pipe(Effect.catchTag("Form.NotFoundError", () => missingForm(formID)))
@@ -125,21 +127,23 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.create",
         Effect.fn(function* (ctx) {
-          return {
-            data: yield* session
-              .create({
-                id: ctx.payload.id,
-                title: ctx.payload.title,
-                agent: ctx.payload.agent,
-                model: ctx.payload.model,
-                metadata: ctx.payload.metadata,
-                permissions: ctx.payload.permissions,
-                ...(ctx.payload.parentID === undefined
-                  ? { location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) } }
-                  : { parentID: ctx.payload.parentID }),
-              })
-              .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
-          }
+          const created = yield* session
+            .create({
+              id: ctx.payload.id,
+              title: ctx.payload.title,
+              agent: ctx.payload.agent,
+              model: ctx.payload.model,
+              metadata: ctx.payload.metadata,
+              permissions: ctx.payload.permissions,
+              environmentID: ctx.payload.environmentID,
+              ...(ctx.payload.parentID === undefined
+                ? { location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) } }
+                : { parentID: ctx.payload.parentID }),
+            })
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          // Best-effort bookkeeping: a failed last-used update never fails creation.
+          if (created.environmentID) yield* environments.touch(created.environmentID).pipe(Effect.ignore)
+          return { data: created }
         }),
       )
       .handle(

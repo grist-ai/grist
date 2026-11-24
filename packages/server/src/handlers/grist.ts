@@ -1,4 +1,6 @@
 import { Location } from "@opencode/core/location"
+import { Project } from "@opencode/core/project"
+import { EnvironmentRegistry } from "@opencode/core/environment/registry"
 import { InvalidRequestError } from "@opencode/protocol/errors"
 import { createFileStore, createGraphifyProvider, loadGraphifyDocument, summarizeGraph } from "@grist-ai/logic"
 import { Effect } from "effect"
@@ -13,7 +15,34 @@ import { Api } from "../api"
  */
 export const GristHandler = HttpApiBuilder.group(Api, "server.grist", (handlers) =>
   Effect.gen(function* () {
+    const environments = yield* EnvironmentRegistry.Service
     return handlers
+      .handle("grist.environment.list", () =>
+        Effect.gen(function* () {
+          const location = yield* Location.Service
+          const list = yield* environments
+            .list({ projectID: location.project.id })
+            .pipe(Effect.mapError(environmentError))
+          return { environments: list }
+        }),
+      )
+      .handle("grist.environment.create", (ctx) =>
+        Effect.gen(function* () {
+          const location = yield* Location.Service
+          return yield* environments
+            .create({ projectID: location.project.id, name: ctx.payload.name, kind: ctx.payload.kind })
+            .pipe(Effect.mapError(environmentError))
+        }),
+      )
+      .handle("grist.environment.remove", (ctx) =>
+        Effect.gen(function* () {
+          const location = yield* Location.Service
+          yield* environments
+            .remove({ projectID: location.project.id, name: ctx.payload.name, force: ctx.payload.force ?? false })
+            .pipe(Effect.mapError(environmentError))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
       .handle("grist.memory.list", () =>
         Effect.gen(function* () {
           const location = yield* Location.Service
@@ -51,3 +80,25 @@ export const GristHandler = HttpApiBuilder.group(Api, "server.grist", (handlers)
       )
   }),
 )
+
+function environmentError(error: EnvironmentRegistry.Error): InvalidRequestError {
+  if (error instanceof Project.NotFoundError)
+    return new InvalidRequestError({ message: `Project not found: ${error.projectID}` })
+  if (error instanceof EnvironmentRegistry.NotFoundError)
+    return new InvalidRequestError({ message: `Environment not found: ${error.name}`, field: "name" })
+  if (error instanceof EnvironmentRegistry.NameTakenError)
+    return new InvalidRequestError({ message: `Environment name already in use: ${error.name}`, field: "name" })
+  if (error instanceof EnvironmentRegistry.LocalImmutableError)
+    return new InvalidRequestError({
+      message:
+        error.operation === "create"
+          ? "The local environment always exists and cannot be created"
+          : "The local environment cannot be removed",
+    })
+  if (error instanceof EnvironmentRegistry.SandboxUnavailableError)
+    return new InvalidRequestError({ message: "Sandbox environments are not available yet" })
+  return new InvalidRequestError({
+    message:
+      "message" in error && typeof error.message === "string" ? error.message : `Environment operation failed: ${error._tag}`,
+  })
+}
