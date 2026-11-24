@@ -131,6 +131,10 @@ export type TeamMemoryPushResult =
 export type TeamMemoryAuditRow = {
   id: number
   team_id: string
+  /** Content kind the action belongs to: `memory` for team memory rows,
+   * the object kind (`skill`, `agent_definition`) for filesystem objects —
+   * one trail for the whole team filesystem (filesystem spec v1 §4). */
+  kind: string
   actor_uid: string
   action: string
   entry_id: string
@@ -155,6 +159,62 @@ export type TeamMemoryCounts = {
   byOutcome: Record<string, number>
   byStatus: Record<string, number>
 }
+
+/** Object kinds in the team filesystem v1 (filesystem spec v1 §3).
+ * `artifact` joins in S-FS3; memory never lands in `team_objects`. */
+export type TeamObjectKind = "skill" | "agent_definition"
+
+export type TeamObjectStatus = "active" | "flagged" | "archived"
+
+/**
+ * One row of the team object store (filesystem spec v1 §4). `metadata` is
+ * JSON text holding an object of any JSON shape — def config (tool
+ * surface, rung ceiling), skill frontmatter overflow — because objects
+ * carry their own body/metadata contract; memory's string-only metadata
+ * does not bind them. Versioning is a linear supersede chain (§5): an
+ * edit is a new row whose `supersedes` names the previous head, and the
+ * current version of a (container, kind, name) is the chain tip — the row
+ * no other row supersedes. `seq` is a per-team cursor within this table
+ * only; it cannot be shared with the memory table's feed (§6).
+ */
+export type TeamObjectRow = {
+  id: string
+  team_id: string
+  kind: string
+  container: string
+  name: string
+  body: string
+  metadata: string
+  author_uid: string
+  author_user_id: string | null
+  supersedes: string | null
+  created_at: number
+  updated_at: number
+  seq: number
+  status: TeamObjectStatus
+}
+
+/** A validated object push, normalized by the HTTP layer (admission —
+ * schema validity + secrets scan — lives there, as with memory). */
+export type TeamObjectPushInput = {
+  id: string
+  kind: TeamObjectKind
+  container: string
+  name: string
+  body: string
+  metadata: Record<string, unknown>
+  supersedes: string | null
+}
+
+export type TeamObjectPushResult =
+  | { status: "stored"; object: TeamObjectRow; replayed: boolean }
+  | {
+      status: "rejected"
+      reason: "archived" | "id_conflict" | "name_taken" | "stale_head" | "supersedes_not_found"
+    }
+
+/** A list-surface object row: the row plus whether it is its chain's tip. */
+export type TeamObjectListRow = TeamObjectRow & { is_head: number }
 
 export type CliLoginRow = {
   device_code: string
@@ -386,6 +446,26 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       entry_id TEXT NOT NULL,
       at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS team_objects (
+      id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      container TEXT NOT NULL,
+      name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      author_uid TEXT NOT NULL,
+      author_user_id TEXT,
+      supersedes TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      PRIMARY KEY (team_id, id)
+    );
+    CREATE INDEX IF NOT EXISTS team_objects_team_seq ON team_objects(team_id, seq);
+    CREATE INDEX IF NOT EXISTS team_objects_chain
+      ON team_objects(team_id, container, kind, name);
   `)
   // `CREATE TABLE IF NOT EXISTS` will not add the column to a database created
   // before per-key attribution existed, so backfill it in place.
@@ -406,6 +486,16 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   const apiKeyColumns = db.prepare("PRAGMA table_info(api_keys)").all() as { name: string }[]
   if (!apiKeyColumns.some((column) => column.name === "kind")) {
     db.exec("ALTER TABLE api_keys ADD COLUMN kind TEXT NOT NULL DEFAULT 'standard'")
+  }
+  // The audit trail is one log for the whole team filesystem (filesystem
+  // spec v1 §4): object actions write there too, tagged with their kind.
+  // Rows written before the column existed are all memory actions, so the
+  // backfill default is exact, not a guess.
+  const auditColumns = db.prepare("PRAGMA table_info(team_memory_audit)").all() as {
+    name: string
+  }[]
+  if (!auditColumns.some((column) => column.name === "kind")) {
+    db.exec("ALTER TABLE team_memory_audit ADD COLUMN kind TEXT NOT NULL DEFAULT 'memory'")
   }
   // Public user IDs: the shareable handle teams add members by. Backfilled
   // for every account created before they existed, so an ID always resolves.
@@ -549,7 +639,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `SELECT COALESCE(MAX(seq), 0) AS max_seq FROM team_memory_entries WHERE team_id = ?`,
   )
   const insertTeamMemoryAudit = db.prepare(
-    `INSERT INTO team_memory_audit (team_id, actor_uid, action, entry_id, at) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO team_memory_audit (team_id, kind, actor_uid, action, entry_id, at) VALUES (?, ?, ?, ?, ?, ?)`,
   )
   const selectTeamMemoryAudit = db.prepare(
     `SELECT * FROM team_memory_audit WHERE team_id = ? ORDER BY id ASC`,
@@ -578,6 +668,26 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   )
   const countTeamMemoryTotal = db.prepare(
     `SELECT COUNT(*) AS n FROM team_memory_entries WHERE team_id = ?`,
+  )
+  const insertTeamObject = db.prepare(
+    `INSERT INTO team_objects
+       (id, team_id, kind, container, name, body, metadata, author_uid, author_user_id,
+        supersedes, created_at, updated_at, seq, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+  )
+  const selectTeamObjectById = db.prepare(
+    `SELECT * FROM team_objects WHERE team_id = ? AND id = ?`,
+  )
+  const selectTeamObjectChain = db.prepare(
+    `SELECT * FROM team_objects WHERE team_id = ? AND container = ? AND kind = ? AND name = ?
+     ORDER BY seq ASC`,
+  )
+  const archiveTeamObject = db.prepare(
+    `UPDATE team_objects SET status = 'archived', updated_at = ?, seq = ?
+     WHERE team_id = ? AND id = ?`,
+  )
+  const maxTeamObjectSeq = db.prepare(
+    `SELECT COALESCE(MAX(seq), 0) AS max_seq FROM team_objects WHERE team_id = ?`,
   )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
@@ -644,6 +754,42 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   /** Next per-team change-feed cursor for team memory (spec v2 §5). */
   function nextTeamMemorySeq(teamId: string): number {
     return (maxTeamMemorySeq.get(teamId) as { max_seq: number }).max_seq + 1
+  }
+
+  /**
+   * Next per-team change-feed cursor for team objects. Objects keep their
+   * own seq space (filesystem spec v1 §6): a cursor cannot be shared
+   * across two tables whose rows are allocated by MAX(seq)+1 within each.
+   */
+  function nextTeamObjectSeq(teamId: string): number {
+    return (maxTeamObjectSeq.get(teamId) as { max_seq: number }).max_seq + 1
+  }
+
+  /**
+   * The D-FS5 predicate seam (filesystem spec v1 §8): every object read
+   * path funnels through here, so per-container ACLs — and later
+   * initiator-scoped permissions — slot in as a predicate over data that
+   * already exists (author_uid, container) without API or client changes.
+   * In v1, team membership is the whole access control, so any row in the
+   * caller's team is visible to them.
+   */
+  function teamObjectVisibleTo(row: TeamObjectRow, actor: { uid: string }): boolean {
+    // v1: membership is the whole access control — reads reach this
+    // predicate only with rows already scoped to the actor's team.
+    return true
+  }
+
+  /** The tip of a supersede chain: the row no other chain row supersedes. */
+  function chainTip(chain: TeamObjectRow[]): TeamObjectRow | undefined {
+    const superseded = new Set(
+      chain.map((row) => row.supersedes).filter((id): id is string => id !== null),
+    )
+    let tip: TeamObjectRow | undefined
+    for (const row of chain) {
+      if (superseded.has(row.id)) continue
+      if (!tip || row.seq > tip.seq) tip = row
+    }
+    return tip
   }
 
   /** Resolve an API key to its invite code without touching last_used_at. */
@@ -1142,7 +1288,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
             teamId,
             bySignature.id,
           )
-          insertTeamMemoryAudit.run(teamId, actor.uid, "strengthen", bySignature.id, at)
+          insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "strengthen", bySignature.id, at)
           result = {
             status: "strengthened",
             entry: selectTeamMemoryById.get(teamId, bySignature.id) as TeamMemoryRow,
@@ -1166,7 +1312,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           at,
           nextTeamMemorySeq(teamId),
         )
-        insertTeamMemoryAudit.run(teamId, actor.uid, "store", input.id, at)
+        insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "store", input.id, at)
         result = {
           status: "stored",
           entry: selectTeamMemoryById.get(teamId, input.id) as TeamMemoryRow,
@@ -1248,7 +1394,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       const at = Date.now()
       db.transaction(() => {
         archiveTeamMemory.run(at, nextTeamMemorySeq(teamId), teamId, entryId)
-        insertTeamMemoryAudit.run(teamId, actor.uid, "remove", entryId, at)
+        insertTeamMemoryAudit.run(teamId, "memory", actor.uid, "remove", entryId, at)
       })()
       return { ok: true }
     },
@@ -1285,6 +1431,253 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
      * which entry, when — never entry bodies. */
     teamMemoryAudit(teamId: string): TeamMemoryAuditRow[] {
       return selectTeamMemoryAudit.all(teamId) as TeamMemoryAuditRow[]
+    },
+
+    /**
+     * Apply one validated object push to a team's filesystem store
+     * (filesystem spec v1 §§4–5). Admission — per-kind schema validity and
+     * the secrets scan — already happened in the HTTP layer; this method
+     * owns chain integrity. Tenancy is structural, as with memory.
+     *
+     * - Same object id again with identical content → idempotent replay
+     *   (no mutation, no audit): a harness retrying a queued push must
+     *   not fork the chain or double-store.
+     * - Same id, different content → rejected `id_conflict`: ids are
+     *   immutable version identities; an edit is a NEW id superseding
+     *   the current head.
+     * - A push into a chain whose tip was removed → rejected `archived`:
+     *   removals are deliberate, and a stale queued edit must not
+     *   resurrect the chain.
+     * - `supersedes` naming no row in this team → `supersedes_not_found`
+     *   (a guessed foreign id is indistinguishable from a typo — nothing
+     *   about the other team leaks). Naming a row that is not the named
+     *   chain's current tip → `stale_head`: v1 chains are linear, so a
+     *   second edit off the same head is a fork the store will not take.
+     * - A fresh root (supersedes null) for a name that already has a live
+     *   chain → `name_taken`: edit the head instead.
+     * - The old head keeps status `active` after an edit — it leaves
+     *   "current" via the chain, and archiving superseded rows is the
+     *   policy sweep's job (S-FS3), exactly as with memory.
+     */
+    pushTeamObject(
+      teamId: string,
+      actor: { uid: string; userId: string | null },
+      input: TeamObjectPushInput,
+    ): TeamObjectPushResult {
+      const at = Date.now()
+      let result: TeamObjectPushResult | undefined
+      db.transaction(() => {
+        const byId = selectTeamObjectById.get(teamId, input.id) as TeamObjectRow | undefined
+        if (byId) {
+          if (byId.status === "archived") {
+            result = { status: "rejected", reason: "archived" }
+            return
+          }
+          const identical =
+            byId.kind === input.kind &&
+            byId.container === input.container &&
+            byId.name === input.name &&
+            byId.body === input.body &&
+            byId.metadata === JSON.stringify(input.metadata) &&
+            byId.supersedes === input.supersedes
+          result = identical
+            ? { status: "stored", object: byId, replayed: true }
+            : { status: "rejected", reason: "id_conflict" }
+          return
+        }
+        if (input.supersedes) {
+          const target = selectTeamObjectById.get(teamId, input.supersedes) as
+            | TeamObjectRow
+            | undefined
+          if (!target) {
+            result = { status: "rejected", reason: "supersedes_not_found" }
+            return
+          }
+          if (target.status === "archived") {
+            result = { status: "rejected", reason: "archived" }
+            return
+          }
+        }
+        const chain = selectTeamObjectChain.all(
+          teamId,
+          input.container,
+          input.kind,
+          input.name,
+        ) as TeamObjectRow[]
+        const tip = chainTip(chain)
+        if (input.supersedes) {
+          if (!tip || input.supersedes !== tip.id) {
+            result = { status: "rejected", reason: "stale_head" }
+            return
+          }
+        } else if (tip) {
+          result =
+            tip.status === "archived"
+              ? { status: "rejected", reason: "archived" }
+              : { status: "rejected", reason: "name_taken" }
+          return
+        }
+        insertTeamObject.run(
+          input.id,
+          teamId,
+          input.kind,
+          input.container,
+          input.name,
+          input.body,
+          JSON.stringify(input.metadata),
+          actor.uid,
+          actor.userId,
+          input.supersedes,
+          at,
+          at,
+          nextTeamObjectSeq(teamId),
+        )
+        insertTeamMemoryAudit.run(
+          teamId,
+          input.kind,
+          actor.uid,
+          input.supersedes ? "edit" : "store",
+          input.id,
+          at,
+        )
+        result = {
+          status: "stored",
+          object: selectTeamObjectById.get(teamId, input.id) as TeamObjectRow,
+          replayed: false,
+        }
+      })()
+      if (!result) throw new Error("team object push produced no result")
+      return result
+    },
+
+    /**
+     * Incremental pull for one team's objects (filesystem spec v1 §6):
+     * chain HEADS only — a row some other row supersedes is history, not
+     * current — with seq > sinceSeq in the objects' own seq space, plus
+     * the ids archived since sinceSeq so local mirrors converge. Kind and
+     * container filters scope both halves.
+     */
+    pullTeamObjects(
+      teamId: string,
+      actor: { uid: string },
+      sinceSeq: number,
+      filters?: { kinds?: TeamObjectKind[]; containers?: string[] },
+    ): { objects: TeamObjectRow[]; tombstones: string[]; nextSeq: number } {
+      const clauses = ["team_id = ?", "seq > ?"]
+      const params: (string | number)[] = [teamId, sinceSeq]
+      if (filters?.kinds && filters.kinds.length > 0) {
+        clauses.push(`kind IN (${filters.kinds.map(() => "?").join(", ")})`)
+        params.push(...filters.kinds)
+      }
+      if (filters?.containers && filters.containers.length > 0) {
+        clauses.push(`container IN (${filters.containers.map(() => "?").join(", ")})`)
+        params.push(...filters.containers)
+      }
+      const where = clauses.join(" AND ")
+      const heads = db
+        .prepare(
+          `SELECT * FROM team_objects
+           WHERE ${where} AND status = 'active'
+             AND NOT EXISTS (
+               SELECT 1 FROM team_objects newer
+               WHERE newer.team_id = team_objects.team_id AND newer.supersedes = team_objects.id
+             )
+           ORDER BY seq ASC`,
+        )
+        .all(...params) as TeamObjectRow[]
+      const tombstones = db
+        .prepare(`SELECT id FROM team_objects WHERE ${where} AND status = 'archived'`)
+        .all(...params) as { id: string }[]
+      return {
+        objects: heads.filter((row) => teamObjectVisibleTo(row, actor)),
+        tombstones: tombstones.map((row) => row.id),
+        nextSeq: (maxTeamObjectSeq.get(teamId) as { max_seq: number }).max_seq,
+      }
+    },
+
+    /**
+     * Remove one object (filesystem spec v1 §6): the author, or a team
+     * owner/admin — memory's semantics exactly. Removal archives the row
+     * and gives it a fresh seq, so the removal travels the pull feed as a
+     * tombstone; the row (and its audit trail) stays server-side.
+     * Idempotent for an already-archived object.
+     */
+    removeTeamObject(
+      teamId: string,
+      objectId: string,
+      actor: { uid: string; role: TeamRole },
+    ): { ok: true } | { ok: false; reason: "not_found" | "not_authorized" } {
+      const row = selectTeamObjectById.get(teamId, objectId) as TeamObjectRow | undefined
+      if (!row) return { ok: false, reason: "not_found" }
+      if (row.author_uid !== actor.uid && actor.role !== "owner" && actor.role !== "admin") {
+        return { ok: false, reason: "not_authorized" }
+      }
+      if (row.status === "archived") return { ok: true }
+      const at = Date.now()
+      db.transaction(() => {
+        archiveTeamObject.run(at, nextTeamObjectSeq(teamId), teamId, objectId)
+        insertTeamMemoryAudit.run(teamId, row.kind, actor.uid, "remove", objectId, at)
+      })()
+      return { ok: true }
+    },
+
+    /**
+     * Browse a team's objects (dashboard + history surface), newest
+     * first. Unlike pull, list returns every row — heads and retained
+     * history alike — each tagged `is_head`, so a chain's full version
+     * history is reachable by filtering to one (container, kind, name).
+     */
+    listTeamObjects(
+      teamId: string,
+      actor: { uid: string },
+      filters?: {
+        container?: string
+        kind?: string
+        name?: string
+        authorUserId?: string
+        headOnly?: boolean
+        limit?: number
+      },
+    ): TeamObjectListRow[] {
+      const clauses = ["team_id = ?"]
+      const params: (string | number)[] = [teamId]
+      if (filters?.container) {
+        clauses.push("container = ?")
+        params.push(filters.container)
+      }
+      if (filters?.kind) {
+        clauses.push("kind = ?")
+        params.push(filters.kind)
+      }
+      if (filters?.name) {
+        clauses.push("name = ?")
+        params.push(filters.name)
+      }
+      if (filters?.authorUserId) {
+        clauses.push("author_user_id = ?")
+        params.push(filters.authorUserId)
+      }
+      if (filters?.headOnly) {
+        clauses.push(
+          `NOT EXISTS (
+             SELECT 1 FROM team_objects newer
+             WHERE newer.team_id = team_objects.team_id AND newer.supersedes = team_objects.id
+           )`,
+        )
+      }
+      const limit = Math.min(200, Math.max(1, Math.floor(filters?.limit ?? 100)))
+      const rows = db
+        .prepare(
+          `SELECT *,
+             NOT EXISTS (
+               SELECT 1 FROM team_objects newer
+               WHERE newer.team_id = team_objects.team_id AND newer.supersedes = team_objects.id
+             ) AS is_head
+           FROM team_objects WHERE ${clauses.join(" AND ")}
+           ORDER BY created_at DESC, seq DESC LIMIT ?`,
+        )
+        .all(...params, limit) as TeamObjectListRow[]
+      return rows.filter((row) => teamObjectVisibleTo(row, actor))
     },
 
     /** Every team id — the policy sweep's work list. */
@@ -1372,7 +1765,7 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           const byId = new Map(rows.map((row) => [row.id, row]))
           const active = () => [...byId.values()].filter((row) => row.status === "active")
           const audit = (action: string, entryId: string) =>
-            insertTeamMemoryAudit.run(teamId, "dreaming", action, entryId, input.now)
+            insertTeamMemoryAudit.run(teamId, "memory", "dreaming", action, entryId, input.now)
 
           // 1. Merge near-duplicates.
           const groups = new Map<string, TeamMemoryRow[]>()

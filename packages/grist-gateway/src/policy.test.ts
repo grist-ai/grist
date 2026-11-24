@@ -177,8 +177,12 @@ describe("team memory policy sweep", () => {
         "at",
         "entry_id",
         "id",
+        "kind",
         "team_id",
       ])
+      // Memory actions are tagged with their kind on the one shared
+      // trail (filesystem spec v1 §4).
+      expect(row.kind).toBe("memory")
     }
 
     // The run summary is recorded for the dashboard.
