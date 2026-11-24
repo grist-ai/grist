@@ -373,9 +373,11 @@ describe("team object sync", () => {
     })
     expect(results(minimalDef)).toEqual([{ id: "def_1", result: "stored" }])
 
-    // Kinds outside this slice — including artifact (S-FS3) and memory
-    // (which never lands here) — are refused at the boundary.
-    for (const kind of ["artifact", "memory", "note"]) {
+    // Kinds outside the filesystem allowlist — memory (which never
+    // lands here) and anything unnamed — are refused at the boundary.
+    // (Artifact joined the allowlist in S-FS3; its admission is covered
+    // by the artifact describe below.)
+    for (const kind of ["memory", "note"]) {
       const res = await call(gw, "/v1/team-objects/push", a.code, {
         objects: [skill({ id: `obj_kind_${kind}`, kind })],
       })
@@ -714,5 +716,209 @@ describe("one audit trail for the whole filesystem", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe("artifact admission (filesystem spec v1 §5, S-FS3)", () => {
+  function artifact(overrides?: Record<string, unknown>): Record<string, unknown> {
+    return {
+      id: "art_1",
+      kind: "artifact",
+      container: "repo-x",
+      name: "fix-diff",
+      body: "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-old line\n+new line\n",
+      metadata: { session_id: "sess_1" },
+      ...overrides,
+    }
+  }
+
+  function memoryEntry(overrides?: Record<string, unknown>): Record<string, unknown> {
+    return {
+      id: "mem_1",
+      content: "Run bun test from the package dir.",
+      container: "repo-x",
+      outcome: "tests_passed",
+      weight: 0.75,
+      createdAt: 1_700_000_000_000,
+      sessionID: "sess_1",
+      metadata: { signature: "src/a.ts|bun test" },
+      ...overrides,
+    }
+  }
+
+  async function pushMemory(gw: Gateway, code: string, entries: Record<string, unknown>[]) {
+    const res = await call(gw, "/v1/team-memory/push", code, { entries })
+    expect(res.status).toBe(200)
+    return res
+  }
+
+  test("a valid artifact is stored and pulls, with its provenance intact", async () => {
+    const store = openGatewayStore()
+    const gw = createGateway({ store })
+    const a = makeAccount(store, "uid_a")
+    const b = makeAccount(store, "uid_b")
+    makeTeam(store, a, [b])
+    // The session exists for the team because a memory entry carries it.
+    await pushMemory(gw, a.code, [memoryEntry()])
+
+    const push = await call(gw, "/v1/team-objects/push", a.code, { objects: [artifact()] })
+    expect(results(push)).toEqual([{ id: "art_1", result: "stored" }])
+
+    const pulledAll = await call(gw, "/v1/team-objects/pull", b.code, { since_seq: 0 })
+    expect(pulled(pulledAll).map((object) => object.id)).toEqual(["art_1"])
+    expect(pulled(pulledAll)[0]?.kind).toBe("artifact")
+    expect(pulled(pulledAll)[0]?.metadata).toEqual({ session_id: "sess_1" })
+
+    const pulledKind = await call(gw, "/v1/team-objects/pull", b.code, {
+      since_seq: 0,
+      kinds: ["artifact"],
+    })
+    expect(pulled(pulledKind)).toHaveLength(1)
+    const pulledSkills = await call(gw, "/v1/team-objects/pull", b.code, {
+      since_seq: 0,
+      kinds: ["skill"],
+    })
+    expect(pulled(pulledSkills)).toHaveLength(0)
+
+    // The audit row carries the artifact kind on the shared trail.
+    const teamId = store.getTeamForUser(a.uid)?.team.id as string
+    const audit = store.teamMemoryAudit(teamId).filter((row) => row.entry_id === "art_1")
+    expect(audit).toHaveLength(1)
+    expect(audit[0]?.kind).toBe("artifact")
+    expect(audit[0]?.action).toBe("store")
+  })
+
+  test("provenance must name a memory entry or session that exists for the team", async () => {
+    const store = openGatewayStore()
+    const gw = createGateway({ store })
+    const a = makeAccount(store, "uid_a")
+    makeTeam(store, a, [])
+    await pushMemory(gw, a.code, [memoryEntry()])
+
+    // By memory entry id: resolves.
+    const byEntry = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [artifact({ id: "art_entry", metadata: { memory_entry_id: "mem_1" } })],
+    })
+    expect(results(byEntry)).toEqual([{ id: "art_entry", result: "stored" }])
+
+    // Both named, both resolve: stored.
+    const both = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [
+        artifact({
+          id: "art_both",
+          name: "both-links",
+          metadata: { memory_entry_id: "mem_1", session_id: "sess_1" },
+        }),
+      ],
+    })
+    expect(results(both)).toEqual([{ id: "art_both", result: "stored" }])
+
+    // Named but not found — entry, session, and one-of-two alike.
+    for (const [id, metadata] of [
+      ["art_ghost_entry", { memory_entry_id: "mem_nope" }],
+      ["art_ghost_session", { session_id: "sess_nope" }],
+      ["art_half", { memory_entry_id: "mem_1", session_id: "sess_nope" }],
+    ] as const) {
+      const res = await call(gw, "/v1/team-objects/push", a.code, {
+        objects: [artifact({ id, name: `n-${id}`, metadata })],
+      })
+      expect(results(res)).toEqual([{ id, result: "rejected", reason: "provenance_not_found" }])
+    }
+
+    // Nothing named, or named in the wrong shape: missing provenance.
+    for (const [id, metadata] of [
+      ["art_none", {}],
+      ["art_empty", { session_id: "" }],
+      ["art_typed", { memory_entry_id: 42 }],
+    ] as const) {
+      const res = await call(gw, "/v1/team-objects/push", a.code, {
+        objects: [artifact({ id, name: `n-${id}`, metadata })],
+      })
+      expect(results(res)).toEqual([{ id, result: "rejected", reason: "missing_provenance" }])
+    }
+  })
+
+  test("provenance does not resolve across teams", async () => {
+    const store = openGatewayStore()
+    const gw = createGateway({ store })
+    const a = makeAccount(store, "uid_a")
+    const c = makeAccount(store, "uid_c")
+    makeTeam(store, a, [])
+    makeTeam(store, c, [], "Other")
+    await pushMemory(gw, a.code, [memoryEntry()])
+
+    // Team C names team A's memory entry and session: neither exists
+    // for team C, and nothing about team A leaks in the answer.
+    const byEntry = await call(gw, "/v1/team-objects/push", c.code, {
+      objects: [artifact({ metadata: { memory_entry_id: "mem_1" } })],
+    })
+    expect(results(byEntry)).toEqual([
+      { id: "art_1", result: "rejected", reason: "provenance_not_found" },
+    ])
+    const bySession = await call(gw, "/v1/team-objects/push", c.code, {
+      objects: [artifact({ id: "art_2", name: "other-diff" })],
+    })
+    expect(results(bySession)).toEqual([
+      { id: "art_2", result: "rejected", reason: "provenance_not_found" },
+    ])
+  })
+
+  test("artifacts get their own 64 KB cap — past the document cap stores, past 64 KB is oversize", async () => {
+    const store = openGatewayStore()
+    const gw = createGateway({ store })
+    const a = makeAccount(store, "uid_a")
+    makeTeam(store, a, [])
+    await pushMemory(gw, a.code, [memoryEntry()])
+
+    // 40 KB: over the 32 KB skill/def cap, under the artifact cap.
+    const mid = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [artifact({ id: "art_mid", name: "mid-log", body: "x".repeat(40 * 1024) })],
+    })
+    expect(results(mid)).toEqual([{ id: "art_mid", result: "stored" }])
+
+    const atCap = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [artifact({ id: "art_cap", name: "at-cap", body: "x".repeat(64 * 1024) })],
+    })
+    expect(results(atCap)).toEqual([{ id: "art_cap", result: "stored" }])
+
+    const overCap = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [artifact({ id: "art_over", name: "over-cap", body: "x".repeat(64 * 1024 + 1) })],
+    })
+    expect(results(overCap)).toEqual([
+      { id: "art_over", result: "rejected", reason: "oversize" },
+    ])
+  })
+
+  test("binary-shaped bodies are rejected as not_text; secrets are still caught", async () => {
+    const store = openGatewayStore()
+    const gw = createGateway({ store })
+    const a = makeAccount(store, "uid_a")
+    makeTeam(store, a, [])
+    await pushMemory(gw, a.code, [memoryEntry()])
+
+    for (const [id, body] of [
+      ["art_nul", "PK\u0003\u0004 binary zip bytes"],
+      ["art_ctrl", "log line\u0007bell"],
+      ["art_repl", "forced decode: \uFFFD\uFFFD"],
+    ] as const) {
+      const res = await call(gw, "/v1/team-objects/push", a.code, {
+        objects: [artifact({ id, name: `n-${id}`, body })],
+      })
+      expect(results(res)).toEqual([{ id, result: "rejected", reason: "not_text" }])
+    }
+
+    // Ordinary log text — tabs, newlines, form feeds — is plain text.
+    const log = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [artifact({ id: "art_log", name: "test-log", body: "ok\t1 passed\n\f2 passed\r\n" })],
+    })
+    expect(results(log)).toEqual([{ id: "art_log", result: "stored" }])
+
+    const secret = `sk-${"a1".repeat(20)}`
+    const leaked = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [artifact({ id: "art_secret", name: "leaked", body: `the key was ${secret}` })],
+    })
+    expect(results(leaked)).toEqual([
+      { id: "art_secret", result: "rejected", reason: "secret_detected" },
+    ])
   })
 })

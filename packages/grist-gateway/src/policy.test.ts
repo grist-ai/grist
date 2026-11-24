@@ -1,7 +1,12 @@
+import { Database } from "bun:sqlite"
 import { afterAll, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { createGateway } from "./http.js"
 import {
   runTeamMemoryPolicySweep,
+  runTeamObjectPolicySweep,
   startTeamMemoryPolicy,
   teamMemoryPolicyConfig,
 } from "./policy.js"
@@ -369,6 +374,188 @@ describe("team memory policy sweep", () => {
   })
 })
 
+describe("object policy sweep (filesystem spec v1 §7 partition)", () => {
+  function skillObj(overrides?: Record<string, unknown>): Record<string, unknown> {
+    return {
+      id: "obj_1",
+      kind: "skill",
+      container: "repo-x",
+      name: "deploy-check",
+      body: "Verify the deploy: run the smoke suite, then check the health endpoint.",
+      metadata: { description: "Pre-deploy verification checklist" },
+      ...overrides,
+    }
+  }
+
+  async function pushObjects(gw: Gateway, code: string, objects: Record<string, unknown>[]) {
+    const res = await call(gw, "/v1/team-objects/push", code, { objects })
+    expect(res.status).toBe(200)
+    return res
+  }
+
+  function objectRowsById(store: Store, teamId: string) {
+    return new Map(
+      store.listTeamObjects(teamId, { uid: "sweep-test" }, { limit: 200 }).map((row) => [row.id, row]),
+    )
+  }
+
+  test("archives a superseded skill with a skill-kind audit row; the head stays current", async () => {
+    const store = openGatewayStore()
+    const gw = createGateway({ store })
+    const a = makeAccount(store, "uid_a")
+    const b = makeAccount(store, "uid_b")
+    const teamId = makeTeam(store, a, [b])
+
+    await pushObjects(gw, a.code, [skillObj()])
+    await pushObjects(gw, b.code, [
+      skillObj({ id: "obj_2", body: "Verify the deploy: run the full suite first.", supersedes: "obj_1" }),
+    ])
+    // Push deliberately leaves the superseded head active (S-FS1); the
+    // sweep is what closes the loop.
+    expect(objectRowsById(store, teamId).get("obj_1")?.status).toBe("active")
+
+    const now = Date.now()
+    const sweep = runTeamObjectPolicySweep(store, { now })
+    expect(sweep.totals).toEqual({ archived: 1, flagged: 0 })
+    expect(sweep.teams.find((team) => team.teamId === teamId)?.byKind).toEqual({
+      skill: { archived: 1, flagged: 0 },
+    })
+
+    const rows = objectRowsById(store, teamId)
+    expect(rows.get("obj_1")?.status).toBe("archived")
+    expect(rows.get("obj_2")?.status).toBe("active")
+
+    // The archive travels the objects pull feed as a tombstone; the
+    // head is the only content.
+    const pulled = store.pullTeamObjects(teamId, { uid: a.uid }, 0)
+    expect(pulled.objects.map((row) => row.id)).toEqual(["obj_2"])
+    expect(pulled.tombstones).toEqual(["obj_1"])
+
+    // Audited under the job's actor, tagged with the object's kind.
+    const audit = store
+      .teamMemoryAudit(teamId)
+      .filter((row) => row.actor_uid === "dreaming")
+    expect(audit).toHaveLength(1)
+    expect(audit[0]).toMatchObject({ kind: "skill", action: "archive", entry_id: "obj_1" })
+
+    // The run summary is recorded for the dashboard, kinds split out.
+    expect(store.getObjectDreamingRun(teamId)).toEqual({
+      at: now,
+      archived: 1,
+      flagged: 0,
+      byKind: { skill: { archived: 1, flagged: 0 } },
+    })
+
+    // Idempotent: a second sweep at the same instant changes nothing.
+    const auditCount = store.teamMemoryAudit(teamId).length
+    const again = runTeamObjectPolicySweep(store, { now })
+    expect(again.totals).toEqual({ archived: 0, flagged: 0 })
+    expect(store.teamMemoryAudit(teamId).length).toBe(auditCount)
+  })
+
+  test("never merges near-duplicate skills — while memory duplicates still merge in the same cycle", async () => {
+    const store = openGatewayStore()
+    const gw = createGateway({ store })
+    const a = makeAccount(store, "uid_a")
+    const b = makeAccount(store, "uid_b")
+    const teamId = makeTeam(store, a, [b])
+
+    // Two DISTINCT skills with byte-identical bodies (different names,
+    // so different chains). Memory's merge keys on normalized content
+    // text within a container — applied to objects, it would fuse
+    // these into one. The partition must not let it.
+    const body = "Always run the smoke suite before declaring the deploy done."
+    await pushObjects(gw, a.code, [
+      skillObj({ id: "sk_a", name: "deploy-check", body, metadata: { description: "Deploy check" } }),
+      skillObj({ id: "sk_b", name: "release-check", body, metadata: { description: "Release check" } }),
+    ])
+    // And a genuine memory duplicate pair, to prove the memory side of
+    // the partition still does its job in the same sweep cycle.
+    await push(gw, a.code, [entry()])
+    await push(gw, b.code, [
+      entry({
+        id: "mem_2",
+        content: "  run bun test from the package dir; the repo root run is guarded and fails.\n",
+        weight: 0.5,
+        metadata: { signature: "src/c.ts|bun test", commit_sha: "def456" },
+      }),
+    ])
+
+    runTeamMemoryPolicySweep(store, { now: Date.now(), ...NO_DECAY })
+    const objects = runTeamObjectPolicySweep(store, { now: Date.now() })
+    expect(objects.totals).toEqual({ archived: 0, flagged: 0 })
+
+    const rows = objectRowsById(store, teamId)
+    expect(rows.get("sk_a")?.status).toBe("active")
+    expect(rows.get("sk_b")?.status).toBe("active")
+    expect(rows.get("sk_a")?.supersedes).toBeNull()
+    expect(rows.get("sk_b")?.supersedes).toBeNull()
+
+    // Memory merged as always; not one dreaming action touched a skill.
+    const memory = rowsById(store, teamId)
+    expect(memory.get("mem_1")?.weight).toBe(1.25)
+    expect(memory.get("mem_2")?.status).toBe("archived")
+    const audit = store.teamMemoryAudit(teamId).filter((row) => row.actor_uid === "dreaming")
+    expect(audit.length).toBeGreaterThan(0)
+    expect(audit.every((row) => row.kind === "memory")).toBe(true)
+  })
+
+  test("flags a head whose supersedes target is missing — chain integrity, not silent trust", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "grist-fs-integrity-"))
+    const file = path.join(dir, "gateway.db")
+    try {
+      const store = openGatewayStore(file)
+      const a = makeAccount(store, "uid_a")
+      const teamId = makeTeam(store, a, [])
+      const actor = { uid: a.uid, userId: a.userId }
+      const root = store.pushTeamObject(teamId, actor, {
+        id: "obj_root",
+        kind: "skill",
+        container: "repo-x",
+        name: "deploy-check",
+        body: "Verify the deploy.",
+        metadata: { description: "Pre-deploy verification checklist" },
+        supersedes: null,
+      })
+      expect(root.status).toBe("stored")
+      const head = store.pushTeamObject(teamId, actor, {
+        id: "obj_head",
+        kind: "skill",
+        container: "repo-x",
+        name: "deploy-check",
+        body: "Verify the deploy: full suite.",
+        metadata: { description: "Pre-deploy verification checklist" },
+        supersedes: "obj_root",
+      })
+      expect(head.status).toBe("stored")
+
+      // Corruption the API cannot produce (push rejects dangling
+      // pointers and rows are never deleted): the chain root vanishes.
+      const raw = new Database(file)
+      raw.run("DELETE FROM team_objects WHERE id = ?", ["obj_root"])
+      raw.close()
+
+      const now = Date.now()
+      const sweep = runTeamObjectPolicySweep(store, { now })
+      expect(sweep.totals).toEqual({ archived: 0, flagged: 1 })
+      const rows = objectRowsById(store, teamId)
+      expect(rows.get("obj_head")?.status).toBe("flagged")
+      const audit = store
+        .teamMemoryAudit(teamId)
+        .filter((row) => row.actor_uid === "dreaming")
+      expect(audit).toHaveLength(1)
+      expect(audit[0]).toMatchObject({ kind: "skill", action: "flag", entry_id: "obj_head" })
+
+      // Flagged is terminal for the sweep: no re-flag, no archive.
+      const again = runTeamObjectPolicySweep(store, { now })
+      expect(again.totals).toEqual({ archived: 0, flagged: 0 })
+      expect(store.teamMemoryAudit(teamId).length).toBeGreaterThan(0)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("dashboard team memory surface", () => {
   const USERS: Record<string, { localId: string; email: string }> = {
     tok_a: { localId: "uid_a", email: "a@example.com" },
@@ -439,5 +626,69 @@ describe("dashboard team memory surface", () => {
     expect(html).toContain('id="team-memory-filter"')
     expect(html).toContain('id="team-memory-summary"')
     expect(html).toContain('id="team-memory-dreaming"')
+  })
+
+  test("the served dashboard page carries the filesystem kind switcher", async () => {
+    const gw = gateway(openGatewayStore())
+    const response = await gw.fetch(new Request("http://localhost/dashboard/team"))
+    expect(response.status).toBe(200)
+    const html = await response.text()
+    expect(html).toContain('id="team-fs-summary"')
+    expect(html).toContain('data-fs-kind="memory"')
+    expect(html).toContain('data-fs-kind="skill"')
+    expect(html).toContain('data-fs-kind="agent_definition"')
+    expect(html).toContain('data-fs-kind="artifact"')
+    expect(html).toContain('id="team-memory-panel"')
+    expect(html).toContain('id="team-objects-panel"')
+    expect(html).toContain('id="team-objects-list"')
+    expect(html).toContain('id="team-objects-filter"')
+  })
+
+  test("objects list + remove round-trip on the dashboard's Bearer Firebase auth", async () => {
+    const store = openGatewayStore()
+    const a = makeAccount(store, "uid_a")
+    const b = makeAccount(store, "uid_b")
+    const teamId = makeTeam(store, a, [b])
+    const gw = gateway(store)
+    const pushed = await call(gw, "/v1/team-objects/push", a.code, {
+      objects: [
+        {
+          id: "obj_1",
+          kind: "skill",
+          container: "repo-x",
+          name: "deploy-check",
+          body: "Verify the deploy: run the smoke suite, then check the health endpoint.",
+          metadata: { description: "Pre-deploy verification checklist" },
+        },
+      ],
+    })
+    expect(pushed.status).toBe(200)
+
+    // Exactly the dashboard's shape: POST JSON with a Bearer ID token.
+    const listed = await call(gw, "/v1/team-objects/list", undefined, { kind: "skill" }, {
+      Authorization: "Bearer tok_b",
+    })
+    expect(listed.status).toBe(200)
+    const objects = listed.json.objects as { id: string; is_head: boolean }[]
+    expect(objects).toHaveLength(1)
+    expect(objects[0]?.is_head).toBe(true)
+    const counts = listed.json.counts as { total: number; byKind: Record<string, number> }
+    expect(counts.total).toBe(1)
+    expect(counts.byKind).toEqual({ skill: 1 })
+    expect(listed.json.dreaming).toBeNull()
+
+    // A member who is not the author cannot remove it — the endpoint
+    // enforces, and the dashboard surfaces this failure honestly.
+    const denied = await call(gw, "/v1/team-objects/remove", undefined, { id: "obj_1" }, {
+      Authorization: "Bearer tok_b",
+    })
+    expect(denied.status).toBe(403)
+
+    const removed = await call(gw, "/v1/team-objects/remove", undefined, { id: "obj_1" }, {
+      Authorization: "Bearer tok_a",
+    })
+    expect(removed.status).toBe(200)
+    const rows = store.listTeamObjects(teamId, { uid: a.uid }, {})
+    expect(rows.find((row) => row.id === "obj_1")?.status).toBe("archived")
   })
 })
