@@ -11,7 +11,7 @@ import {
   normalizeGithubEvent,
   parseListenerDefinition,
 } from "./listeners.js"
-import { runListenerExpirySweep } from "./policy.js"
+import { runListenerClaimLeaseSweep, runListenerExpirySweep } from "./policy.js"
 import { openGatewayStore } from "./store.js"
 
 type Store = ReturnType<typeof openGatewayStore>
@@ -778,8 +778,7 @@ describe("team listener admin endpoints", () => {
   })
 })
 
-describe("audit detail migration", () => {
-  test("a pre-detail database gains the column; old rows read detail null", () => {
+describe("audit detail migration", () => {  test("a pre-detail database gains the column; old rows read detail null", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "grist-lis-migration-"))
     const file = path.join(dir, "gateway.db")
     try {
@@ -816,5 +815,315 @@ describe("audit detail migration", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe("runner claim + envelope (next-block spec §6.3/§6.7, S-LIS2)", () => {
+  async function claim(gw: Gateway, code: string, requestId: string): Promise<CallResult> {
+    return post(gw, "/v1/listeners/requests/claim", code, { request_id: requestId })
+  }
+
+  async function complete(
+    gw: Gateway,
+    code: string,
+    requestId: string,
+    body: Record<string, unknown>,
+  ): Promise<CallResult> {
+    return post(gw, "/v1/listeners/requests/complete", code, { request_id: requestId, ...body })
+  }
+
+  async function pushListener(
+    setup: ReturnType<typeof intakeSetup>,
+    definitionOverrides?: Record<string, unknown>,
+    objectOverrides?: Record<string, unknown>,
+  ) {
+    const pushed = await pushObjects(setup.gw, setup.owner.code, [
+      listenerObject({
+        body: JSON.stringify(definition(definitionOverrides)),
+        ...objectOverrides,
+      }),
+    ])
+    expect(pushResults(pushed)[0]?.result).toBe("stored")
+  }
+
+  async function deliverQueued(
+    setup: ReturnType<typeof intakeSetup>,
+    deliveryId: string,
+  ): Promise<string> {
+    const res = await deliver(setup.gw, setup.teamId, {
+      raw: JSON.stringify(githubFailurePayload()),
+      secret: setup.secret,
+      deliveryId,
+      event: "workflow_run",
+    })
+    expect(res.json.queued).toBe(1)
+    return (res.json.request_ids as string[])[0] as string
+  }
+
+  function refusedRows(store: Store, teamId: string) {
+    return listenerAudit(store, teamId).filter((row) => row.action === "refused_cap")
+  }
+
+  function notificationTypes(store: Store, uid: string): string[] {
+    return store.listNotifications(uid).map((row) => row.type)
+  }
+
+  test("claim → complete closes the loop: audit sequence, spend recorded, creator notified", async () => {
+    const setup = intakeSetup()
+    await pushEnabledListener(setup)
+    const requestId = await deliverQueued(setup, "delivery-1")
+
+    // A runner operated by a different member claims it — the run
+    // executes as the creator regardless of whose machine claims.
+    const claimed = await claim(setup.gw, setup.member.code, requestId)
+    expect(claimed.status).toBe(200)
+    expect(claimed.json.claimed).toBe(true)
+    expect((claimed.json.request as Record<string, unknown>).state).toBe("claimed")
+
+    // Atomic: a second claim of the same request fails.
+    const second = await claim(setup.gw, setup.owner.code, requestId)
+    expect(second.status).toBe(409)
+
+    // Only the claiming runner may report the outcome.
+    const byOther = await complete(setup.gw, setup.owner.code, requestId, { spend_usd: 0.5 })
+    expect(byOther.status).toBe(403)
+
+    const done = await complete(setup.gw, setup.member.code, requestId, {
+      spend_usd: 0.5,
+      session_id: "ses_test",
+    })
+    expect(done.status).toBe(200)
+    expect(done.json.completed).toBe(true)
+    expect(done.json.over_run_cap).toBe(false)
+
+    const requests = await queue(setup.gw, setup.owner.code)
+    expect(requests[0]?.state).toBe("completed")
+    expect(requests[0]?.spend_usd).toBe(0.5)
+    expect(typeof requests[0]?.completed_at).toBe("number")
+
+    const audit = listenerAudit(setup.store, setup.teamId)
+    expect(audit.map((row) => row.action)).toEqual([
+      "store",
+      "fired",
+      "queued",
+      "claimed",
+      "completed",
+    ])
+    const completedRow = audit.find((row) => row.action === "completed")
+    expect(completedRow?.actor_uid).toBe(setup.member.uid)
+    expect(JSON.parse(completedRow?.detail ?? "{}")).toEqual({
+      spend_usd: 0.5,
+      outcome: "succeeded",
+      session_id: "ses_test",
+    })
+    expect(notificationTypes(setup.store, setup.owner.uid)).toContain("listener_request_completed")
+  })
+
+  test("a failed run completes the lifecycle as a failure, never dressed as success", async () => {
+    const setup = intakeSetup()
+    await pushEnabledListener(setup)
+    const requestId = await deliverQueued(setup, "delivery-1")
+    await claim(setup.gw, setup.owner.code, requestId)
+    const done = await complete(setup.gw, setup.owner.code, requestId, {
+      spend_usd: 0.25,
+      outcome: "failed",
+      error: "tests still red",
+    })
+    expect(done.json.completed).toBe(true)
+    const completedRow = listenerAudit(setup.store, setup.teamId).find(
+      (row) => row.action === "completed",
+    )
+    expect(JSON.parse(completedRow?.detail ?? "{}")).toEqual({
+      spend_usd: 0.25,
+      outcome: "failed",
+      error: "tests still red",
+    })
+    const note = setup.store
+      .listNotifications(setup.owner.uid)
+      .find((row) => row.type === "listener_request_completed")
+    expect(JSON.parse(note?.payload ?? "{}")).toMatchObject({ outcome: "failed" })
+  })
+
+  test("spend above the per-run cap is recorded and flagged, not hidden", async () => {
+    const setup = intakeSetup()
+    await pushEnabledListener(setup)
+    const requestId = await deliverQueued(setup, "delivery-1")
+    await claim(setup.gw, setup.owner.code, requestId)
+    // The default envelope caps a run at $2; the run spent $2.50.
+    const done = await complete(setup.gw, setup.owner.code, requestId, { spend_usd: 2.5 })
+    expect(done.json.over_run_cap).toBe(true)
+    const requests = await queue(setup.gw, setup.owner.code)
+    expect(requests[0]?.spend_usd).toBe(2.5)
+    const completedRow = listenerAudit(setup.store, setup.teamId).find(
+      (row) => row.action === "completed",
+    )
+    expect(JSON.parse(completedRow?.detail ?? "{}")).toMatchObject({
+      spend_usd: 2.5,
+      over_run_cap: true,
+    })
+  })
+
+  test("runs/day: a second claim past the daily run cap is refused mechanically", async () => {
+    const setup = intakeSetup()
+    await pushListener(setup, {
+      envelope: { max_runs_per_day: 1, max_spend_per_day_usd: 10, max_spend_per_run_usd: 2 },
+    })
+    const first = await deliverQueued(setup, "delivery-1")
+    await claim(setup.gw, setup.owner.code, first)
+    await complete(setup.gw, setup.owner.code, first, { spend_usd: 0.5 })
+
+    const second = await deliverQueued(setup, "delivery-2")
+    const refused = await claim(setup.gw, setup.owner.code, second)
+    expect(refused.status).toBe(200)
+    expect(refused.json.claimed).toBe(false)
+    expect(refused.json.refused).toBe(true)
+    expect(refused.json.reason).toBe("max_runs_per_day")
+    expect((refused.json.request as Record<string, unknown>).state).toBe("refused")
+
+    const rows = refusedRows(setup.store, setup.teamId)
+    expect(rows.map((row) => row.detail)).toEqual(["max_runs_per_day"])
+    expect(rows[0]?.entry_id).toBe(second)
+    expect(notificationTypes(setup.store, setup.owner.uid)).toContain("listener_request_refused")
+    // No partial run, no spend: nothing was claimed for the second request.
+    const audit = listenerAudit(setup.store, setup.teamId)
+    expect(audit.filter((row) => row.action === "claimed")).toHaveLength(1)
+  })
+
+  test("spend/day: recorded spend plus the next run's cap exposure refuses the claim", async () => {
+    const setup = intakeSetup()
+    await pushListener(setup, {
+      envelope: { max_runs_per_day: 10, max_spend_per_day_usd: 3, max_spend_per_run_usd: 2 },
+    })
+    const first = await deliverQueued(setup, "delivery-1")
+    const firstClaim = await claim(setup.gw, setup.owner.code, first)
+    expect(firstClaim.json.claimed).toBe(true) // exposure 0 + $2 ≤ $3
+    await complete(setup.gw, setup.owner.code, first, { spend_usd: 1.5 })
+
+    const second = await deliverQueued(setup, "delivery-2")
+    const refused = await claim(setup.gw, setup.owner.code, second)
+    expect(refused.json.refused).toBe(true)
+    expect(refused.json.reason).toBe("max_spend_per_day") // $1.50 recorded + $2 exposure > $3
+    expect(refusedRows(setup.store, setup.teamId).map((row) => row.detail)).toEqual([
+      "max_spend_per_day",
+    ])
+  })
+
+  test("kill switch: disabling a listener refuses its already-queued requests at claim", async () => {
+    const setup = intakeSetup()
+    await pushEnabledListener(setup)
+    const requestId = await deliverQueued(setup, "delivery-1")
+    const disabled = await pushObjects(setup.gw, setup.owner.code, [
+      listenerObject({
+        id: "lis_2",
+        supersedes: "lis_1",
+        body: JSON.stringify(definition({ enabled: false })),
+      }),
+    ])
+    expect(pushResults(disabled)).toEqual([{ id: "lis_2", result: "stored" }])
+    const refused = await claim(setup.gw, setup.owner.code, requestId)
+    expect(refused.json.refused).toBe(true)
+    expect(refused.json.reason).toBe("listener_disabled")
+    expect(refusedRows(setup.store, setup.teamId).map((row) => row.detail)).toEqual([
+      "listener_disabled",
+    ])
+    expect(notificationTypes(setup.store, setup.owner.uid)).toContain("listener_request_refused")
+  })
+
+  test("a removed listener refuses at claim as listener_removed", async () => {
+    const setup = intakeSetup()
+    await pushEnabledListener(setup)
+    const requestId = await deliverQueued(setup, "delivery-1")
+    const removed = await post(setup.gw, "/v1/team-objects/remove", setup.owner.code, {
+      id: "lis_1",
+    })
+    expect(removed.status).toBe(200)
+    const refused = await claim(setup.gw, setup.owner.code, requestId)
+    expect(refused.json.refused).toBe(true)
+    expect(refused.json.reason).toBe("listener_removed")
+  })
+
+  test("a creator who left the team after firing refuses at claim", async () => {
+    const setup = intakeSetup()
+    const authored = await pushObjects(setup.gw, setup.member.code, [listenerObject({ id: "lis_m" })])
+    expect(pushResults(authored)).toEqual([{ id: "lis_m", result: "stored" }])
+    const requestId = await deliverQueued(setup, "delivery-1")
+    expect(setup.store.leaveTeam({ uid: setup.member.uid }).ok).toBe(true)
+    const refused = await claim(setup.gw, setup.owner.code, requestId)
+    expect(refused.json.refused).toBe(true)
+    expect(refused.json.reason).toBe("creator_not_member")
+  })
+
+  test("claim guards: unknown request 404s; connector keys cannot claim", async () => {
+    const setup = intakeSetup()
+    await pushEnabledListener(setup)
+    const requestId = await deliverQueued(setup, "delivery-1")
+    const missing = await claim(setup.gw, setup.owner.code, "glr_DOESNOTEXIST")
+    expect(missing.status).toBe(404)
+    const minted = setup.store.createApiKey({
+      inviteCode: setup.owner.code,
+      name: "scoped",
+      kind: "connector",
+    })
+    if (!minted) throw new Error("connector mint failed")
+    const byConnector = await post(
+      setup.gw,
+      "/v1/listeners/requests/claim",
+      undefined,
+      { request_id: requestId },
+      { "X-Grist-Api-Key": minted.secret },
+    )
+    expect(byConnector.status).toBe(403)
+    // The request is untouched — still queued for a real runner.
+    expect((await queue(setup.gw, setup.owner.code))[0]?.state).toBe("queued")
+  })
+
+  test("claim lease: a stale claim requeues once, then expires with audit + notification", async () => {
+    const setup = intakeSetup()
+    await pushEnabledListener(setup)
+    const requestId = await deliverQueued(setup, "delivery-1")
+    await claim(setup.gw, setup.owner.code, requestId)
+
+    const leaseMs = 30 * 60_000
+    const first = runListenerClaimLeaseSweep(setup.store, {
+      now: Date.now() + leaseMs + 60_000,
+      leaseMs,
+    })
+    expect(first).toEqual({ requeued: 1, expired: 0 })
+    expect((await queue(setup.gw, setup.owner.code))[0]?.state).toBe("queued")
+    const requeueRow = listenerAudit(setup.store, setup.teamId).find(
+      (row) => row.action === "queued" && row.detail?.startsWith("requeue"),
+    )
+    expect(requeueRow?.entry_id).toBe(requestId)
+
+    // The requeued request claims again — and this time completes.
+    const reclaimed = await claim(setup.gw, setup.owner.code, requestId)
+    expect(reclaimed.json.claimed).toBe(true)
+    const done = await complete(setup.gw, setup.owner.code, requestId, { spend_usd: 0.1 })
+    expect(done.json.completed).toBe(true)
+
+    // A second request whose lease lapses twice expires terminally.
+    const second = await deliverQueued(setup, "delivery-2")
+    await claim(setup.gw, setup.owner.code, second)
+    runListenerClaimLeaseSweep(setup.store, { now: Date.now() + leaseMs + 60_000, leaseMs })
+    await claim(setup.gw, setup.owner.code, second)
+    const lapsed = runListenerClaimLeaseSweep(setup.store, {
+      now: Date.now() + 2 * leaseMs + 120_000,
+      leaseMs,
+    })
+    expect(lapsed).toEqual({ requeued: 0, expired: 1 })
+    const requests = await queue(setup.gw, setup.owner.code)
+    expect(requests.find((row) => row.id === second)?.state).toBe("expired")
+    const expiredRow = listenerAudit(setup.store, setup.teamId).find(
+      (row) => row.action === "expired" && row.entry_id === second,
+    )
+    expect(expiredRow?.detail).toBe("claim_lease_expired")
+    const notes = setup.store
+      .listNotifications(setup.owner.uid)
+      .filter((row) => row.type === "listener_request_expired")
+    expect(notes.length).toBeGreaterThan(0)
+    expect(JSON.parse(notes[notes.length - 1]?.payload ?? "{}")).toMatchObject({
+      request_id: second,
+      reason: "claim_lease_expired",
+    })
   })
 })
