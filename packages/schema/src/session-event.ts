@@ -25,6 +25,7 @@ import { SessionInbox } from "./session-inbox.js"
 import { Project } from "./project.js"
 import { SessionFork } from "./session-fork.js"
 import { Permission } from "./permission.js"
+import { EnvironmentID } from "./environment-id.js"
 
 export const Source = Schema.Struct({
   start: NonNegativeInt,
@@ -51,6 +52,8 @@ export const Created = Event.durable({
   schema: {
     ...Base,
     projectID: Project.ID,
+    /** The environment the session runs in. Absent means environment zero (the local working copy). */
+    environmentID: EnvironmentID.pipe(optional),
     location: Location.Ref,
     subpath: RelativePath.pipe(optional),
     parentID: SessionID.pipe(optional),

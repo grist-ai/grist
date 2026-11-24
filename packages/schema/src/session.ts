@@ -14,6 +14,7 @@ import { Permission } from "./permission.js"
 import { TokenUsage } from "./token-usage.js"
 import { Revert } from "./session-revert.js"
 import { SessionFork } from "./session-fork.js"
+import { EnvironmentID } from "./environment-id.js"
 
 export const ID = SessionID
 export type ID = SessionID
@@ -36,6 +37,8 @@ export const Info = Schema.Struct({
     boundary: ForkBoundary,
   }).pipe(optional),
   projectID: Project.ID,
+  /** The environment the session runs in. Absent means environment zero (the local working copy). */
+  environmentID: EnvironmentID.pipe(optional),
   agent: Agent.ID.pipe(optional),
   model: Model.Ref.pipe(optional),
   cost: Money.USD,
