@@ -29,6 +29,8 @@ export type MemoryHit = {
   score?: number
   id?: string
   outcome?: OutcomeKind
+  /** Set when the hit came from the team mirror (spec v2 §8 provenance). */
+  team?: { authorUserId: string }
 }
 
 export type RememberInput = {

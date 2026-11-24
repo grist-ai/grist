@@ -73,5 +73,29 @@ export { createFileStore } from "./file-store.js"
 export { createSupermemoryStore, shouldUseSupermemory } from "./supermemory-store.js"
 export { ensureSupermemoryLocal, resolveSupermemoryBinary } from "./ensure-local.js"
 export { formatHits } from "./format.js"
+export { findSecretKind } from "./secrets-scan.js"
+export {
+  TEAM_RECALL_TOKEN_BUDGET,
+  flushTeamMemoryPushes,
+  loadTeamSyncState,
+  mergeRecallHits,
+  pullTeamMemory,
+  queueTeamMemoryPush,
+  readTeamSyncStateSync,
+  recallTeamMemory,
+  saveTeamSyncState,
+  setTeamMemoryEnabled,
+  summarizeTeamSyncState,
+  syncTeamMemory,
+  teamSyncPath,
+  estimateTokens,
+  type PullSummary,
+  type PushSummary,
+  type QueueResult,
+  type TeamMirrorEntry,
+  type TeamSyncDeps,
+  type TeamSyncState,
+  type TeamSyncStatus,
+} from "./team-sync.js"
 export { renderMemoryRepo, parseMemoryRepo, type MemoryRepoFile, type ImportedMemory } from "./interchange.js"
 export { planDream, applyDream, type DreamPlan } from "./dreaming.js"

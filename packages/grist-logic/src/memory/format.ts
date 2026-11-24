@@ -13,6 +13,7 @@ export function formatHits(input: { query: string; hits: MemoryHit[]; backend: s
       hit.outcome ? `outcome=${hit.outcome}` : undefined,
       hit.score !== undefined ? `score=${hit.score.toFixed(3)}` : undefined,
       hit.id ? `id=${hit.id}` : undefined,
+      hit.team ? `team: verified by ${hit.team.authorUserId}` : undefined,
     ]
       .filter(Boolean)
       .join(" ")
