@@ -1255,6 +1255,38 @@ grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</
           <h2>Team spend</h2>
           <p class="muted" id="team-usage-total"></p>
           <section class="admin-list" id="team-usage"></section>
+          <h2>Team memory</h2>
+          <p class="muted">
+            Verified lessons your team's harnesses captured and now share.
+            Only distilled, verified entries sync — never transcripts or raw
+            output. Anything the team would not put in a shared wiki does
+            not belong here.
+          </p>
+          <p class="muted" id="team-memory-summary"></p>
+          <p class="muted" id="team-memory-dreaming"></p>
+          <form id="team-memory-filter" class="key-form">
+            <div>
+              <label for="team-memory-container">Container</label>
+              <input id="team-memory-container" maxlength="120" placeholder="repo…" autocomplete="off" />
+            </div>
+            <div>
+              <label for="team-memory-outcome">Outcome</label>
+              <select id="team-memory-outcome">
+                <option value="">Any outcome</option>
+                <option value="tests_passed">Tests passed</option>
+                <option value="user_approved">User approved</option>
+                <option value="user_corrected">User corrected</option>
+                <option value="check_failed">Check failed</option>
+              </select>
+            </div>
+            <div>
+              <label for="team-memory-author">Author user ID</label>
+              <input id="team-memory-author" maxlength="32" placeholder="gu_…" autocomplete="off" />
+            </div>
+            <button class="btn" type="submit">Filter</button>
+            <span class="muted" id="team-memory-msg" role="status"></span>
+          </form>
+          <section class="admin-list" id="team-memory-list"></section>
         </section>
         <section class="install">
           <h2>Notifications</h2>

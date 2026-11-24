@@ -1682,6 +1682,38 @@ pre {
   font-size: 0.85rem;
 }
 
+.memory-row {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+}
+
+.memory-row.is-archived {
+  color: var(--muted);
+}
+
+.memory-content {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.memory-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.memory-meta code {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
 .pill {
   font-size: 0.7rem;
   text-transform: uppercase;

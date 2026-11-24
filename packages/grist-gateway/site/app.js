@@ -997,6 +997,7 @@ async function loadTeam() {
   if (team) {
     const usage = await teamCall("/v1/teams/usage")
     if (gen !== teamLoad) return
+    void loadTeamMemory()
     document.getElementById("team-usage-total").textContent =
       `$${Number(usage.data.total_spent_usd ?? 0).toFixed(2)} spent by the team in total.`
     document.getElementById("team-usage").innerHTML = (usage.data.members ?? [])
@@ -1024,6 +1025,80 @@ async function loadTeam() {
         .join("")
     : `<p class="muted">Nothing yet.</p>`
 }
+
+let teamMemoryLoad = 0
+
+async function loadTeamMemory() {
+  const gen = ++teamMemoryLoad
+  const body = {}
+  const container = document.getElementById("team-memory-container").value.trim()
+  if (container) body.container = container
+  const outcome = document.getElementById("team-memory-outcome").value
+  if (outcome) body.outcome = outcome
+  const author = document.getElementById("team-memory-author").value.trim()
+  if (author) body.author_user_id = author
+  const result = await teamCall("/v1/team-memory/list", body)
+  if (gen !== teamMemoryLoad) return
+  const msg = document.getElementById("team-memory-msg")
+  if (result.status !== 200) {
+    msg.textContent = result.data.error ?? "Couldn’t load team memory."
+    return
+  }
+  msg.textContent = ""
+  const counts = result.data.counts ?? { total: 0, byOutcome: {} }
+  const outcomeText = Object.entries(counts.byOutcome ?? {})
+    .map(([kind, n]) => `${n} ${kind.replaceAll("_", " ")}`)
+    .join(" · ")
+  document.getElementById("team-memory-summary").textContent = counts.total
+    ? `${counts.total} ${counts.total === 1 ? "entry" : "entries"}${outcomeText ? ` — ${outcomeText}` : ""}.`
+    : ""
+  const dreaming = result.data.dreaming
+  document.getElementById("team-memory-dreaming").textContent = dreaming
+    ? `Last curation run ${new Date(dreaming.at).toLocaleString()}: merged ${dreaming.merged}, flagged ${dreaming.flagged}, decayed ${dreaming.decayed}, archived ${dreaming.archived}.`
+    : "No curation run yet."
+  const entries = result.data.entries ?? []
+  document.getElementById("team-memory-list").innerHTML = entries.length
+    ? entries
+        .map((entry) => {
+          const day = (ts) => new Date(ts).toLocaleDateString()
+          return `<article class="memory-row${entry.status === "archived" ? " is-archived" : ""}">
+          <div class="memory-meta">
+            <span class="pill">${escapeHtml(String(entry.outcome).replaceAll("_", " "))}</span>
+            <span class="pill pill-dim">${escapeHtml(entry.status)}</span>
+            <code>${escapeHtml(entry.container)}</code>
+            <span>by <code>${escapeHtml(entry.author_user_id ?? "—")}</code></span>
+            <span>weight ${Number(entry.weight).toFixed(2)}</span>
+            <span>commit <code>${entry.commit_sha ? escapeHtml(String(entry.commit_sha).slice(0, 7)) : "—"}</code></span>
+            <span>created ${day(entry.createdAt)}</span>
+            <span>updated ${day(entry.updated_at)}</span>
+            ${entry.superseded_by ? `<span>superseded by <code>${escapeHtml(entry.superseded_by)}</code></span>` : ""}
+          </div>
+          <p class="memory-content">${escapeHtml(entry.content)}</p>
+          ${entry.status !== "archived" ? `<div><button class="text-btn" type="button" data-remove-memory="${escapeHtml(entry.id)}">Remove</button></div>` : ""}
+        </article>`
+        })
+        .join("")
+    : `<p class="muted">No entries match. Team memory fills as members' harnesses verify fixes in opted-in repos.</p>`
+}
+
+document.getElementById("team-memory-filter")?.addEventListener("submit", (event) => {
+  event.preventDefault()
+  void loadTeamMemory()
+})
+
+document.getElementById("team-memory-list")?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-remove-memory]")
+  if (!button) return
+  const result = await teamCall("/v1/team-memory/remove", {
+    id: button.getAttribute("data-remove-memory"),
+  })
+  if (result.status === 200) {
+    void loadTeamMemory()
+    return
+  }
+  document.getElementById("team-memory-msg").textContent =
+    result.data.error ?? "Couldn’t remove that entry."
+})
 
 async function loadModels() {
   const gen = ++modelsLoad
