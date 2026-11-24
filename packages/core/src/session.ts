@@ -19,6 +19,7 @@ import { SessionMessageTable } from "./session/sql.js"
 import { SessionSchema } from "./session/schema.js"
 import { RelativePath } from "./schema.js"
 import { Agent } from "@opencode/schema/agent"
+import type { Environment } from "@opencode/schema/environment"
 import type { Permission } from "@opencode/schema/permission"
 import { App } from "./app.js"
 import { Slug } from "./util/slug.js"
@@ -87,6 +88,8 @@ type CreateBaseInput = {
   model?: Model.Ref
   metadata?: SessionSchema.Metadata
   permissions?: Permission.Ruleset
+  /** The environment the session runs in; absent (or inherited from the parent) means environment zero (local). */
+  environmentID?: Environment.ID
 }
 type CreateInput = CreateBaseInput &
   ({ location: Location.Ref; parentID?: never } | { parentID: SessionSchema.ID; location?: never })
@@ -277,6 +280,9 @@ const layer = Layer.effect(
               slug: Slug.create(),
               version: app.version,
               projectID: project.id,
+              // Children inherit the environment the way they inherit location,
+              // metadata, and permissions: a session family runs in one place.
+              environmentID: input.environmentID ?? parent?.environmentID,
               parentID: input.parentID,
               location,
               subpath: RelativePath.make(path.relative(project.directory, location.directory).replaceAll("\\", "/")),

@@ -95,6 +95,7 @@ const layer = Layer.effect(
               slug: Slug.create(),
               version: app.version,
               projectID: project.id,
+              environmentID: input.data.info.environmentID,
               location: input.location,
               subpath: RelativePath.make(
                 path.relative(project.directory, input.location.directory).replaceAll("\\", "/"),

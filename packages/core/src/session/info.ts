@@ -6,6 +6,7 @@ import { Project } from "@opencode/schema/project"
 import { Provider } from "@opencode/schema/provider"
 import { AbsolutePath, RelativePath } from "../schema.js"
 import { Workspace } from "@opencode/schema/workspace"
+import { Environment } from "@opencode/schema/environment"
 import { SessionSchema } from "./schema.js"
 import type { SessionTable } from "./sql.js"
 import { PersistedRevert } from "@opencode/schema/session-revert"
@@ -17,6 +18,7 @@ export function fromRow(row: typeof SessionTable.$inferSelect): SessionSchema.In
   return SessionSchema.Info.make({
     id: SessionSchema.ID.make(row.id),
     projectID: Project.ID.make(row.project_id),
+    environmentID: row.environment_id ? Environment.ID.make(row.environment_id) : undefined,
     title: row.title ?? undefined,
     parentID: row.parent_id ? SessionSchema.ID.make(row.parent_id) : undefined,
     fork:
