@@ -25,10 +25,17 @@ import {
   createMemoryStore,
   distillFailures,
   distillSuccesses,
+  flushTeamMemoryPushes,
   formatHits,
+  loadTeamSyncState,
+  mergeRecallHits,
   outcomeForExecution,
+  queueTeamMemoryPush,
+  recallTeamMemory,
   recordTaskUsage,
+  syncTeamMemory,
   taskUsageFromStepEnded,
+  type MemoryRecord,
   type MemoryStore,
 } from "@grist-ai/logic"
 import { routeTask } from "@grist-ai/logic"
@@ -134,7 +141,7 @@ function handleSessionEvent(
  * project's learnings into another project's store (seen live 2026-10-31,
  * in both directions, before this resolution existed).
  */
-export type LearningSink = { store: MemoryStore; container: string }
+export type LearningSink = { store: MemoryStore; container: string; directory?: string }
 
 const sinksByDirectory = new Map<string, LearningSink>()
 
@@ -146,9 +153,25 @@ function sinkForDirectory(directory: string): LearningSink | undefined {
   const sink: LearningSink = {
     store,
     container: directory.split("/").filter(Boolean).pop() ?? "default",
+    directory,
   }
   sinksByDirectory.set(directory, sink)
   return sink
+}
+
+/**
+ * Team memory (spec v2 §6): a locally captured record is queued for push
+ * at the same point local capture persists. Only opted-in repos sync —
+ * the queue call itself is the gate (D2) and is a no-op otherwise.
+ * Fire-and-forget: sync is a background consequence of capture, never a
+ * gate on the session, so failures surface only in the sync status.
+ */
+function queueForTeamSync(sink: LearningSink, record: MemoryRecord): void {
+  const directory = sink.directory
+  if (!directory) return
+  void queueTeamMemoryPush(directory, record)
+    .then((result) => (result === "queued" ? flushTeamMemoryPushes(directory) : undefined))
+    .catch((error) => gristWarn("[grist:team-memory] push queue failed", error))
 }
 
 /**
@@ -209,6 +232,7 @@ async function distillSessionFailures(
       gristLog(
         `[grist:learn] negative memory stored session=${sessionID} tool=${candidate.metadata?.tool} id=${record.id}`,
       )
+      if (learningMemory) queueForTeamSync(learningMemory, record)
     }
   }
 }
@@ -251,6 +275,7 @@ async function distillSessionSuccesses(sessionID: string, learningMemory?: Learn
     const record = await store.remember(candidate)
     if (record) {
       gristLog(`[grist:learn] verified-change memory stored session=${sessionID} id=${record.id}`)
+      if (learningMemory) queueForTeamSync(learningMemory, record)
     }
   }
 }
@@ -311,14 +336,38 @@ export function registerGristHooks(
         const recallSink = await resolveSessionSink(ctx, sessionID, learningMemory)
         if (recallSink) {
           try {
+            // Team memory (spec v2 §§6/8): in an opted-in repo, sync at
+            // task start — flush anything queued offline, pull fresh
+            // team entries into the mirror — then recall local + team
+            // merged under the shared 4k-token budget (D5). Best-effort
+            // throughout: a failed sync means team recall is stale, and
+            // a repo that never opted in takes exactly the old path.
+            const directory = recallSink.directory
+            let teamState = directory ? await loadTeamSyncState(directory) : undefined
+            if (directory && teamState?.enabled && !teamState.revoked) {
+              await syncTeamMemory(directory).catch((error) =>
+                gristWarn("[grist:team-memory] sync failed; continuing", error),
+              )
+              teamState = await loadTeamSyncState(directory).catch(() => teamState)
+            }
+            const teamUsable = !!teamState?.enabled && !teamState.revoked
             const hits = await recallSink.store.recall({
               query: text,
               container: recallSink.container,
-              limit: 5,
+              limit: teamUsable ? 12 : 5,
             })
-            if (hits.length > 0) {
+            let merged = hits
+            if (directory && teamUsable && teamState) {
+              const teamHits = recallTeamMemory(teamState, {
+                query: text,
+                container: recallSink.container,
+                limit: 12,
+              })
+              if (teamHits.length > 0) merged = mergeRecallHits({ local: hits, team: teamHits })
+            }
+            if (merged.length > 0) {
               const status = await recallSink.store.status()
-              pendingRecall.set(sessionID, formatHits({ query: text, hits, backend: status.backend }))
+              pendingRecall.set(sessionID, formatHits({ query: text, hits: merged, backend: status.backend }))
             } else {
               pendingRecall.delete(sessionID)
             }

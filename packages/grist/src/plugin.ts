@@ -145,7 +145,9 @@ export const Plugin = define({
       ctx.location.directory.split("/").filter(Boolean).pop() ?? "default"
     yield* registerGristHooks(
       ctx,
-      memoryStore ? { store: memoryStore, container: defaultContainer } : undefined,
+      memoryStore
+        ? { store: memoryStore, container: defaultContainer, directory: ctx.location.directory }
+        : undefined,
     )
     if (memoryStore) {
       yield* ctx.tool.transform((editor) => {
