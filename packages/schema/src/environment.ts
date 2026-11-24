@@ -28,6 +28,35 @@ export type Kind = typeof Kind.Type
 export const Status = Schema.Literals(["active", "missing"]).annotate({ identifier: "Environment.Status" })
 export type Status = typeof Status.Type
 
+/**
+ * One sandbox policy surface as actually enforced on this machine. `full`
+ * means the surface is enforced as specified; `degraded` means it is
+ * enforced with a disclosed gap (the note says which); `unavailable` means
+ * the surface cannot be enforced here at all. A degraded surface is always
+ * disclosed, never silently presented as full.
+ */
+export const PolicySurface = Schema.Struct({
+  status: Schema.Literals(["full", "degraded", "unavailable"]),
+  note: optional(Schema.String),
+}).annotate({ identifier: "Environment.PolicySurface" })
+export interface PolicySurface extends Schema.Schema.Type<typeof PolicySurface> {}
+
+/**
+ * The sandbox policy summary carried by `sandbox` environment records:
+ * which backend enforces the jail on this machine, the per-surface honesty
+ * matrix for it, and the egress allowlist in force. Computed from the
+ * record and the machine, never stored.
+ */
+export const PolicySummary = Schema.Struct({
+  backend: Schema.Literals(["bwrap", "sandbox-exec", "none"]),
+  filesystem: PolicySurface,
+  network: PolicySurface,
+  environment: PolicySurface,
+  limits: PolicySurface,
+  egressAllowlist: Schema.Array(Schema.String),
+}).annotate({ identifier: "Environment.PolicySummary" })
+export interface PolicySummary extends Schema.Schema.Type<typeof PolicySummary> {}
+
 export const Info = Schema.Struct({
   id: ID,
   projectID: Project.ID,
@@ -41,6 +70,8 @@ export const Info = Schema.Struct({
   machine: optional(Schema.String),
   /** Account that created the environment, when known. Local records are single-user in v1 and leave it unset. */
   owner: optional(Schema.String),
+  /** Sandbox policy summary; present only on `sandbox` records. */
+  policy: optional(PolicySummary),
   status: Status,
   time: Schema.Struct({
     created: DateTimeUtcFromMillis,

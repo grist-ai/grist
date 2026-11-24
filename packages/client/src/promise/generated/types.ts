@@ -317,6 +317,8 @@ export type GristCodeMapSummary = {
 
 export type EnvironmentKind = "local" | "worktree" | "sandbox"
 
+export type EnvironmentPolicySurface = { status: "full" | "degraded" | "unavailable"; note?: string }
+
 export type EnvironmentStatus = "active" | "missing"
 
 export type WebSearchID = string
@@ -879,17 +881,13 @@ export type VcsInfo = { provider?: string; branch: VcsBranch }
 
 export type GristMemoryList = { backend: string; records: Array<GristMemoryRecord> }
 
-export type EnvironmentInfo = {
-  id: EnvironmentID
-  projectID: ProjectID
-  name: string
-  kind: EnvironmentKind
-  directory?: AbsolutePath
-  branch?: string
-  machine?: string
-  owner?: string
-  status: EnvironmentStatus
-  time: { created: number; updated: number; used?: number }
+export type EnvironmentPolicySummary = {
+  backend: "bwrap" | "sandbox-exec" | "none"
+  filesystem: EnvironmentPolicySurface
+  network: EnvironmentPolicySurface
+  environment: EnvironmentPolicySurface
+  limits: EnvironmentPolicySurface
+  egressAllowlist: Array<string>
 }
 
 export type WebSearchProvider = { id: WebSearchID; name: string }
@@ -2042,7 +2040,19 @@ export type FormReplied = {
   data: { id: FormID; sessionID: string; answer: FormAnswer2 }
 }
 
-export type GristEnvironmentList = { environments: Array<EnvironmentInfo> }
+export type EnvironmentInfo = {
+  id: EnvironmentID
+  projectID: ProjectID
+  name: string
+  kind: EnvironmentKind
+  directory?: AbsolutePath
+  branch?: string
+  machine?: string
+  owner?: string
+  policy?: EnvironmentPolicySummary
+  status: EnvironmentStatus
+  time: { created: number; updated: number; used?: number }
+}
 
 export type SessionInboxMove = {
   id: SessionMessageID
@@ -2431,6 +2441,8 @@ export type FormFields = [FormField, ...Array<FormField>]
 export type CredentialValue = CredentialOAuth | CredentialKey | CredentialExternal
 
 export type FormFields2 = [FormField1, ...Array<FormField1>]
+
+export type GristEnvironmentList = { environments: Array<EnvironmentInfo> }
 
 export type SessionMessageCompaction =
   | SessionMessageCompactionRunning
