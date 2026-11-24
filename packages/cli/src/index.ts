@@ -81,6 +81,13 @@ const Handlers = Runtime.handlers(Commands, {
     publish: () => import("./commands/handlers/team-objects/publish"),
     status: () => import("./commands/handlers/team-objects/status"),
   },
+  listener: {
+    enable: () => import("./commands/handlers/listener/enable"),
+    disable: () => import("./commands/handlers/listener/disable"),
+    status: () => import("./commands/handlers/listener/status"),
+    "run-once": () => import("./commands/handlers/listener/run-once"),
+    watch: () => import("./commands/handlers/listener/watch"),
+  },
   env: {
     list: () => import("./commands/handlers/env/list"),
     create: () => import("./commands/handlers/env/create"),

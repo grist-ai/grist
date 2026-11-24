@@ -298,6 +298,38 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         }),
       ],
     }),
+    Spec.make("listener", {
+      description: "Run queued listener requests for this repository (opt-in, per repo and per machine)",
+      commands: [
+        Spec.make("enable", {
+          description: "Opt this machine into running listener requests for this repository",
+        }),
+        Spec.make("disable", {
+          description: "Stop this machine from running listener requests for this repository",
+        }),
+        Spec.make("status", {
+          description: "Show listener runner status for this repository on this machine",
+          params: {
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+        Spec.make("run-once", {
+          description: "Claim and execute at most one queued listener request for this repository",
+          params: {
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+        Spec.make("watch", {
+          description: "Poll for queued listener requests and execute them as they arrive (Ctrl-C to stop)",
+        }),
+      ],
+    }),
     Spec.make("env", {
       description: "Manage environments for this repository (local and git worktrees)",
       commands: [
