@@ -137,6 +137,25 @@ export type TeamMemoryAuditRow = {
   at: number
 }
 
+/** Action counts from one policy sweep over one team (spec v2 §10). */
+export type TeamMemoryPolicyCounts = {
+  merged: number
+  flagged: number
+  decayed: number
+  archived: number
+}
+
+/** The last policy ("Dreaming") run for a team, as the dashboard shows it
+ * (spec v2 §11): when it ran and what it did. */
+export type TeamMemoryDreamingRun = TeamMemoryPolicyCounts & { at: number }
+
+/** Team-wide memory counts for the dashboard browser (spec v2 §11). */
+export type TeamMemoryCounts = {
+  total: number
+  byOutcome: Record<string, number>
+  byStatus: Record<string, number>
+}
+
 export type CliLoginRow = {
   device_code: string
   user_code: string
@@ -534,6 +553,31 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   )
   const selectTeamMemoryAudit = db.prepare(
     `SELECT * FROM team_memory_audit WHERE team_id = ? ORDER BY id ASC`,
+  )
+  const allTeamIds = db.prepare(`SELECT id FROM teams`)
+  const allTeamMemoryForTeam = db.prepare(
+    `SELECT * FROM team_memory_entries WHERE team_id = ? ORDER BY seq ASC`,
+  )
+  const flagTeamMemory = db.prepare(
+    `UPDATE team_memory_entries SET status = 'flagged', updated_at = ?, seq = ?
+     WHERE team_id = ? AND id = ?`,
+  )
+  const supersedeTeamMemory = db.prepare(
+    `UPDATE team_memory_entries SET superseded_by = ?, updated_at = ?, seq = ?
+     WHERE team_id = ? AND id = ?`,
+  )
+  const decayTeamMemory = db.prepare(
+    `UPDATE team_memory_entries SET weight = ?, metadata = ?, seq = ?
+     WHERE team_id = ? AND id = ?`,
+  )
+  const countTeamMemoryByOutcome = db.prepare(
+    `SELECT outcome, COUNT(*) AS n FROM team_memory_entries WHERE team_id = ? GROUP BY outcome`,
+  )
+  const countTeamMemoryByStatus = db.prepare(
+    `SELECT status, COUNT(*) AS n FROM team_memory_entries WHERE team_id = ? GROUP BY status`,
+  )
+  const countTeamMemoryTotal = db.prepare(
+    `SELECT COUNT(*) AS n FROM team_memory_entries WHERE team_id = ?`,
   )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
@@ -1243,6 +1287,228 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
       return selectTeamMemoryAudit.all(teamId) as TeamMemoryAuditRow[]
     },
 
+    /** Every team id — the policy sweep's work list. */
+    teamIds(): string[] {
+      return (allTeamIds.all() as { id: string }[]).map((row) => row.id)
+    },
+
+    /** Team-wide counts for the dashboard browser (spec v2 §11): totals
+     * across all statuses, not just the list window. */
+    teamMemoryCounts(teamId: string): TeamMemoryCounts {
+      const byOutcome: Record<string, number> = {}
+      for (const row of countTeamMemoryByOutcome.all(teamId) as { outcome: string; n: number }[]) {
+        byOutcome[row.outcome] = row.n
+      }
+      const byStatus: Record<string, number> = {}
+      for (const row of countTeamMemoryByStatus.all(teamId) as { status: string; n: number }[]) {
+        byStatus[row.status] = row.n
+      }
+      return {
+        total: (countTeamMemoryTotal.get(teamId) as { n: number }).n,
+        byOutcome,
+        byStatus,
+      }
+    },
+
+    /** The team's last policy ("Dreaming") run summary, if any (spec v2
+     * §11). Stored as a settings row so it survives restarts. */
+    getDreamingRun(teamId: string): TeamMemoryDreamingRun | undefined {
+      const row = getSetting.get(`dreaming:${teamId}`) as { value: string } | undefined
+      if (!row) return undefined
+      try {
+        const parsed = JSON.parse(row.value) as Partial<TeamMemoryDreamingRun>
+        if (typeof parsed.at !== "number") return undefined
+        return {
+          at: parsed.at,
+          merged: parsed.merged ?? 0,
+          flagged: parsed.flagged ?? 0,
+          decayed: parsed.decayed ?? 0,
+          archived: parsed.archived ?? 0,
+        }
+      } catch {
+        return undefined
+      }
+    },
+
+    /**
+     * One policy sweep over every team (spec v2 §§9–10 — the hosted
+     * Dreaming loop). Fully mechanical, no human gate; every action writes
+     * an audit row under the actor `dreaming`, and nothing is ever deleted:
+     *
+     * 1. Merge near-duplicates — same team + container, same normalized
+     *    content: the strongest entry absorbs the others' weight and
+     *    verifiers (the push strengthen semantics), the absorbed entries
+     *    are marked superseded_by it.
+     * 2. Archive superseded entries — anything still active whose
+     *    superseded_by is set.
+     * 3. Staleness flags (§9, decision D4) — an active entry is flagged
+     *    when a newer active entry in the same container verifies
+     *    overlapping code at a different commit. Flag only: the row, its
+     *    content, and its list visibility are untouched.
+     * 4. Decay (§10) — active entries inactive for the whole retention
+     *    window lose a factor of their weight, at most one step per
+     *    window (tracked in metadata, so a repeat sweep is a no-op).
+     *    Activity is last store/strengthen time; the store keeps no
+     *    per-entry pull ledger in v1.
+     * 5. Archive zero-weight entries (§10) inactive past the window.
+     *
+     * Decisions are computed from a per-team snapshot, so a second sweep
+     * at the same instant changes nothing (idempotent). Each team's run
+     * summary is recorded for the dashboard (§11).
+     */
+    runTeamMemoryPolicy(input: {
+      now: number
+      retentionMs: number
+      decayFactor: number
+    }): Array<{ teamId: string } & TeamMemoryPolicyCounts> {
+      const results: Array<{ teamId: string } & TeamMemoryPolicyCounts> = []
+      const teamIds = (allTeamIds.all() as { id: string }[]).map((row) => row.id)
+      for (const teamId of teamIds) {
+        const counts: TeamMemoryPolicyCounts = { merged: 0, flagged: 0, decayed: 0, archived: 0 }
+        db.transaction(() => {
+          const rows = (allTeamMemoryForTeam.all(teamId) as TeamMemoryRow[]).map((row) => ({
+            ...row,
+          }))
+          const byId = new Map(rows.map((row) => [row.id, row]))
+          const active = () => [...byId.values()].filter((row) => row.status === "active")
+          const audit = (action: string, entryId: string) =>
+            insertTeamMemoryAudit.run(teamId, "dreaming", action, entryId, input.now)
+
+          // 1. Merge near-duplicates.
+          const groups = new Map<string, TeamMemoryRow[]>()
+          for (const row of active()) {
+            const key = `${row.container}\n${normalizeMemoryContent(row.content)}`
+            const group = groups.get(key)
+            if (group) group.push(row)
+            else groups.set(key, [row])
+          }
+          for (const group of groups.values()) {
+            if (group.length < 2) continue
+            group.sort((a, b) => b.weight - a.weight || a.created_at - b.created_at || a.seq - b.seq)
+            const winner = group[0]
+            if (!winner) continue
+            for (const loser of group.slice(1)) {
+              const metadata = JSON.parse(winner.metadata) as Record<string, unknown>
+              const verifiers = new Set(
+                Array.isArray(metadata.also_verified_by)
+                  ? metadata.also_verified_by.filter((v): v is string => typeof v === "string")
+                  : [],
+              )
+              if (loser.author_user_id && loser.author_user_id !== winner.author_user_id) {
+                verifiers.add(loser.author_user_id)
+              }
+              metadata.also_verified_by = [...verifiers]
+              winner.weight += loser.weight
+              if (loser.created_at > winner.created_at && loser.commit_sha) {
+                winner.commit_sha = loser.commit_sha
+              }
+              winner.metadata = JSON.stringify(metadata)
+              winner.updated_at = input.now
+              winner.seq = nextTeamMemorySeq(teamId)
+              strengthenTeamMemory.run(
+                winner.weight,
+                winner.commit_sha,
+                winner.metadata,
+                winner.updated_at,
+                winner.seq,
+                teamId,
+                winner.id,
+              )
+              audit("strengthen", winner.id)
+              loser.superseded_by = winner.id
+              loser.updated_at = input.now
+              loser.seq = nextTeamMemorySeq(teamId)
+              supersedeTeamMemory.run(winner.id, loser.updated_at, loser.seq, teamId, loser.id)
+              audit("supersede", loser.id)
+              counts.merged++
+            }
+          }
+
+          // 2. Archive superseded entries.
+          for (const row of active()) {
+            if (!row.superseded_by) continue
+            row.status = "archived"
+            row.updated_at = input.now
+            row.seq = nextTeamMemorySeq(teamId)
+            archiveTeamMemory.run(row.updated_at, row.seq, teamId, row.id)
+            audit("archive", row.id)
+            counts.archived++
+          }
+
+          // 3. Staleness flags — decided from the post-merge active set,
+          // before any flag is applied, so the outcome cannot depend on
+          // iteration order.
+          const actives = active()
+          const refsOf = (row: TeamMemoryRow): string[] => {
+            try {
+              const parsed = JSON.parse(row.code_refs) as unknown
+              return Array.isArray(parsed)
+                ? parsed.filter((ref): ref is string => typeof ref === "string")
+                : []
+            } catch {
+              return []
+            }
+          }
+          const stale = actives.filter(
+            (entry) =>
+              entry.commit_sha &&
+              actives.some(
+                (newer) =>
+                  newer.id !== entry.id &&
+                  newer.container === entry.container &&
+                  newer.commit_sha &&
+                  newer.commit_sha !== entry.commit_sha &&
+                  newer.created_at > entry.created_at &&
+                  refsOf(newer).some((ref) => refsOf(entry).includes(ref)),
+              ),
+          )
+          for (const row of stale) {
+            row.status = "flagged"
+            row.updated_at = input.now
+            row.seq = nextTeamMemorySeq(teamId)
+            flagTeamMemory.run(row.updated_at, row.seq, teamId, row.id)
+            audit("flag", row.id)
+            counts.flagged++
+          }
+
+          // 4. Decay weights of entries inactive for a full window.
+          for (const row of active()) {
+            const metadata = JSON.parse(row.metadata) as Record<string, unknown>
+            const lastDecay =
+              typeof metadata.dreaming_decayed_at === "number" ? metadata.dreaming_decayed_at : 0
+            if (input.now - Math.max(row.updated_at, lastDecay) < input.retentionMs) continue
+            const decayed = Math.round(row.weight * input.decayFactor * 1000) / 1000
+            if (decayed === row.weight) continue
+            metadata.dreaming_decayed_at = input.now
+            row.weight = decayed
+            row.metadata = JSON.stringify(metadata)
+            row.seq = nextTeamMemorySeq(teamId)
+            decayTeamMemory.run(row.weight, row.metadata, row.seq, teamId, row.id)
+            audit("decay", row.id)
+            counts.decayed++
+          }
+
+          // 5. Archive zero-weight entries past the window.
+          for (const row of active()) {
+            if (row.weight > 0) continue
+            if (input.now - row.updated_at < input.retentionMs) continue
+            row.status = "archived"
+            row.updated_at = input.now
+            row.seq = nextTeamMemorySeq(teamId)
+            archiveTeamMemory.run(row.updated_at, row.seq, teamId, row.id)
+            audit("archive", row.id)
+            counts.archived++
+          }
+        })()
+        setSetting.run(
+          `dreaming:${teamId}`,
+          JSON.stringify({ at: input.now, ...counts }),
+        )
+        results.push({ teamId, ...counts })
+      }
+      return results
+    },
+
     createApiKey(input: { inviteCode: string; name?: string; kind?: ApiKeyKind }): { secret: string; key: PublicApiKey } | undefined {
       const invite = lookup(input.inviteCode)
       if (!invite) return
@@ -1391,6 +1657,13 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
 }
 
 export type GatewayStore = ReturnType<typeof openGatewayStore>
+
+/** Content identity for the policy job's duplicate detection (spec v2
+ * §10): case- and whitespace-insensitive, so a re-captured lesson with
+ * cosmetic differences still reads as the same lesson. */
+function normalizeMemoryContent(content: string): string {
+  return content.trim().replace(/\s+/g, " ").toLowerCase()
+}
 
 function publicApiKey(row: ApiKeyRow): PublicApiKey {
   return {
