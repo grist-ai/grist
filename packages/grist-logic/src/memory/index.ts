@@ -88,7 +88,7 @@ export {
   summarizeTeamSyncState,
   syncTeamMemory,
   teamSyncPath,
-  estimateTokens,
+  estimateMemoryTokens,
   type PullSummary,
   type PushSummary,
   type QueueResult,

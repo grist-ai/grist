@@ -435,7 +435,7 @@ export function recallTeamMemory(
 }
 
 /** Rough token estimate for budget accounting (~4 chars/token). */
-export function estimateTokens(text: string): number {
+export function estimateMemoryTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
@@ -459,7 +459,7 @@ export function mergeRecallHits(input: {
   let used = 0
   for (const hit of ranked) {
     if (merged.length >= maxHits) break
-    const cost = estimateTokens(hit.content) + 16
+    const cost = estimateMemoryTokens(hit.content) + 16
     if (merged.length > 0 && used + cost > budget) continue
     merged.push(hit)
     used += cost

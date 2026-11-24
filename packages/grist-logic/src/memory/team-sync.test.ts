@@ -50,7 +50,7 @@ function stubGateway(options?: {
 }) {
   const calls: { path: string; body: Record<string, unknown> }[] = []
   const seenSignatures = new Set<string>()
-  const fetchStub: typeof fetch = async (input, init) => {
+  const fetchStub = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = String(input)
     const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
     calls.push({ path: url, body })
@@ -78,7 +78,8 @@ function stubGateway(options?: {
     }
     return new Response("not found", { status: 404 })
   }
-  return { calls, fetch: fetchStub, deps: { fetch: fetchStub, loadConfig: () => CONFIG } satisfies TeamSyncDeps }
+  const deps: TeamSyncDeps = { fetch: fetchStub as typeof fetch, loadConfig: () => CONFIG }
+  return { calls, fetch: fetchStub, deps }
 }
 
 function wireEntry(overrides?: Record<string, unknown>): Record<string, unknown> {
@@ -205,7 +206,7 @@ describe("team memory push path", () => {
       fetch: (async () => {
         calls++
         throw new Error("must not be called")
-      }) as typeof fetch,
+      }) as unknown as typeof fetch,
     })
     expect(summary.error).toBe("not signed in")
     expect(summary.pending).toBe(1)
