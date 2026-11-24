@@ -20,6 +20,9 @@ import {
   type NotificationRow,
   type TeamMemoryPushInput,
   type TeamMemoryRow,
+  type TeamObjectKind,
+  type TeamObjectPushInput,
+  type TeamObjectRow,
 } from "./store.js"
 import { findSecretKind } from "./secrets-scan.js"
 import { canonicalApiKey } from "./codes.js"
@@ -147,6 +150,9 @@ const RATE_LIMITS = {
   // Team memory pushes land at session end; 120 batches/hr per actor is
   // far above real harness cadence and bounds store-spam from a bad client.
   teamMemoryPush: { limit: 120, windowMs: 3_600_000 },
+  // Object pushes mirror the memory discipline exactly (filesystem spec
+  // v1 §6: own bucket, same shape) — authoring is bursty, not continuous.
+  teamObjectsPush: { limit: 120, windowMs: 3_600_000 },
 }
 /**
  * Flat debit per Jev `scoreTask` call. Jev bills per request rather than per
@@ -160,6 +166,18 @@ const MAX_GATE_BYTES = 8 * 1024
 const TEAM_MEMORY_MAX_ENTRIES = 50
 const TEAM_MEMORY_MAX_CONTENT_BYTES = 4 * 1024
 const TEAM_MEMORY_PUSH_MAX_BYTES = 512 * 1024
+/**
+ * Team objects (filesystem spec v1 §§5–6): at most 50 objects per push,
+ * bodies capped at 32 KB per kind (skill and agent_definition alike), so
+ * a full batch of max-size objects plus JSON overhead bounds the body.
+ * Object names are slugs: how the harness addresses a skill or def on
+ * disk and in pickers, so they stay lowercase, path-safe, and short.
+ */
+const TEAM_OBJECTS_MAX_ENTRIES = 50
+const TEAM_OBJECT_MAX_BODY_BYTES = 32 * 1024
+const TEAM_OBJECTS_PUSH_MAX_BYTES = 2 * 1024 * 1024
+const TEAM_OBJECT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/
+const TEAM_OBJECT_KINDS: readonly TeamObjectKind[] = ["skill", "agent_definition"]
 const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
@@ -492,6 +510,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (pathname === "/v1/team-memory" || pathname.startsWith("/v1/team-memory/")) {
       return teamMemory(req, pathname)
+    }
+    if (pathname === "/v1/team-objects" || pathname.startsWith("/v1/team-objects/")) {
+      return teamObjects(req, pathname)
     }
 
     if (pathname === "/v1/rung-models") {
@@ -1205,6 +1226,206 @@ export function createGateway(opts: GatewayOptions = {}) {
     return json(404, { error: "not found" })
   }
 
+  type ParsedObjectEntry =
+    | { ok: true; input: TeamObjectPushInput }
+    | { ok: false; id: string | null; reason: string; container?: string }
+
+  /**
+   * Validate one pushed object at the boundary (filesystem spec v1 §5):
+   * shape, the kind allowlist for this slice, a legal slug name, the
+   * 32 KB body cap, the secrets re-scan over body and metadata, then the
+   * per-kind schema. Admission lives here, not in the store — the same
+   * layering as team memory. Verified-kinds-only does NOT apply: that
+   * rule is memory's, and extending it to documents would dilute it
+   * exactly where it matters (D-FS4).
+   */
+  function parseObjectEntry(raw: unknown): ParsedObjectEntry {
+    if (!raw || typeof raw !== "object") return { ok: false, id: null, reason: "invalid_entry" }
+    const entry = raw as Record<string, unknown>
+    const id =
+      typeof entry.id === "string" && entry.id.length > 0 && entry.id.length <= 128
+        ? entry.id
+        : undefined
+    if (!id) return { ok: false, id: null, reason: "invalid_entry" }
+    const fail = (reason: string, container?: string): ParsedObjectEntry => ({
+      ok: false,
+      id,
+      reason,
+      container,
+    })
+    const container = entry.container
+    if (typeof container !== "string" || container.length === 0 || container.length > 256) {
+      return fail("invalid_entry")
+    }
+    if (
+      typeof entry.kind !== "string" ||
+      !TEAM_OBJECT_KINDS.includes(entry.kind as TeamObjectKind)
+    ) {
+      return fail("invalid_kind", container)
+    }
+    const kind = entry.kind as TeamObjectKind
+    if (typeof entry.name !== "string" || !TEAM_OBJECT_NAME.test(entry.name)) {
+      return fail("invalid_name", container)
+    }
+    const name = entry.name
+    const body = entry.body
+    if (typeof body !== "string" || body.length === 0) return fail("invalid_entry", container)
+    if (new TextEncoder().encode(body).length > TEAM_OBJECT_MAX_BODY_BYTES) {
+      return fail("oversize", container)
+    }
+    let metadata: Record<string, unknown> = {}
+    if (entry.metadata !== undefined) {
+      if (!entry.metadata || typeof entry.metadata !== "object" || Array.isArray(entry.metadata)) {
+        return fail("invalid_metadata", container)
+      }
+      metadata = entry.metadata as Record<string, unknown>
+    }
+    if (findSecretKind(body) || findSecretKind(JSON.stringify(metadata))) {
+      return fail("secret_detected", container)
+    }
+    const supersedes = entry.supersedes === undefined ? null : entry.supersedes
+    if (
+      supersedes !== null &&
+      (typeof supersedes !== "string" || supersedes.length === 0 || supersedes.length > 128)
+    ) {
+      return fail("invalid_entry", container)
+    }
+    const schemaError =
+      kind === "skill"
+        ? skillSchemaError(name, body, metadata)
+        : agentDefinitionSchemaError(metadata)
+    if (schemaError) return fail(schemaError, container)
+    return { ok: true, input: { id, kind, container, name, body, metadata, supersedes } }
+  }
+
+  /**
+   * Team object sync (filesystem spec v1 §6): a parallel stream beside
+   * team memory — same auth (resolveInvite), same tenancy derivation
+   * (the caller's team comes from membership, never from the request),
+   * membership re-read on every call, connector keys read-only. The
+   * memory endpoints are frozen; this stream has its own seq space and
+   * its own rate bucket.
+   */
+  async function teamObjects(req: Request, pathname: string): Promise<Response> {
+    if (req.method !== "POST") return json(405, { error: "method not allowed" })
+    const invite = await resolveInvite(req)
+    if (invite instanceof Response) return invite
+    const account = store.getAccountByInvite(invite.code)
+    if (!account) return json(403, { error: "an account is required for team objects" })
+    const uid = account.firebase_uid
+    const mine = store.getTeamForUser(uid)
+    const actor = { uid }
+
+    if (pathname === "/v1/team-objects/pull") {
+      const body = await readJson(req)
+      // No team → nothing to mirror; the revoked signal tells the client
+      // to wipe its local object mirror, exactly as with memory (§6).
+      if (!mine) return json(200, { revoked: true, objects: [], tombstones: [], next_seq: 0 })
+      const sinceSeq =
+        typeof body?.since_seq === "number" && Number.isFinite(body.since_seq) && body.since_seq > 0
+          ? Math.floor(body.since_seq)
+          : 0
+      const kinds = Array.isArray(body?.kinds)
+        ? body.kinds.filter(
+            (k): k is TeamObjectKind =>
+              typeof k === "string" && TEAM_OBJECT_KINDS.includes(k as TeamObjectKind),
+          )
+        : undefined
+      const containers = Array.isArray(body?.containers)
+        ? body.containers.filter((c): c is string => typeof c === "string")
+        : undefined
+      const pulled = store.pullTeamObjects(mine.team.id, actor, sinceSeq, { kinds, containers })
+      return json(200, {
+        objects: pulled.objects.map((row) => publicTeamObject(row, true)),
+        tombstones: pulled.tombstones,
+        next_seq: pulled.nextSeq,
+      })
+    }
+
+    if (!mine) return json(409, { error: "not in a team" })
+
+    if (pathname === "/v1/team-objects/push") {
+      if (invite.keyKind === "connector") {
+        return json(403, { error: "connector keys cannot modify team objects" })
+      }
+      if (
+        !allowWindow(
+          `teamobjectspush:${uid}`,
+          limits.teamObjectsPush.limit,
+          limits.teamObjectsPush.windowMs,
+        )
+      ) {
+        return json(429, { error: "too many team object pushes — try again later" })
+      }
+      const body = await readJson(req, TEAM_OBJECTS_PUSH_MAX_BYTES)
+      const objects = body?.objects
+      if (!Array.isArray(objects)) return json(400, { error: "objects must be an array" })
+      if (objects.length > TEAM_OBJECTS_MAX_ENTRIES) {
+        return json(400, { error: `at most ${TEAM_OBJECTS_MAX_ENTRIES} objects per push` })
+      }
+      const pushActor = { uid, userId: account.user_id }
+      const results = objects.map((raw) => {
+        const parsed = parseObjectEntry(raw)
+        if (!parsed.ok) {
+          if (parsed.reason === "secret_detected") {
+            // The author learns the object was rejected and why — never
+            // which pattern matched or what it matched.
+            store.createNotification({
+              uid,
+              type: "object_rejected",
+              payload: {
+                object_id: parsed.id,
+                container: parsed.container ?? null,
+                reason: "secret_detected",
+              },
+            })
+          }
+          return { id: parsed.id, result: "rejected" as const, reason: parsed.reason }
+        }
+        const applied = store.pushTeamObject(mine.team.id, pushActor, parsed.input)
+        if (applied.status === "rejected") {
+          return { id: parsed.input.id, result: "rejected" as const, reason: applied.reason }
+        }
+        return { id: parsed.input.id, result: applied.status }
+      })
+      return json(200, { results })
+    }
+
+    if (pathname === "/v1/team-objects/remove") {
+      if (invite.keyKind === "connector") {
+        return json(403, { error: "connector keys cannot modify team objects" })
+      }
+      const body = await readJson(req)
+      const id = typeof body?.id === "string" ? body.id : ""
+      const removed = store.removeTeamObject(mine.team.id, id, {
+        uid,
+        role: mine.membership.role,
+      })
+      if (!removed.ok) {
+        if (removed.reason === "not_found") return json(404, { error: "object not found" })
+        return json(403, { error: "only the author or a team owner/admin can remove an object" })
+      }
+      return json(200, { ok: true })
+    }
+
+    if (pathname === "/v1/team-objects/list") {
+      const body = await readJson(req)
+      const rows = store.listTeamObjects(mine.team.id, actor, {
+        container: typeof body?.container === "string" ? body.container : undefined,
+        kind: typeof body?.kind === "string" ? body.kind : undefined,
+        name: typeof body?.name === "string" ? body.name : undefined,
+        authorUserId: typeof body?.author_user_id === "string" ? body.author_user_id : undefined,
+        headOnly: body?.head_only === true,
+        limit: typeof body?.limit === "number" ? body.limit : undefined,
+      })
+      return json(200, {
+        objects: rows.map((row) => publicTeamObject(row, row.is_head === 1)),
+      })
+    }
+
+    return json(404, { error: "not found" })
+  }
+
   async function usage(req: Request): Promise<Response> {
     const invite = await resolveInvite(req)
     if (invite instanceof Response) return invite
@@ -1642,6 +1863,106 @@ function publicTeamMemoryEntry(row: TeamMemoryRow) {
     superseded_by: row.superseded_by,
     updated_at: row.updated_at,
   }
+}
+
+/**
+ * A team object row as the sync + browse surfaces return it: body and
+ * metadata whole (objects are documents, consumed as files by the
+ * harness — there is no field-level shaping story like memory's), author
+ * attribution, chain position, status, and the pull cursor.
+ * firebase_uid never leaves the server.
+ */
+function publicTeamObject(row: TeamObjectRow, isHead: boolean) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    container: row.container,
+    name: row.name,
+    body: row.body,
+    metadata: JSON.parse(row.metadata) as Record<string, unknown>,
+    author_user_id: row.author_user_id,
+    supersedes: row.supersedes,
+    status: row.status,
+    seq: row.seq,
+    is_head: isHead,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }
+}
+
+/**
+ * Skill admission (filesystem spec v1 §5): a skill is a SKILL.md-shaped
+ * definition — name, description, body. The name rides as the object's
+ * identity; the description lives in metadata or in the body's own
+ * frontmatter. A frontmatter block, when present, must be closed, and
+ * the name it declares must agree with the object's name — a definition
+ * that calls itself something else is not the object it claims to be.
+ * Returns the rejection reason, or undefined when the skill is valid.
+ */
+function skillSchemaError(
+  name: string,
+  body: string,
+  metadata: Record<string, unknown>,
+): string | undefined {
+  const frontmatter = parseSkillFrontmatter(body)
+  if (frontmatter.present && !frontmatter.closed) return "invalid_schema"
+  if (frontmatter.fields.name && frontmatter.fields.name !== name) return "invalid_schema"
+  const declared = metadata.description
+  const description =
+    typeof declared === "string" && declared.trim() ? declared : frontmatter.fields.description
+  if (!description || description.length > 1024) return "invalid_schema"
+  return undefined
+}
+
+/**
+ * The flat `key: value` fields of a body's leading `---` frontmatter
+ * block, when it has one. Deliberately a shallow scan, not a YAML parse:
+ * admission needs the name/description agreement check, and full YAML
+ * semantics are the harness's concern when it loads the skill.
+ */
+function parseSkillFrontmatter(body: string): {
+  present: boolean
+  closed: boolean
+  fields: Record<string, string>
+} {
+  if (!body.startsWith("---")) return { present: false, closed: true, fields: {} }
+  const lines = body.split("\n")
+  if (lines[0]?.trim() !== "---") return { present: false, closed: true, fields: {} }
+  const fields: Record<string, string> = {}
+  for (let i = 1; i < lines.length; i++) {
+    const line = (lines[i] ?? "").trim()
+    if (line === "---" || line === "...") return { present: true, closed: true, fields }
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    if (match?.[1] && match[2] !== undefined) {
+      fields[match[1]] = match[2].replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1")
+    }
+  }
+  return { present: true, closed: false, fields }
+}
+
+/**
+ * Agent-definition admission (filesystem spec v1 §5): the def's body is
+ * its system prompt (§4), so the schema constrains the config that rides
+ * in metadata — and only the fields the spec names, only when present.
+ * Unknown keys are the def's own business (frontmatter-overflow
+ * posture); a malformed known field is a rejection, not a silent drop.
+ */
+function agentDefinitionSchemaError(metadata: Record<string, unknown>): string | undefined {
+  if (metadata.tools !== undefined) {
+    if (!Array.isArray(metadata.tools)) return "invalid_schema"
+    if (metadata.tools.some((tool) => typeof tool !== "string" || tool.length === 0)) {
+      return "invalid_schema"
+    }
+  }
+  if (metadata.rung_ceiling !== undefined) {
+    if (
+      typeof metadata.rung_ceiling !== "string" ||
+      !PUBLIC_RUNGS.includes(metadata.rung_ceiling as Rung)
+    ) {
+      return "invalid_schema"
+    }
+  }
+  return undefined
 }
 
 function inviteUsable(invite: InviteRow, t: number): boolean {
