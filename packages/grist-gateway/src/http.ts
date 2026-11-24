@@ -212,6 +212,12 @@ const TEAM_OBJECT_KINDS: readonly TeamObjectKind[] = [
 const WEBHOOK_MAX_BYTES = 1024 * 1024
 const WEBHOOK_RATE_LIMIT = { limit: 600, windowMs: 3_600_000 }
 const DEFAULT_LISTENER_REQUEST_TTL_MS = 72 * 3_600_000
+/**
+ * Runner claim/complete calls (S-LIS2): a polling runner is chatty by
+ * design, so the bucket is generous — it bounds a runaway loop, not a
+ * working runner.
+ */
+const LISTENER_RUNNER_RATE_LIMIT = { limit: 600, windowMs: 3_600_000 }
 const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
@@ -1723,11 +1729,12 @@ export function createGateway(opts: GatewayOptions = {}) {
   }
 
   /**
-   * Listener run-request queue reads (next-block spec §6.7, S-LIS1).
-   * Same auth and tenancy as the team streams: resolveInvite, the
-   * caller's team from membership, connector keys read-only by
-   * construction. The claim endpoint is S-LIS2's — this slice exposes
-   * the queue for inspection only.
+   * Listener run-request queue surface (next-block spec §6.7). Reads
+   * (S-LIS1) and the runner lifecycle (S-LIS2: claim + complete) share
+   * the auth and tenancy of the team streams: resolveInvite, the
+   * caller's team from membership, never from the request. Connector
+   * keys are read-only here as everywhere — a scoped token can inspect
+   * the queue but can never claim work or report spend.
    */
   async function listenerRequests(req: Request, pathname: string): Promise<Response> {
     if (req.method !== "POST") return json(405, { error: "method not allowed" })
@@ -1745,6 +1752,80 @@ export function createGateway(opts: GatewayOptions = {}) {
         limit: typeof body?.limit === "number" ? body.limit : undefined,
       })
       return json(200, { requests: rows.map(publicListenerRunRequest) })
+    }
+    if (pathname === "/v1/listeners/requests/claim" || pathname === "/v1/listeners/requests/complete") {
+      if (invite.keyKind === "connector") {
+        return json(403, { error: "connector keys cannot run listener requests" })
+      }
+      if (!mine) return json(409, { error: "not in a team" })
+      if (
+        !allowWindow(
+          `listenerrunner:${invite.code}`,
+          LISTENER_RUNNER_RATE_LIMIT.limit,
+          LISTENER_RUNNER_RATE_LIMIT.windowMs,
+        )
+      ) {
+        return json(429, { error: "too many runner calls — try again later" })
+      }
+      const body = await readJson(req)
+      const requestId = typeof body?.request_id === "string" ? body.request_id : ""
+      if (!requestId) return json(400, { error: "request_id is required" })
+      if (pathname === "/v1/listeners/requests/claim") {
+        // The store decides mechanically (spec §6.3): envelope caps,
+        // the kill switch, creator membership — a refusal is a
+        // successful decision, reported as one, not an error.
+        const result = store.claimListenerRunRequest({
+          teamId: mine.team.id,
+          requestId,
+          claimantUid: account.firebase_uid,
+        })
+        if (result.status === "not_found") return json(404, { error: "request not found" })
+        if (result.status === "not_claimable") {
+          return json(409, { error: `request is ${result.state}, not queued` })
+        }
+        if (result.status === "expired") {
+          return json(200, {
+            claimed: false,
+            expired: true,
+            request: publicListenerRunRequest(result.request),
+          })
+        }
+        if (result.status === "refused") {
+          return json(200, {
+            claimed: false,
+            refused: true,
+            reason: result.reason,
+            request: publicListenerRunRequest(result.request),
+          })
+        }
+        return json(200, { claimed: true, request: publicListenerRunRequest(result.request) })
+      }
+      const spendUsd = body?.spend_usd
+      if (typeof spendUsd !== "number" || !Number.isFinite(spendUsd) || spendUsd < 0 || spendUsd > 1_000_000) {
+        return json(400, { error: "spend_usd must be a number between 0 and 1000000" })
+      }
+      const outcome = body?.outcome === "failed" ? "failed" : "succeeded"
+      const result = store.completeListenerRunRequest({
+        teamId: mine.team.id,
+        requestId,
+        claimantUid: account.firebase_uid,
+        spendUsd,
+        outcome,
+        sessionId: typeof body?.session_id === "string" ? body.session_id : undefined,
+        error: typeof body?.error === "string" ? body.error : undefined,
+      })
+      if (result.status === "not_found") return json(404, { error: "request not found" })
+      if (result.status === "not_claimant") {
+        return json(403, { error: "only the runner that claimed this request can report it" })
+      }
+      if (result.status === "not_claimable") {
+        return json(409, { error: `request is ${result.state}, not claimed` })
+      }
+      return json(200, {
+        completed: true,
+        over_run_cap: result.overRunCap,
+        request: publicListenerRunRequest(result.request),
+      })
     }
     return json(404, { error: "not found" })
   }
@@ -2735,9 +2816,11 @@ function publicListenerRunRequest(row: ListenerRunRequestRow) {
     target: JSON.parse(row.target) as Record<string, unknown>,
     envelope: JSON.parse(row.envelope) as Record<string, unknown>,
     state: row.state,
+    spend_usd: row.spend_usd,
     created_at: row.created_at,
     updated_at: row.updated_at,
     expires_at: row.expires_at,
+    completed_at: row.completed_at,
   }
 }
 
