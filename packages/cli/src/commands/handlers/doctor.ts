@@ -1,7 +1,13 @@
 import { Service } from "@opencode/client/effect/service"
 import { names as configFileNames } from "@opencode/core/config/discovery"
 import { Global } from "@opencode/util/global"
-import { gatewayAuthHeaders, loadInviteConfig, type InviteConfig } from "@grist-ai/logic"
+import {
+  gatewayAuthHeaders,
+  loadInviteConfig,
+  readTeamSyncStateSync,
+  summarizeTeamSyncState,
+  type InviteConfig,
+} from "@grist-ai/logic"
 import { Effect } from "effect"
 import fs from "node:fs"
 import path from "node:path"
@@ -157,6 +163,22 @@ async function checkGateway(): Promise<CheckResult> {
   }
 }
 
+/**
+ * Team memory sync status for the current repo (spec v2 §11). Local-only:
+ * reads the per-repo journal, never the network. Not opted in is a healthy
+ * state (D2) — reported as pass with the opt-in hint, never a failure.
+ */
+export function checkTeamMemory(cwd: string = process.cwd()): CheckResult {
+  const status = summarizeTeamSyncState(readTeamSyncStateSync(cwd), cwd)
+  if (!status.enabled) return ok("team memory", "not enabled for this repo — opt in: grist team-memory enable")
+  if (status.revoked) {
+    return warn("team memory", "paused — gateway reports no team for this account; rejoin, then: grist team-memory enable")
+  }
+  const detail = `sync on · mirror ${status.mirrorCount} · queued ${status.pendingCount} · cursor ${status.cursor}`
+  if (status.lastError) return warn("team memory", `${detail} · last error: ${status.lastError}`)
+  return ok("team memory", detail)
+}
+
 function checkJevGate(): CheckResult {
   if (process.env.TYPESAFE_API_KEY?.trim()) {
     return ok("jev gate", "TYPESAFE_API_KEY set — live confidence gate")
@@ -215,6 +237,7 @@ export default Runtime.handler(
     ]
     results.push(yield* Effect.promise(() => checkAuth()))
     results.push(yield* Effect.promise(() => checkGateway()))
+    results.push(checkTeamMemory())
     results.push(checkJevGate())
     results.push(yield* checkService())
     results.push(checkWritability())

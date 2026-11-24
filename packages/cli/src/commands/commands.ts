@@ -240,6 +240,26 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         }),
       ],
     }),
+    Spec.make("team-memory", {
+      description: "Manage team memory sync for this repository (opt-in, per repo)",
+      commands: [
+        Spec.make("enable", {
+          description: "Opt this repository into team memory sync",
+        }),
+        Spec.make("disable", {
+          description: "Stop team memory sync for this repository",
+        }),
+        Spec.make("status", {
+          description: "Show team memory sync status for this repository",
+          params: {
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+      ],
+    }),
     Spec.make("mcp", {
       description: "Manage MCP (Model Context Protocol) servers",
       commands: [

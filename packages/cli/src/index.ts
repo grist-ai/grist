@@ -72,6 +72,11 @@ const Handlers = Runtime.handlers(Commands, {
     remove: () => import("./commands/handlers/plugin/remove"),
   },
   models: () => import("./commands/handlers/models"),
+  "team-memory": {
+    enable: () => import("./commands/handlers/team-memory/enable"),
+    disable: () => import("./commands/handlers/team-memory/disable"),
+    status: () => import("./commands/handlers/team-memory/status"),
+  },
   doctor: () => import("./commands/handlers/doctor"),
   stats: () => import("./commands/handlers/stats"),
   mini: () => import("./commands/handlers/mini"),
