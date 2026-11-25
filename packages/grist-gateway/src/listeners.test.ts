@@ -963,7 +963,7 @@ describe("runner claim + envelope (next-block spec §6.3/§6.7, S-LIS2)", () => 
     })
   })
 
-  test("runs/day: a second claim past the daily run cap is refused mechanically", async () => {
+  test("runs/day: a second claim past the daily run cap parks in the inbox (S-INBOX1)", async () => {
     const setup = intakeSetup()
     await pushListener(setup, {
       envelope: { max_runs_per_day: 1, max_spend_per_day_usd: 10, max_spend_per_run_usd: 2 },
@@ -973,23 +973,25 @@ describe("runner claim + envelope (next-block spec §6.3/§6.7, S-LIS2)", () => 
     await complete(setup.gw, setup.owner.code, first, { spend_usd: 0.5 })
 
     const second = await deliverQueued(setup, "delivery-2")
-    const refused = await claim(setup.gw, setup.owner.code, second)
-    expect(refused.status).toBe(200)
-    expect(refused.json.claimed).toBe(false)
-    expect(refused.json.refused).toBe(true)
-    expect(refused.json.reason).toBe("max_runs_per_day")
-    expect((refused.json.request as Record<string, unknown>).state).toBe("refused")
-
-    const rows = refusedRows(setup.store, setup.teamId)
-    expect(rows.map((row) => row.detail)).toEqual(["max_runs_per_day"])
-    expect(rows[0]?.entry_id).toBe(second)
-    expect(notificationTypes(setup.store, setup.owner.uid)).toContain("listener_request_refused")
+    const parked = await claim(setup.gw, setup.owner.code, second)
+    expect(parked.status).toBe(200)
+    expect(parked.json.claimed).toBe(false)
+    // S-INBOX1 supersedes the S-LIS2 interim behavior (refuse
+    // outright): an envelope breach parks as awaiting_approval with
+    // an inbox item, and nothing is refused yet.
+    expect(parked.json.parked).toBe(true)
+    expect(parked.json.reason).toBe("max_runs_per_day")
+    expect(typeof parked.json.inbox_item_id).toBe("string")
+    expect((parked.json.request as Record<string, unknown>).state).toBe("awaiting_approval")
+    expect(refusedRows(setup.store, setup.teamId)).toHaveLength(0)
+    expect(notificationTypes(setup.store, setup.owner.uid)).toContain("inbox_item_parked")
+    expect(notificationTypes(setup.store, setup.owner.uid)).not.toContain("listener_request_refused")
     // No partial run, no spend: nothing was claimed for the second request.
     const audit = listenerAudit(setup.store, setup.teamId)
     expect(audit.filter((row) => row.action === "claimed")).toHaveLength(1)
   })
 
-  test("spend/day: recorded spend plus the next run's cap exposure refuses the claim", async () => {
+  test("spend/day: recorded spend plus the next run's cap exposure parks the claim (S-INBOX1)", async () => {
     const setup = intakeSetup()
     await pushListener(setup, {
       envelope: { max_runs_per_day: 10, max_spend_per_day_usd: 3, max_spend_per_run_usd: 2 },
@@ -1000,12 +1002,11 @@ describe("runner claim + envelope (next-block spec §6.3/§6.7, S-LIS2)", () => 
     await complete(setup.gw, setup.owner.code, first, { spend_usd: 1.5 })
 
     const second = await deliverQueued(setup, "delivery-2")
-    const refused = await claim(setup.gw, setup.owner.code, second)
-    expect(refused.json.refused).toBe(true)
-    expect(refused.json.reason).toBe("max_spend_per_day") // $1.50 recorded + $2 exposure > $3
-    expect(refusedRows(setup.store, setup.teamId).map((row) => row.detail)).toEqual([
-      "max_spend_per_day",
-    ])
+    const parked = await claim(setup.gw, setup.owner.code, second)
+    expect(parked.json.parked).toBe(true)
+    expect(parked.json.reason).toBe("max_spend_per_day") // $1.50 recorded + $2 exposure > $3
+    expect((parked.json.request as Record<string, unknown>).state).toBe("awaiting_approval")
+    expect(refusedRows(setup.store, setup.teamId)).toHaveLength(0)
   })
 
   test("kill switch: disabling a listener refuses its already-queued requests at claim", async () => {
