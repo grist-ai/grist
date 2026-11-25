@@ -47,13 +47,13 @@ function estimateBodyBytes(messages: ReadonlyArray<Message>): number {
 export function truncateHistory(
   messages: Array<Message>,
   threshold = DEFAULT_TRUNCATION_THRESHOLD,
+  protectedFrom = protectedTailStart(messages),
 ): TruncationReport {
   const initial = estimateBodyBytes(messages)
   if (initial <= threshold) {
     return { messages, truncated: false, bytesDropped: 0, partsShrunk: 0, finalSize: initial }
   }
 
-  const protectedFrom = protectedTailStart(messages)
   const next = [...messages]
   let size = initial
   let bytesDropped = 0

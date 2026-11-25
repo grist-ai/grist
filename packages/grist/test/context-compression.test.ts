@@ -331,6 +331,30 @@ describe("compressHistory — trigger and backstop", () => {
     expect(report.bytesBefore).toBeLessThanOrEqual(DEFAULT_COMPRESSION_BUDGET_BYTES)
   })
 
+  test("compresses in a single-prompt run shape (user message only at the head)", () => {
+    // Real run histories are [user, assistant, tool, assistant, tool, …]:
+    // the latest user message is the FIRST message. Eligibility must not
+    // exempt everything after it — only the recency tail is protected.
+    const messages = [
+      Message.user("task"),
+      toolCall("c1", "bash"),
+      toolOutput("c1", "bash", noisyLog()),
+      ...fillers(70),
+    ]
+    const report = compressHistory(messages, { budgetBytes: 1_000 })
+    expect(report.compressed).toBe(true)
+    expect(outputText(report.messages[2])).toContain("repeated")
+  })
+
+  test("tombstone backstop also fires in the single-prompt shape", () => {
+    const chunk = "prose ".repeat(1_040)
+    const messages: Array<Message> = [Message.user("task")]
+    for (let i = 0; i < 55; i++) messages.push(toolCall(`c${i}`, "read"), toolOutput(`c${i}`, "read", chunk))
+    const report = compressHistory(messages, { budgetBytes: 120_000 })
+    expect(report.truncated).toBe(true)
+    expect(report.bytesAfter).toBeLessThanOrEqual(200_000)
+  })
+
   test("compresses oldest first and stops once under budget", () => {
     const messages = [
       Message.user("task"),

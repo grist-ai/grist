@@ -38,7 +38,6 @@ import { controlPlaneEnabled } from "@grist-ai/logic"
 
 import {
   DEFAULT_TRUNCATION_THRESHOLD,
-  protectedTailStart,
   toolResultText,
   truncateHistory,
 } from "./history-truncation.js"
@@ -675,14 +674,20 @@ export function compressHistory(
   }
   if (bytesBefore <= budget) return unchanged
 
-  const protectedFrom = protectedTailStart(messages)
+  // Eligibility is per part, not per suffix: in a single-prompt run the
+  // latest user message sits at the head and everything after it is the
+  // run itself, so a "from the last user message onward" gate would exempt
+  // the whole history (the tombstone guard has that shape and is inert in
+  // such runs — compression exists to do better). The protections that
+  // matter here are the system role, the recent-outputs tail, and the
+  // error rules, all enforced per part below and in compressToolResultPart.
   const recent = recentToolResultParts(messages)
   const next = [...messages]
   const byKind = emptyKinds()
   let size = bytesBefore
   let partsCompressed = 0
 
-  for (let index = 0; index < protectedFrom && size > budget; index++) {
+  for (let index = 0; index < messages.length && size > budget; index++) {
     const message = next[index] as Message
     if (message.role === "system") continue
     const content = [...message.content]
@@ -707,7 +712,9 @@ export function compressHistory(
   let truncatedParts = 0
   const threshold = options.truncationThreshold ?? DEFAULT_TRUNCATION_THRESHOLD
   if (size > threshold) {
-    const backstop = truncateHistory(finalMessages, threshold)
+    // Backstop with the same per-part eligibility (tail index = end), so a
+    // single-prompt run can still be saved from the hard cap.
+    const backstop = truncateHistory(finalMessages, threshold, finalMessages.length)
     if (backstop.truncated) {
       finalMessages = backstop.messages
       truncated = true
