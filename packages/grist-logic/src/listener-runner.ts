@@ -39,6 +39,7 @@ import path from "node:path"
 import { execFileSync } from "node:child_process"
 import { gatewayAuthHeaders, loadInviteConfig, type InviteConfig } from "./invite-config.js"
 import { GatewayHttpError } from "./invite-client.js"
+import { listInboxItems, postInboxItem, type InboxBoundary, type InboxItemWire } from "./inbox.js"
 
 export type ListenerRunnerState = {
   version: 1
@@ -46,6 +47,10 @@ export type ListenerRunnerState = {
   machines: Record<string, { enabled_at: number }>
   last_run_at?: number
   last_error?: string
+  /** Inbox item ids whose human answer this runner already resumed
+   * (S-INBOX1) — an approved item stays approved on the gateway, so
+   * the runner remembers which ones it has already acted on. */
+  resumed_inbox_items?: string[]
 }
 
 export type ListenerRunnerDeps = {
@@ -88,6 +93,13 @@ export function loadListenerRunnerState(cwd: string, deps?: ListenerRunnerDeps):
       machines,
       ...(typeof parsed.last_run_at === "number" ? { last_run_at: parsed.last_run_at } : {}),
       ...(typeof parsed.last_error === "string" ? { last_error: parsed.last_error } : {}),
+      ...(Array.isArray(parsed.resumed_inbox_items)
+        ? {
+            resumed_inbox_items: parsed.resumed_inbox_items.filter(
+              (id): id is string => typeof id === "string",
+            ),
+          }
+        : {}),
     }
   } catch {
     return emptyListenerRunnerState()
@@ -271,6 +283,13 @@ export async function listQueuedListenerRequests(
 export type ListenerClaimOutcome =
   | { claimed: true; request: ListenerRunRequestWire }
   | { claimed: false; refused: true; reason: string; request: ListenerRunRequestWire }
+  | {
+      claimed: false
+      parked: true
+      reason: string
+      inboxItemId: string
+      request: ListenerRunRequestWire
+    }
   | { claimed: false; expired: true; request: ListenerRunRequestWire }
 
 export async function claimListenerRequest(
@@ -281,15 +300,42 @@ export async function claimListenerRequest(
   const body = await runnerJson<{
     claimed: boolean
     refused?: boolean
+    parked?: boolean
     expired?: boolean
     reason?: string
+    inbox_item_id?: string
     request: ListenerRunRequestWire
   }>(config, "/v1/listeners/requests/claim", { method: "POST", body: { request_id: requestId } }, deps)
   if (body.claimed) return { claimed: true, request: body.request }
+  if (body.parked) {
+    return {
+      claimed: false,
+      parked: true,
+      reason: body.reason ?? "envelope_breach",
+      inboxItemId: body.inbox_item_id ?? "",
+      request: body.request,
+    }
+  }
   if (body.refused) {
     return { claimed: false, refused: true, reason: body.reason ?? "refused", request: body.request }
   }
   return { claimed: false, expired: true, request: body.request }
+}
+
+/** Read one request back by id (any state) — the resume pass uses it
+ * to match an answered inbox item to this repo before resuming. */
+export async function fetchListenerRequest(
+  config: InviteConfig,
+  requestId: string,
+  deps?: ListenerRunnerDeps,
+): Promise<ListenerRunRequestWire | undefined> {
+  const body = await runnerJson<{ requests: ListenerRunRequestWire[] }>(
+    config,
+    "/v1/listeners/requests/list",
+    { method: "POST", body: { limit: 200 } },
+    deps,
+  )
+  return (body.requests ?? []).find((request) => request.id === requestId)
 }
 
 export async function completeListenerRequest(
@@ -365,14 +411,27 @@ export function renderListenerPrompt(request: ListenerRunRequestWire): string {
 }
 
 /** What the CLI's executor runs for a claimed request — a real
- * `grist run`. Injected so the cycle is testable without a model. */
+ * `grist run`. Injected so the cycle is testable without a model.
+ * `requestId` identifies the claimed request (the CLI exposes it to
+ * the run as GRIST_LISTENER_REQUEST_ID so a run can post inbox
+ * questions against it); `sessionId` resumes an existing session
+ * (the S-INBOX1 answer-delivery path). `escalation` reports that the
+ * run stopped on an unanswered ask with no user present — the cycle
+ * posts it to the approvals inbox (spec §7 source 2). */
 export type ListenerExecRun = (input: {
   directory: string
   prompt: string
   environment?: string
   conversation?: string
   agent?: string
-}) => Promise<{ sessionId?: string; ok: boolean; error?: string }>
+  requestId?: string
+  sessionId?: string
+}) => Promise<{
+  sessionId?: string
+  ok: boolean
+  error?: string
+  escalation?: { boundary: InboxBoundary; question: string }
+}>
 
 export type ListenerCycleResult =
   | { status: "disabled" }
@@ -381,6 +440,9 @@ export type ListenerCycleResult =
   | { status: "idle" }
   | { status: "contended"; requestId: string }
   | { status: "refused"; requestId: string; reason: string }
+  | { status: "parked"; requestId: string; reason: string; inboxItemId: string }
+  | { status: "question_parked"; requestId: string; itemId: string; sessionId?: string }
+  | { status: "resumed"; itemId: string; sessionId?: string; ok: boolean }
   | { status: "expired"; requestId: string }
   | {
       status: "completed"
@@ -409,6 +471,13 @@ export async function runListenerCycle(
   const identity = repoIdentity(cwd, deps)
   if (!identity) return { status: "no_repo_identity" }
   try {
+    // S-INBOX1 answer delivery: an approved question item with an
+    // answer and a session resumes that session with the answer as
+    // the next prompt. Checked before new claims — the parked work
+    // is older than anything newly queued.
+    const resumed = await resumeAnsweredItem(cwd, config, identity, state, deps)
+    if (resumed) return resumed
+
     const queued = await listQueuedListenerRequests(config, deps)
     const mine = queued
       .filter((request) => {
@@ -431,15 +500,32 @@ export async function runListenerCycle(
       throw error
     }
     if (!claim.claimed) {
+      if ("parked" in claim) {
+        // Envelope breach: the gateway parked the request in the
+        // approvals inbox (spec §7 source 1). Not an error — a human
+        // decides, and approval returns it to claimable.
+        return {
+          status: "parked",
+          requestId: request.id,
+          reason: claim.reason,
+          inboxItemId: claim.inboxItemId,
+        }
+      }
       if ("refused" in claim) return { status: "refused", requestId: request.id, reason: claim.reason }
       return { status: "expired", requestId: request.id }
     }
 
-    let execution: { sessionId?: string; ok: boolean; error?: string }
+    let execution: {
+      sessionId?: string
+      ok: boolean
+      error?: string
+      escalation?: { boundary: InboxBoundary; question: string }
+    }
     try {
       execution = await deps.execRun({
         directory: cwd,
         prompt: renderListenerPrompt(claim.request),
+        requestId: request.id,
         ...(claim.request.target.environment
           ? { environment: claim.request.target.environment }
           : {}),
@@ -452,6 +538,65 @@ export async function runListenerCycle(
       execution = {
         ok: false,
         error: error instanceof Error ? error.message : "the run failed to start",
+      }
+    }
+    if (execution.escalation && execution.sessionId) {
+      // The run stopped on an unanswered ask with no user present
+      // (spec §7 source 2): report the request failed, then park the
+      // question in the approvals inbox. The human's answer resumes
+      // this session on a later cycle.
+      let item: InboxItemWire | undefined
+      let postError: string | undefined
+      try {
+        item = await postInboxItem(
+          config,
+          {
+            source: "ask_human",
+            boundary: execution.escalation.boundary,
+            question: execution.escalation.question,
+            requestId: request.id,
+            sessionId: execution.sessionId,
+          },
+          { fetchFn: deps.fetch },
+        )
+      } catch (error) {
+        postError = error instanceof Error ? error.message : String(error)
+      }
+      const afterEscalation = await inviteSpentUsd(config, deps)
+      const escalationSpend = Math.max(0, Math.round((afterEscalation - before) * 1_000_000) / 1_000_000)
+      const { overRunCap } = await completeListenerRequest(
+        config,
+        {
+          requestId: request.id,
+          spendUsd: escalationSpend,
+          outcome: "failed",
+          sessionId: execution.sessionId,
+          error: item
+            ? `stopped on an unanswered ask — parked in the approvals inbox (${item.id})`
+            : `stopped on an unanswered ask; the inbox post failed${postError ? `: ${postError}` : ""}`,
+        },
+        deps,
+      )
+      const next = loadListenerRunnerState(cwd, deps)
+      next.last_run_at = now()
+      if (postError) next.last_error = `inbox post failed: ${postError}`
+      else delete next.last_error
+      saveListenerRunnerState(cwd, next, deps)
+      if (item) {
+        return {
+          status: "question_parked",
+          requestId: request.id,
+          itemId: item.id,
+          sessionId: execution.sessionId,
+        }
+      }
+      return {
+        status: "completed",
+        requestId: request.id,
+        sessionId: execution.sessionId,
+        spendUsd: escalationSpend,
+        outcome: "failed",
+        overRunCap,
       }
     }
     const after = await inviteSpentUsd(config, deps)
@@ -491,6 +636,84 @@ export async function runListenerCycle(
     }
     return { status: "error", message }
   }
+}
+
+const RESUMED_ITEMS_CAP = 200
+
+/**
+ * S-INBOX1 answer delivery (spec §7 source 2/3): find the oldest
+ * approved question item this runner has not resumed yet whose linked
+ * request belongs to this repo, and resume its session with the
+ * human's answer as the next prompt. Returns the cycle result when a
+ * resume ran, undefined when there is nothing to resume.
+ *
+ * Honest limits: the resume executes under the runner operator's own
+ * invite, outside the (already completed) request's envelope
+ * accounting — the human's approval is the authorization. Items
+ * without a linked request or session cannot resume: there is no
+ * repo to match and no session to continue.
+ */
+async function resumeAnsweredItem(
+  cwd: string,
+  config: InviteConfig,
+  identity: string,
+  state: ListenerRunnerState,
+  deps: ListenerRunnerDeps & { execRun: ListenerExecRun },
+): Promise<ListenerCycleResult | undefined> {
+  const done = new Set(state.resumed_inbox_items ?? [])
+  // Fail-soft by design: the inbox is additive to the runner's
+  // claiming job — a gateway without inbox support (or a transient
+  // read failure) means "nothing to resume", never a broken cycle.
+  let approved: InboxItemWire[]
+  try {
+    approved = await listInboxItems(config, { state: "approved", limit: 100 }, { fetchFn: deps.fetch })
+  } catch {
+    return undefined
+  }
+  const candidates = approved.filter(
+    (item) =>
+      (item.source === "ask_human" || item.source === "question") &&
+      typeof item.answer === "string" &&
+      item.answer.length > 0 &&
+      item.session_id !== null &&
+      item.request_id !== null &&
+      !done.has(item.id),
+  )
+  for (const item of candidates) {
+    const request = await fetchListenerRequest(config, item.request_id as string, deps).catch(
+      () => undefined,
+    )
+    const repo = typeof request?.event.repo === "string" ? request.event.repo : ""
+    if (!request || repo.toLowerCase() !== identity.toLowerCase()) continue
+    let execution: { sessionId?: string; ok: boolean; error?: string }
+    try {
+      execution = await deps.execRun({
+        directory: cwd,
+        prompt: item.answer as string,
+        requestId: request.id,
+        sessionId: item.session_id as string,
+        ...(request.target.environment ? { environment: request.target.environment } : {}),
+        ...(request.target.agent ? { agent: request.target.agent } : {}),
+      })
+    } catch (error) {
+      execution = {
+        ok: false,
+        error: error instanceof Error ? error.message : "the resumed run failed to start",
+      }
+    }
+    const next = loadListenerRunnerState(cwd, deps)
+    next.resumed_inbox_items = [...(next.resumed_inbox_items ?? []), item.id].slice(-RESUMED_ITEMS_CAP)
+    next.last_run_at = (deps.now ?? Date.now)()
+    delete next.last_error
+    saveListenerRunnerState(cwd, next, deps)
+    return {
+      status: "resumed",
+      itemId: item.id,
+      sessionId: execution.sessionId ?? (item.session_id as string),
+      ok: execution.ok,
+    }
+  }
+  return undefined
 }
 
 /** Watch mode: cycles on an interval until the signal aborts. */

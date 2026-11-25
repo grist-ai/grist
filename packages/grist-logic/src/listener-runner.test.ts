@@ -3,6 +3,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import type { InviteConfig } from "./invite-config.js"
+import { decideInboxItem, type InboxItemWire } from "./inbox.js"
 import {
   isListenerRunnerEnabled,
   loadListenerRunnerState,
@@ -215,6 +216,7 @@ describe("runListenerCycle", () => {
       {
         directory: cwd,
         prompt: "Fix the failing CI run on main in acme/widgets.",
+        requestId: "glr_1",
       },
     ])
     const completeCall = stub.calls.find((call) => call.path.endsWith("/complete"))
@@ -279,5 +281,198 @@ describe("runListenerCycle", () => {
       },
     })
     expect(executed[0]).toMatchObject({ environment: "sandbox", conversation: "conv_1" })
+  })
+})
+
+describe("approvals inbox wiring (next-block spec §7, S-INBOX1)", () => {
+  function inboxItem(overrides?: Partial<InboxItemWire>): InboxItemWire {
+    return {
+      id: "gi_1",
+      team_id: "team_1",
+      source: "ask_human",
+      boundary: "write-outside-environment",
+      state: "approved",
+      question: "May the run read the file outside its environment?",
+      detail: {},
+      creator_user_id: "gu_creator",
+      request_id: "glr_1",
+      session_id: "ses_9",
+      answer: "Yes — read-only is fine.",
+      decided_by_user_id: "gu_creator",
+      created_at: 1_700_000_000_000,
+      expires_at: 1_700_000_000_000 + 72 * 3_600_000,
+      decided_at: 1_700_000_100_000,
+      ...overrides,
+    }
+  }
+
+  /** Gateway stub with the inbox endpoints wired in. */
+  function inboxGateway(options?: {
+    queued?: ListenerRunRequestWire[]
+    all?: ListenerRunRequestWire[]
+    claim?: (id: string) => Record<string, unknown>
+    inbox?: InboxItemWire[]
+  }) {
+    const calls: { path: string; body: Record<string, unknown> }[] = []
+    const fetchStub = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input)
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+      calls.push({ path: url, body })
+      if (url.endsWith("/v1/inbox/list")) {
+        return Response.json({ items: options?.inbox ?? [] })
+      }
+      if (url.endsWith("/v1/inbox/items")) {
+        return Response.json({ item: inboxItem({ id: "gi_new", state: "pending", answer: null }) })
+      }
+      if (url.endsWith("/v1/listeners/requests/list")) {
+        return Response.json({
+          requests: body.state === "queued" ? (options?.queued ?? []) : (options?.all ?? options?.queued ?? []),
+        })
+      }
+      if (url.endsWith("/v1/listeners/requests/claim")) {
+        const outcome = options?.claim?.(String(body.request_id)) ?? {
+          claimed: true,
+          request: (options?.queued ?? [])[0],
+        }
+        return Response.json(outcome)
+      }
+      if (url.endsWith("/v1/listeners/requests/complete")) {
+        return Response.json({ completed: true, over_run_cap: false })
+      }
+      if (url.endsWith("/v1/usage")) {
+        return Response.json({ spent_usd: 10, cap_usd: null, remaining_usd: null })
+      }
+      return new Response("not found", { status: 404 })
+    }
+    return { calls, fetchStub: fetchStub as typeof fetch }
+  }
+
+  test("a claim that parks on an envelope breach surfaces the park and executes nothing", async () => {
+    const cwd = tempRepo()
+    setListenerRunnerEnabled(cwd, true, baseDeps())
+    const queued = request()
+    const stub = inboxGateway({
+      queued: [queued],
+      claim: () => ({
+        claimed: false,
+        parked: true,
+        reason: "max_runs_per_day",
+        inbox_item_id: "gi_park1",
+        request: { ...queued, state: "awaiting_approval" },
+      }),
+    })
+    let executions = 0
+    const result = await runListenerCycle(cwd, {
+      ...baseDeps({ fetch: stub.fetchStub }),
+      execRun: async () => {
+        executions += 1
+        return { ok: true }
+      },
+    })
+    expect(result).toEqual({
+      status: "parked",
+      requestId: "glr_1",
+      reason: "max_runs_per_day",
+      inboxItemId: "gi_park1",
+    })
+    expect(executions).toBe(0)
+    expect(stub.calls.some((call) => call.path.endsWith("/complete"))).toBe(false)
+  })
+
+  test("an escalation posts an ask_human item and completes the request as failed", async () => {
+    const cwd = tempRepo()
+    setListenerRunnerEnabled(cwd, true, baseDeps())
+    const stub = inboxGateway({ queued: [request()] })
+    const result = await runListenerCycle(cwd, {
+      ...baseDeps({ fetch: stub.fetchStub }),
+      execRun: async () => ({
+        sessionId: "ses_9",
+        ok: false,
+        error: "the run stopped",
+        escalation: {
+          boundary: "write-outside-environment" as const,
+          question: "The run stopped on an unanswered permission ask (external_directory).",
+        },
+      }),
+    })
+    expect(result).toEqual({
+      status: "question_parked",
+      requestId: "glr_1",
+      itemId: "gi_new",
+      sessionId: "ses_9",
+    })
+    const posted = stub.calls.find((call) => call.path.endsWith("/v1/inbox/items"))
+    expect(posted?.body).toMatchObject({
+      source: "ask_human",
+      boundary: "write-outside-environment",
+      request_id: "glr_1",
+      session_id: "ses_9",
+    })
+    const complete = stub.calls.find((call) => call.path.endsWith("/complete"))
+    expect(complete?.body).toMatchObject({ outcome: "failed", session_id: "ses_9" })
+    expect(String(complete?.body.error)).toContain("parked in the approvals inbox")
+  })
+
+  test("an answered item resumes its session with the answer as the prompt — once", async () => {
+    const cwd = tempRepo()
+    setListenerRunnerEnabled(cwd, true, baseDeps())
+    const stub = inboxGateway({
+      queued: [],
+      all: [request({ state: "completed" })],
+      inbox: [inboxItem()],
+    })
+    const executed: Parameters<ListenerExecRun>[0][] = []
+    const deps = {
+      ...baseDeps({ fetch: stub.fetchStub }),
+      execRun: async (input: Parameters<ListenerExecRun>[0]) => {
+        executed.push(input)
+        return { sessionId: "ses_9", ok: true }
+      },
+    }
+    const first = await runListenerCycle(cwd, deps)
+    expect(first).toEqual({ status: "resumed", itemId: "gi_1", sessionId: "ses_9", ok: true })
+    expect(executed).toHaveLength(1)
+    expect(executed[0]).toMatchObject({
+      prompt: "Yes — read-only is fine.",
+      sessionId: "ses_9",
+      requestId: "glr_1",
+    })
+    // The runner remembers the resume: the still-"approved" item is
+    // not resumed a second time; the cycle falls through to idle.
+    const second = await runListenerCycle(cwd, deps)
+    expect(second).toEqual({ status: "idle" })
+    expect(executed).toHaveLength(1)
+    expect(loadListenerRunnerState(cwd, baseDeps()).resumed_inbox_items).toEqual(["gi_1"])
+  })
+
+  test("an answered item for another repo is not resumed here", async () => {
+    const cwd = tempRepo()
+    setListenerRunnerEnabled(cwd, true, baseDeps())
+    const stub = inboxGateway({
+      queued: [],
+      all: [request({ state: "completed", event: { repo: "other/repo" } })],
+      inbox: [inboxItem()],
+    })
+    let executions = 0
+    const result = await runListenerCycle(cwd, {
+      ...baseDeps({ fetch: stub.fetchStub }),
+      execRun: async () => {
+        executions += 1
+        return { ok: true }
+      },
+    })
+    expect(result).toEqual({ status: "idle" })
+    expect(executions).toBe(0)
+  })
+
+  test("the inbox client surfaces the gateway's account-auth refusal on decide", async () => {
+    const fetchStub = async (): Promise<Response> =>
+      Response.json(
+        { error: "inbox decisions require the account holder's own sign-in", reason: "deciding_requires_account_auth" },
+        { status: 403 },
+      )
+    await expect(
+      decideInboxItem(CONFIG, { itemId: "gi_1", decision: "approve" }, { fetchFn: fetchStub as unknown as typeof fetch }),
+    ).rejects.toThrow("deciding_requires_account_auth")
   })
 })
