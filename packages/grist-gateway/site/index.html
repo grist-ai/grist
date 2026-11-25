@@ -1097,6 +1097,7 @@ grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</
         <a href="/dashboard/models" data-dash="models">Models</a>
         <a href="/dashboard/provider" data-dash="provider">Provider</a>
         <a href="/dashboard/team" data-dash="team">Team</a>
+        <a href="/dashboard/inbox" data-dash="inbox">Inbox <span id="inbox-badge" class="badge" hidden></span></a>
       </nav>
       <p class="error" id="dash-error" hidden></p>
       <p class="remain" id="remain">—</p>
@@ -1333,6 +1334,21 @@ grist run --format json --auto -s "$SESSION_ID" "Continue: …" &lt; /dev/null</
           <h2>Notifications</h2>
           <section class="admin-list" id="team-notifications"></section>
         </section>
+      </div>
+      <div id="dash-panel-inbox" hidden>
+        <p class="lede">
+          Decisions waiting on a human from unattended runs — listener
+          runs that would breach their spend envelope, escalations with
+          nobody present, and questions a run posted on purpose. Nothing
+          here comes from attended sessions or memory curation, and an
+          item nobody decides expires unanswered: the timeout fails
+          closed, never open.
+        </p>
+        <h2>Waiting on you</h2>
+        <section class="admin-list" id="inbox-pending"></section>
+        <h2>Resolved</h2>
+        <section class="admin-list" id="inbox-history"></section>
+        <span class="muted" id="inbox-msg" role="status"></span>
       </div>
     </main>
 

@@ -1644,6 +1644,37 @@ pre {
   color: var(--muted);
 }
 
+.badge {
+  display: inline-block;
+  min-width: 1.3rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.inbox-row {
+  display: grid;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  padding: 0.85rem 1rem;
+  font-size: 0.86rem;
+  border-radius: 4px;
+}
+
+.inbox-row .inbox-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inbox-row textarea {
+  width: 100%;
+  min-height: 3.2rem;
+}
+
 .model-list {
   display: grid;
   gap: 0.55rem;

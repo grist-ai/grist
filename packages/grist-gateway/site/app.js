@@ -33,6 +33,7 @@ const views = {
   "/dashboard/models": "view-dashboard",
   "/dashboard/provider": "view-dashboard",
   "/dashboard/team": "view-dashboard",
+  "/dashboard/inbox": "view-dashboard",
   "/admin": "view-admin",
   "/docs": "view-docs",
   "/docs/quickstart": "view-docs-quickstart",
@@ -52,6 +53,7 @@ const titles = {
   "/dashboard/models": "Models — Grist",
   "/dashboard/provider": "Provider — Grist",
   "/dashboard/team": "Team — Grist",
+  "/dashboard/inbox": "Inbox — Grist",
   "/admin": "Admin — Grist",
   "/docs": "Docs — Grist",
   "/docs/quickstart": "Quickstart — Grist",
@@ -71,6 +73,8 @@ const descriptions = {
     "Grist dashboard: usage broken down by ladder rung, spend caps, API keys for agents, and per-rung model overrides.",
   "/dashboard/api":
     "Mint Grist API keys so agents like Muse can run coding tasks on a VM, billed to your account.",
+  "/dashboard/inbox":
+    "Grist inbox: cross-boundary decisions from unattended runs — envelope-breach parks, escalations, and posted questions — waiting on a human.",
   "/dashboard/models":
     "Override any Grist ladder rung with a model id your provider serves. Clearing a field restores the default.",
   "/admin": "Grist admin: mint account codes with preset spend caps for testers and special cases.",
@@ -374,7 +378,7 @@ async function route() {
     void loadAdmin()
     return
   }
-  if (path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models" || path === "/dashboard/provider" || path === "/dashboard/team") {
+  if (path === "/dashboard" || path === "/dashboard/api" || path === "/dashboard/models" || path === "/dashboard/provider" || path === "/dashboard/team" || path === "/dashboard/inbox") {
     if (!signedIn()) {
       history.replaceState(null, "", "/login")
       show("view-login")
@@ -382,13 +386,15 @@ async function route() {
       return
     }
     show("view-dashboard")
-    setDashTab(path === "/dashboard/api" ? "api" : path === "/dashboard/models" ? "models" : path === "/dashboard/provider" ? "provider" : path === "/dashboard/team" ? "team" : "usage")
+    setDashTab(path === "/dashboard/api" ? "api" : path === "/dashboard/models" ? "models" : path === "/dashboard/provider" ? "provider" : path === "/dashboard/team" ? "team" : path === "/dashboard/inbox" ? "inbox" : "usage")
     setAuthNav()
     void loadDashboard()
+    void refreshInboxBadge()
     if (path === "/dashboard/api") void loadApiKeys()
     if (path === "/dashboard/models") void loadModels()
     if (path === "/dashboard/provider") void loadProvider()
     if (path === "/dashboard/team") void loadTeam()
+    if (path === "/dashboard/inbox") void loadInbox()
     return
   }
   if (path === "/login" && device() && invite()) {
@@ -449,13 +455,14 @@ async function loadDashboard() {
 }
 
 function setDashTab(tab) {
-  const titles = { usage: "Usage", api: "API keys", models: "Models", provider: "Provider", team: "Team" }
+  const titles = { usage: "Usage", api: "API keys", models: "Models", provider: "Provider", team: "Team", inbox: "Inbox" }
   document.getElementById("dash-title").textContent = titles[tab] ?? "Usage"
   document.getElementById("dash-panel-usage").hidden = tab !== "usage"
   document.getElementById("dash-panel-api").hidden = tab !== "api"
   document.getElementById("dash-panel-models").hidden = tab !== "models"
   document.getElementById("dash-panel-provider").hidden = tab !== "provider"
   document.getElementById("dash-panel-team").hidden = tab !== "team"
+  document.getElementById("dash-panel-inbox").hidden = tab !== "inbox"
   for (const node of document.querySelectorAll("[data-dash]")) {
     node.classList.toggle("is-on", node.getAttribute("data-dash") === tab)
   }
@@ -891,6 +898,104 @@ document.getElementById("team-notifications")?.addEventListener("click", async (
   void loadTeam()
 })
 
+const INBOX_SOURCE_LABELS = {
+  envelope_breach: "Envelope breach",
+  ask_human: "Escalation",
+  question: "Question from a run",
+}
+
+function inboxContext(item) {
+  const parts = []
+  const detail = item.detail ?? {}
+  if (detail.listener_name) parts.push(`listener ${detail.listener_name}`)
+  if (detail.reason) parts.push(String(detail.reason).replaceAll("_", " "))
+  if (item.request_id) parts.push(`request ${item.request_id}`)
+  if (item.session_id) parts.push(`session ${item.session_id}`)
+  if (item.creator_user_id) parts.push(`run by ${item.creator_user_id}`)
+  return parts.join(" · ")
+}
+
+function inboxRow(item, decidable) {
+  const when = new Date(item.created_at).toLocaleString()
+  const expires = item.state === "pending" ? ` · expires ${new Date(item.expires_at).toLocaleString()}` : ""
+  const answer =
+    item.state === "pending" && item.source !== "envelope_breach"
+      ? `<textarea id="inbox-answer-${item.id}" placeholder="Your answer — it resumes the run's session as its next prompt" maxlength="4000"></textarea>`
+      : item.answer
+        ? `<p><strong>Answer:</strong> ${escapeHtml(item.answer)}</p>`
+        : ""
+  const actions = decidable
+    ? `<div class="inbox-actions">
+        <button class="btn" type="button" data-inbox-decide="approve" data-inbox-item="${item.id}">${item.source === "envelope_breach" ? "Approve" : "Answer & resume"}</button>
+        <button class="text-btn" type="button" data-inbox-decide="deny" data-inbox-item="${item.id}">${item.source === "envelope_breach" ? "Deny" : "Decline"}</button>
+      </div>`
+    : `<span class="muted">${item.state}${item.decided_at ? ` · ${new Date(item.decided_at).toLocaleString()}` : ""}</span>`
+  return `<article class="inbox-row">
+    <div><strong>${INBOX_SOURCE_LABELS[item.source] ?? item.source}</strong> <span class="muted">${escapeHtml(item.boundary)} · ${when}${expires}</span></div>
+    <p>${escapeHtml(item.question)}</p>
+    ${inboxContext(item) ? `<p class="muted">${escapeHtml(inboxContext(item))}</p>` : ""}
+    ${answer}
+    ${actions}
+  </article>`
+}
+
+let inboxLoad = 0
+
+async function loadInbox() {
+  const gen = ++inboxLoad
+  const res = await teamCall("/v1/inbox/list", { limit: 200 })
+  if (gen !== inboxLoad) return
+  const items = res.data.items ?? []
+  const pending = items.filter((item) => item.state === "pending")
+  const resolved = items.filter((item) => item.state !== "pending")
+  document.getElementById("inbox-pending").innerHTML = pending.length
+    ? pending.map((item) => inboxRow(item, true)).join("")
+    : `<p class="muted">Nothing is waiting on you.</p>`
+  document.getElementById("inbox-history").innerHTML = resolved.length
+    ? resolved.map((item) => inboxRow(item, false)).join("")
+    : `<p class="muted">No decisions yet.</p>`
+  setInboxBadge(pending.length)
+}
+
+function setInboxBadge(count) {
+  const badge = document.getElementById("inbox-badge")
+  if (!badge) return
+  badge.hidden = count === 0
+  badge.textContent = count > 0 ? String(count) : ""
+}
+
+/** The nav badge: pending inbox count, refreshed on dashboard loads.
+ * Fails silently — the Inbox tab itself is the source of truth. */
+async function refreshInboxBadge() {
+  try {
+    const res = await teamCall("/v1/inbox/list", { state: "pending", limit: 200 })
+    if (res.status !== 200) return
+    setInboxBadge((res.data.items ?? []).length)
+  } catch {
+    // Badge is advisory only.
+  }
+}
+
+document.getElementById("dash-panel-inbox")?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-inbox-decide]")
+  if (!button) return
+  const itemId = button.getAttribute("data-inbox-item")
+  const decision = button.getAttribute("data-inbox-decide")
+  const msg = document.getElementById("inbox-msg")
+  const body = { item_id: itemId, decision }
+  if (decision === "approve") {
+    const answerNode = document.getElementById(`inbox-answer-${itemId}`)
+    if (answerNode) body.answer = answerNode.value
+  }
+  const res = await teamCall("/v1/inbox/decide", body)
+  if (res.status !== 200) {
+    msg.textContent = res.data.error ?? "That decision did not land."
+    return
+  }
+  msg.textContent = decision === "approve" ? "Approved." : "Denied."
+  void loadInbox()
+})
+
 document.getElementById("mcn-mint")?.addEventListener("click", async () => {
   const error = document.getElementById("dash-error")
   error.hidden = true
@@ -940,6 +1045,10 @@ function notificationText(note) {
       return `${p.email ?? p.userId ?? "A member"} left team ${p.teamName ?? ""}.`
     case "team_ownership":
       return `You are now the owner of team ${p.teamName ?? ""}.`
+    case "inbox_item_parked":
+      return `An unattended run is parked in your inbox (${p.source ?? "decision"} · ${p.boundary ?? "cross-boundary"}) and waits for a human decision.`
+    case "inbox_item_resolved":
+      return `An inbox item from an unattended run was ${p.state ?? "resolved"} (${p.source ?? "decision"} · ${p.boundary ?? "cross-boundary"}).`
     default:
       return note.type
   }
