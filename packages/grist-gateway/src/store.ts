@@ -18,6 +18,7 @@ import {
   generateConnectorSecret,
   generateDeviceSecret,
   generateDeviceUserCode,
+  generateInboxItemId,
   generateInviteCode,
   generateNotificationId,
   generateRunRequestId,
@@ -311,6 +312,10 @@ export type ListenerRunRequestRow = {
   state: ListenerRunState
   claimed_by: string | null
   spend_usd: number | null
+  /** The envelope refusal reason a human approved for this request
+   * from the inbox (S-INBOX1): the claim check waives exactly that
+   * one reason for this request; any other breach still parks. */
+  approved_reason: string | null
   created_at: number
   updated_at: number
   expires_at: number
@@ -336,6 +341,12 @@ export type ListenerRefusalReason =
 export type ListenerClaimResult =
   | { status: "claimed"; request: ListenerRunRequestRow }
   | { status: "refused"; reason: ListenerRefusalReason; request: ListenerRunRequestRow }
+  | {
+      status: "parked"
+      reason: ListenerRefusalReason
+      item: InboxItemRow
+      request: ListenerRunRequestRow
+    }
   | { status: "expired"; request: ListenerRunRequestRow }
   | { status: "not_claimable"; state: ListenerRunState }
   | { status: "not_found" }
@@ -344,6 +355,69 @@ export type ListenerCompleteResult =
   | { status: "completed"; request: ListenerRunRequestRow; overRunCap: boolean }
   | { status: "not_claimable"; state: ListenerRunState }
   | { status: "not_claimant" }
+  | { status: "not_found" }
+
+/**
+ * The closed cross-boundary enumeration (next-block spec §7, D6
+ * Option 2 — adopted 2026-11-24). Exactly four actions count as
+ * cross-boundary; the list changes only by a new founder decision
+ * recorded in the spec. Anything else an unattended run does is
+ * governed by policy + audit and never enters the inbox.
+ */
+export type InboxBoundary = "send" | "deploy" | "spend-beyond-envelope" | "write-outside-environment"
+
+export const INBOX_BOUNDARIES: readonly InboxBoundary[] = [
+  "send",
+  "deploy",
+  "spend-beyond-envelope",
+  "write-outside-environment",
+]
+
+/**
+ * Where an inbox item comes from — exactly the three D6 sources:
+ * `envelope_breach` parks are produced by the claim path (S-INBOX1);
+ * `ask_human` items are Jev escalations from unattended runs with no
+ * user present; `question` items are decisions an unattended run
+ * deliberately posts. Attended sessions and curation produce none.
+ */
+export type InboxItemSource = "envelope_breach" | "ask_human" | "question"
+
+/** Item lifecycle: `pending` is the only decidable state, and an
+ * undecided item expires — the timeout fails CLOSED, never open. */
+export type InboxItemState = "pending" | "approved" | "denied" | "expired"
+
+/**
+ * One parked decision (next-block spec §7). `creator_uid` is whose
+ * unattended run this is — the notification target and one of the
+ * deciders (the other deciders are the team's owner/admins; the HTTP
+ * layer enforces that scope). `request_id` links the listener run
+ * request the item belongs to, when it has one; `session_id` links
+ * the run's session so an answer can resume it. `detail` is JSON
+ * facts (breach reason, listener name) — never the answer text.
+ */
+export type InboxItemRow = {
+  id: string
+  team_id: string
+  source: InboxItemSource
+  boundary: InboxBoundary
+  state: InboxItemState
+  creator_uid: string
+  creator_user_id: string | null
+  request_id: string | null
+  session_id: string | null
+  question: string
+  detail: string | null
+  answer: string | null
+  decided_by: string | null
+  created_at: number
+  updated_at: number
+  expires_at: number
+  decided_at: number | null
+}
+
+export type InboxDecideResult =
+  | { status: "decided"; item: InboxItemRow; request?: ListenerRunRequestRow }
+  | { status: "not_pending"; state: InboxItemState }
   | { status: "not_found" }
 
 export type CliLoginRow = {
@@ -434,6 +508,15 @@ export type ProviderCredentialSummary = {
 
 const DEFAULT_CAP = 5
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000
+/** How long an inbox park waits for a human before it fails closed
+ * (S-INBOX1). Aligns with the listener queue TTL (72h); the HTTP
+ * layer's GRIST_INBOX_TTL_MS overrides it per deployment. */
+export const DEFAULT_INBOX_PARK_TTL_MS = 72 * 3_600_000
+/** The fresh queue TTL an approved envelope park's request gets when
+ * it returns to `queued` (S-INBOX1) — the same 72h the queue gives a
+ * freshly fired request; GRIST_LISTENER_REQUEST_TTL_MS overrides it
+ * per deployment through the HTTP layer. */
+export const DEFAULT_LISTENER_REQUEUE_TTL_MS = 72 * 3_600_000
 /** Auto-minted account codes don't expire on a human timescale. */
 export const ACCOUNT_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000
 const MAX_API_KEYS = 20
@@ -627,6 +710,27 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     );
     CREATE INDEX IF NOT EXISTS listener_run_requests_team_state
       ON listener_run_requests(team_id, state, created_at);
+    CREATE TABLE IF NOT EXISTS inbox_items (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      boundary TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'pending',
+      creator_uid TEXT NOT NULL,
+      creator_user_id TEXT,
+      request_id TEXT,
+      session_id TEXT,
+      question TEXT NOT NULL,
+      detail TEXT,
+      answer TEXT,
+      decided_by TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      decided_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS inbox_items_team_state
+      ON inbox_items(team_id, state, created_at);
   `)
   // `CREATE TABLE IF NOT EXISTS` will not add the column to a database created
   // before per-key attribution existed, so backfill it in place.
@@ -662,6 +766,14 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   // original verbs never needed; additive and nullable, same pattern.
   if (!auditColumns.some((column) => column.name === "detail")) {
     db.exec("ALTER TABLE team_memory_audit ADD COLUMN detail TEXT")
+  }
+  // The inbox approval waiver (S-INBOX1): the envelope reason a human
+  // approved for one parked request, recorded on the request itself.
+  const listenerRequestColumns = db.prepare("PRAGMA table_info(listener_run_requests)").all() as {
+    name: string
+  }[]
+  if (!listenerRequestColumns.some((column) => column.name === "approved_reason")) {
+    db.exec("ALTER TABLE listener_run_requests ADD COLUMN approved_reason TEXT")
   }
   // Public user IDs: the shareable handle teams add members by. Backfilled
   // for every account created before they existed, so an ID always resolves.
@@ -932,6 +1044,41 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     `SELECT COUNT(*) AS n FROM team_memory_audit
      WHERE team_id = ? AND kind = 'listener' AND action = 'claimed' AND entry_id = ?`,
   )
+  // Inbox (S-INBOX1, D6 Option 2): every transition is state-guarded,
+  // like the queue's — a decision lands exactly once, and a park moves
+  // its request out of `queued` so no runner can claim it undecided.
+  const insertInboxItemRow = db.prepare(
+    `INSERT INTO inbox_items
+       (id, team_id, source, boundary, state, creator_uid, creator_user_id, request_id,
+        session_id, question, detail, answer, decided_by, created_at, updated_at,
+        expires_at, decided_at)
+     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, NULL)`,
+  )
+  const selectInboxItem = db.prepare(`SELECT * FROM inbox_items WHERE team_id = ? AND id = ?`)
+  const decideInboxItemRow = db.prepare(
+    `UPDATE inbox_items SET state = ?, answer = ?, decided_by = ?, decided_at = ?, updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'pending'`,
+  )
+  const expireInboxItemRow = db.prepare(
+    `UPDATE inbox_items SET state = 'expired', updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'pending'`,
+  )
+  const selectExpiredInboxItems = db.prepare(
+    `SELECT * FROM inbox_items WHERE state = 'pending' AND expires_at <= ? ORDER BY created_at ASC`,
+  )
+  const parkListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'awaiting_approval', updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'queued'`,
+  )
+  const releaseParkedListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests
+     SET state = 'queued', approved_reason = ?, expires_at = ?, updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'awaiting_approval'`,
+  )
+  const refuseParkedListenerRunRequest = db.prepare(
+    `UPDATE listener_run_requests SET state = 'refused', updated_at = ?
+     WHERE team_id = ? AND id = ? AND state = 'awaiting_approval'`,
+  )
   const allAccounts = db.prepare(`SELECT invite_code, email FROM accounts`)
   const insertApiKey = db.prepare(
     `INSERT INTO api_keys (id, invite_code, hash, prefix, name, kind, created_at, last_used_at, revoked)
@@ -1052,18 +1199,99 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
   }
 
   /**
-   * The mechanical claim-time envelope decision for one queued request
-   * (next-block spec §6.3, S-LIS2): undefined admits the claim,
-   * anything else is the refusal reason. Liveness comes from the
-   * listener's current chain head; the numbers come from the envelope
-   * snapshot the request carries from fire time. Day boundaries are
-   * UTC — one boundary for every runner, stated here rather than
-   * implied.
+   * Write one inbox item with its `parked` audit row and the
+   * creator's park notification (next-block spec §7, S-INBOX1). Every
+   * source funnels through here — the claim path for envelope
+   * breaches, the runner for ask_human escalations and deliberately
+   * posted questions — so a parked decision never exists without its
+   * trail. The audit detail carries facts only (source, boundary,
+   * the breach reason); question and answer text live on the item.
+   * Callers run this inside their own transaction.
    */
-  function listenerClaimRefusal(
-    row: ListenerRunRequestRow,
-    now: number,
-  ): ListenerRefusalReason | undefined {
+  function insertInboxItem(input: {
+    teamId: string
+    source: InboxItemSource
+    boundary: InboxBoundary
+    creatorUid: string
+    creatorUserId: string | null
+    requestId: string | null
+    sessionId: string | null
+    question: string
+    detail: Record<string, unknown> | null
+    actorUid: string
+    expiresAt: number
+    now: number
+  }): InboxItemRow {
+    let id = generateInboxItemId()
+    while (selectInboxItem.get(input.teamId, id)) id = generateInboxItemId()
+    insertInboxItemRow.run(
+      id,
+      input.teamId,
+      input.source,
+      input.boundary,
+      input.creatorUid,
+      input.creatorUserId,
+      input.requestId,
+      input.sessionId,
+      input.question,
+      input.detail ? JSON.stringify(input.detail) : null,
+      input.now,
+      input.now,
+      input.expiresAt,
+    )
+    insertTeamMemoryAudit.run(
+      input.teamId,
+      "inbox",
+      input.actorUid,
+      "parked",
+      id,
+      JSON.stringify({
+        source: input.source,
+        boundary: input.boundary,
+        ...(input.requestId ? { request_id: input.requestId } : {}),
+        ...(input.detail?.reason ? { reason: input.detail.reason } : {}),
+      }),
+      input.now,
+    )
+    notify(input.creatorUid, "inbox_item_parked", {
+      item_id: id,
+      source: input.source,
+      boundary: input.boundary,
+      ...(input.requestId ? { request_id: input.requestId } : {}),
+    })
+    return selectInboxItem.get(input.teamId, id) as InboxItemRow
+  }
+
+  /**
+   * Close out a parked envelope request whose item resolved against
+   * running it — denial or park expiry (next-block spec §7: the
+   * timeout fails closed, exactly like a denial). The request moves
+   * from `awaiting_approval` to `refused` with the same `refused_cap`
+   * audit row and creator notification a mechanical refusal writes;
+   * only the detail names the inbox as the reason.
+   */
+  function refuseParkedRequest(row: ListenerRunRequestRow, detail: string, now: number) {
+    refuseParkedListenerRunRequest.run(now, row.team_id, row.id)
+    insertTeamMemoryAudit.run(row.team_id, "listener", "gateway", "refused_cap", row.id, detail, now)
+    notify(row.creator_uid, "listener_request_refused", {
+      request_id: row.id,
+      listener_id: row.listener_id,
+      listener_name: row.listener_name,
+      reason: detail,
+    })
+  }
+
+  /**
+   * The liveness half of the claim decision (next-block spec §6.3):
+   * whether the listener still stands behind this request at all. The
+   * listener's CURRENT chain head governs — archived or missing reads
+   * as removed, `enabled: false` is the kill switch. The creator must
+   * still belong to the team (re-read per claim, as intake re-reads
+   * per delivery). Liveness failures refuse outright; they are never
+   * parked — there is nothing a human could approve that revives a
+   * removed listener or a departed creator.
+   */
+  function listenerLivenessRefusal(row: ListenerRunRequestRow): ListenerRefusalReason | undefined {
     const fired = selectTeamObjectById.get(row.team_id, row.listener_id) as
       | TeamObjectRow
       | undefined
@@ -1083,6 +1311,38 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
     if (!membership || membership.team_id !== row.team_id) return "creator_not_member"
     const envelope = parseListenerEnvelope(JSON.parse(row.envelope) as unknown)
     if (!envelope) return "listener_invalid"
+    return undefined
+  }
+
+  /**
+   * The envelope half of the claim decision (next-block spec §6.3):
+   * undefined admits the claim, anything else is the cap the request
+   * would breach. The numbers come from the envelope snapshot the
+   * request carries from fire time. Day boundaries are UTC — one
+   * boundary for every runner, stated here rather than implied.
+   *
+   * `waiveReason` is the S-INBOX1 approval waiver: a human approved
+   * THIS request breaching exactly that cap, so that one check is
+   * skipped for this request. Any other breach still refuses (and
+   * parks) on its own merits.
+   */
+  function listenerEnvelopeRefusal(
+    row: ListenerRunRequestRow,
+    now: number,
+    waiveReason?: string | null,
+  ): ListenerRefusalReason | undefined {
+    const fired = selectTeamObjectById.get(row.team_id, row.listener_id) as
+      | TeamObjectRow
+      | undefined
+    if (!fired) return undefined
+    const chain = selectTeamObjectChain.all(
+      row.team_id,
+      fired.container,
+      "listener",
+      fired.name,
+    ) as TeamObjectRow[]
+    const envelope = parseListenerEnvelope(JSON.parse(row.envelope) as unknown)
+    if (!envelope) return undefined
     const chainIds = chain.map((entry) => entry.id)
     if (chainIds.length === 0) return undefined
     const marks = chainIds.map(() => "?").join(", ")
@@ -1097,7 +1357,9 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
         )
         .get(row.team_id, dayStart, ...chainIds) as { n: number }
     ).n
-    if (claimedToday >= envelope.max_runs_per_day) return "max_runs_per_day"
+    if (claimedToday >= envelope.max_runs_per_day && waiveReason !== "max_runs_per_day") {
+      return "max_runs_per_day"
+    }
     const spentToday = (
       db
         .prepare(
@@ -1116,7 +1378,9 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
         .get(row.team_id, ...chainIds) as { n: number }
     ).n
     const exposure = spentToday + (outstanding + 1) * envelope.max_spend_per_run_usd
-    if (exposure > envelope.max_spend_per_day_usd + 1e-9) return "max_spend_per_day"
+    if (exposure > envelope.max_spend_per_day_usd + 1e-9 && waiveReason !== "max_spend_per_day") {
+      return "max_spend_per_day"
+    }
     return undefined
   }
 
@@ -2273,17 +2537,26 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
      *    spent by then); completion records and flags an overage
      *    rather than pretending claim time could have prevented it.
      *
-     * Any refusal moves the request to `refused` with a `refused_cap`
-     * audit row (detail = the reason) and a creator notification —
-     * until S-INBOX1, over-envelope requests are refused, never parked
-     * (§6.3 interim behavior). The claim itself is a state-guarded
-     * UPDATE: exactly one runner can win a request.
+     * Any liveness refusal moves the request to `refused` with a
+     * `refused_cap` audit row (detail = the reason) and a creator
+     * notification. An ENVELOPE breach parks instead (S-INBOX1, D6
+     * Option 2): the request moves to `awaiting_approval`, an inbox
+     * item is written, and a human decision — or the park's timeout,
+     * which fails closed — resolves it. A request a human already
+     * approved for one specific breach carries that waiver on the
+     * row (`approved_reason`) and claims past exactly that check.
+     * The claim itself is a state-guarded UPDATE: exactly one runner
+     * can win a request.
      */
     claimListenerRunRequest(input: {
       teamId: string
       requestId: string
       claimantUid: string
       now?: number
+      /** How long an envelope park waits for a human before it fails
+       * closed (S-INBOX1). The HTTP layer passes the configured
+       * GRIST_INBOX_TTL_MS; the default aligns with the queue TTL. */
+      parkTtlMs?: number
     }): ListenerClaimResult {
       const now = input.now ?? Date.now()
       const row = selectListenerRunRequest.get(input.teamId, input.requestId) as
@@ -2301,8 +2574,8 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
           }
           return
         }
-        const refusal = listenerClaimRefusal(row, now)
-        if (refusal) {
+        const liveness = listenerLivenessRefusal(row)
+        if (liveness) {
           refuseListenerRunRequest.run(now, input.teamId, row.id)
           insertTeamMemoryAudit.run(
             input.teamId,
@@ -2310,18 +2583,45 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
             "gateway",
             "refused_cap",
             row.id,
-            refusal,
+            liveness,
             now,
           )
           notify(row.creator_uid, "listener_request_refused", {
             request_id: row.id,
             listener_id: row.listener_id,
             listener_name: row.listener_name,
-            reason: refusal,
+            reason: liveness,
           })
           result = {
             status: "refused",
-            reason: refusal,
+            reason: liveness,
+            request: selectListenerRunRequest.get(input.teamId, row.id) as ListenerRunRequestRow,
+          }
+          return
+        }
+        const breach = listenerEnvelopeRefusal(row, now, row.approved_reason)
+        if (breach) {
+          parkListenerRunRequest.run(now, input.teamId, row.id)
+          const item = insertInboxItem({
+            teamId: input.teamId,
+            source: "envelope_breach",
+            boundary: "spend-beyond-envelope",
+            creatorUid: row.creator_uid,
+            creatorUserId: row.creator_user_id,
+            requestId: row.id,
+            sessionId: null,
+            question:
+              `Running listener "${row.listener_name}" now would breach its envelope (${breach}). ` +
+              "Approve to let this one run proceed anyway, or deny to refuse it.",
+            detail: { reason: breach, listener_id: row.listener_id, listener_name: row.listener_name },
+            actorUid: "gateway",
+            expiresAt: now + (input.parkTtlMs ?? DEFAULT_INBOX_PARK_TTL_MS),
+            now,
+          })
+          result = {
+            status: "parked",
+            reason: breach,
+            item,
             request: selectListenerRunRequest.get(input.teamId, row.id) as ListenerRunRequestRow,
           }
           return
@@ -2473,6 +2773,218 @@ export function openGatewayStore(filePath = ":memory:", opts?: { masterKey?: Buf
         }
       })()
       return { requeued, expired }
+    },
+
+    /**
+     * Post a question item to the inbox (next-block spec §7 sources 2
+     * and 3, S-INBOX1): a Jev `ask_human` escalation from an
+     * unattended run, or a decision the run deliberately posts. Only
+     * those two sources enter through here — envelope parks are
+     * written by the claim path itself, and nothing else (attended
+     * sessions, curation) has a path in at all. The item parks
+     * `pending`; a human's answer or the TTL resolves it.
+     */
+    createInboxItem(input: {
+      teamId: string
+      source: "ask_human" | "question"
+      boundary: InboxBoundary
+      creatorUid: string
+      creatorUserId: string | null
+      requestId: string | null
+      sessionId: string | null
+      question: string
+      actorUid: string
+      ttlMs: number
+      now?: number
+    }): InboxItemRow {
+      const now = input.now ?? Date.now()
+      let item: InboxItemRow | undefined
+      db.transaction(() => {
+        item = insertInboxItem({
+          teamId: input.teamId,
+          source: input.source,
+          boundary: input.boundary,
+          creatorUid: input.creatorUid,
+          creatorUserId: input.creatorUserId,
+          requestId: input.requestId,
+          sessionId: input.sessionId,
+          question: input.question,
+          detail: null,
+          actorUid: input.actorUid,
+          expiresAt: now + input.ttlMs,
+          now,
+        })
+      })()
+      if (!item) throw new Error("inbox item creation produced no row")
+      return item
+    },
+
+    /** Browse a team's inbox, newest first — the dashboard surface;
+     * tenancy-scoped as always. */
+    listInboxItems(
+      teamId: string,
+      filters?: { state?: string; limit?: number },
+    ): InboxItemRow[] {
+      const clauses = ["team_id = ?"]
+      const params: (string | number)[] = [teamId]
+      if (filters?.state) {
+        clauses.push("state = ?")
+        params.push(filters.state)
+      }
+      const limit = Math.min(200, Math.max(1, Math.floor(filters?.limit ?? 100)))
+      return db
+        .prepare(
+          `SELECT * FROM inbox_items WHERE ${clauses.join(" AND ")}
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .all(...params, limit) as InboxItemRow[]
+    },
+
+    /** One inbox item by id, tenancy-scoped. */
+    getInboxItem(teamId: string, itemId: string): InboxItemRow | undefined {
+      return selectInboxItem.get(teamId, itemId) as InboxItemRow | undefined
+    },
+
+    /**
+     * Record a human decision on a pending item (next-block spec §7,
+     * S-INBOX1). The HTTP layer has already established that the
+     * decider holds the account holder's own credential and has
+     * standing (the run's creator, or a team owner/admin); the store
+     * performs the transition atomically and applies the resolution:
+     *
+     * - envelope_breach + approve → the request returns to `queued`
+     *   carrying the waiver for exactly the breach that parked it,
+     *   with a fresh queue TTL — the eventual claim re-checks
+     *   liveness and membership like any other.
+     * - envelope_breach + deny → the request is refused, with the
+     *   same audit + notification a mechanical refusal writes.
+     * - ask_human/question + approve → the item carries the human's
+     *   answer; a runner delivers it to the parked session as its
+     *   next prompt on a later cycle.
+     * - ask_human/question + deny → nothing resumes; the run that
+     *   asked stays ended, honestly recorded.
+     *
+     * Every decision writes an `inbox`-kind audit row under the
+     * decider and notifies the run's creator of the resolution.
+     */
+    decideInboxItem(input: {
+      teamId: string
+      itemId: string
+      deciderUid: string
+      decision: "approve" | "deny"
+      answer?: string
+      requeueTtlMs?: number
+      now?: number
+    }): InboxDecideResult {
+      const now = input.now ?? Date.now()
+      const row = selectInboxItem.get(input.teamId, input.itemId) as InboxItemRow | undefined
+      if (!row) return { status: "not_found" }
+      if (row.state !== "pending") return { status: "not_pending", state: row.state }
+      let request: ListenerRunRequestRow | undefined
+      db.transaction(() => {
+        const decided = decideInboxItemRow.run(
+          input.decision === "approve" ? "approved" : "denied",
+          input.decision === "approve" ? (input.answer ?? null) : null,
+          input.deciderUid,
+          now,
+          now,
+          input.teamId,
+          row.id,
+        )
+        if (decided.changes === 0) return
+        const detail: Record<string, unknown> = { source: row.source, boundary: row.boundary }
+        if (row.request_id) detail.request_id = row.request_id
+        if (input.decision === "approve" && row.source !== "envelope_breach") {
+          detail.answered = true
+        }
+        insertTeamMemoryAudit.run(
+          input.teamId,
+          "inbox",
+          input.deciderUid,
+          input.decision === "approve" ? "approved" : "denied",
+          row.id,
+          JSON.stringify(detail),
+          now,
+        )
+        notify(row.creator_uid, "inbox_item_resolved", {
+          item_id: row.id,
+          source: row.source,
+          boundary: row.boundary,
+          state: input.decision === "approve" ? "approved" : "denied",
+          ...(row.request_id ? { request_id: row.request_id } : {}),
+        })
+        if (row.source === "envelope_breach" && row.request_id) {
+          const parked = selectListenerRunRequest.get(input.teamId, row.request_id) as
+            | ListenerRunRequestRow
+            | undefined
+          if (parked && parked.state === "awaiting_approval") {
+            if (input.decision === "approve") {
+              const reason = (JSON.parse(row.detail ?? "{}") as { reason?: unknown }).reason
+              releaseParkedListenerRunRequest.run(
+                typeof reason === "string" ? reason : null,
+                now + (input.requeueTtlMs ?? DEFAULT_LISTENER_REQUEUE_TTL_MS),
+                now,
+                input.teamId,
+                parked.id,
+              )
+            } else {
+              refuseParkedRequest(parked, "inbox_denied", now)
+            }
+            request = selectListenerRunRequest.get(input.teamId, parked.id) as
+              | ListenerRunRequestRow
+              | undefined
+          }
+        }
+      })()
+      const fresh = selectInboxItem.get(input.teamId, row.id) as InboxItemRow
+      if (fresh.state === "pending") return { status: "not_pending", state: row.state }
+      return { status: "decided", item: fresh, ...(request ? { request } : {}) }
+    },
+
+    /**
+     * Expire pending inbox items past their TTL (next-block spec §7:
+     * a parked item that times out fails CLOSED, never open). An
+     * envelope park's expiry refuses its request exactly like a
+     * denial; a question's expiry simply closes the item — the run
+     * that asked already ended, and nothing resumes. Every expiry
+     * writes an `inbox`-kind audit row and notifies the creator.
+     * Driven by the policy timer (policy.ts); idempotent, since only
+     * `pending` rows move.
+     */
+    expireInboxItems(input: { now: number }): InboxItemRow[] {
+      const rows = selectExpiredInboxItems.all(input.now) as InboxItemRow[]
+      if (rows.length === 0) return []
+      db.transaction(() => {
+        for (const row of rows) {
+          const expired = expireInboxItemRow.run(input.now, row.team_id, row.id)
+          if (expired.changes === 0) continue
+          insertTeamMemoryAudit.run(
+            row.team_id,
+            "inbox",
+            "gateway",
+            "expired",
+            row.id,
+            JSON.stringify({ source: row.source, boundary: row.boundary }),
+            input.now,
+          )
+          notify(row.creator_uid, "inbox_item_resolved", {
+            item_id: row.id,
+            source: row.source,
+            boundary: row.boundary,
+            state: "expired",
+            ...(row.request_id ? { request_id: row.request_id } : {}),
+          })
+          if (row.source === "envelope_breach" && row.request_id) {
+            const parked = selectListenerRunRequest.get(row.team_id, row.request_id) as
+              | ListenerRunRequestRow
+              | undefined
+            if (parked && parked.state === "awaiting_approval") {
+              refuseParkedRequest(parked, "inbox_expired", input.now)
+            }
+          }
+        }
+      })()
+      return rows.map((row) => ({ ...row, state: "expired" as const, updated_at: input.now }))
     },
 
     /**

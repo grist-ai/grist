@@ -110,6 +110,28 @@ export function runListenerClaimLeaseSweep(
   return { requeued: result.requeued.length, expired: result.expired.length }
 }
 
+export const DEFAULT_INBOX_TTL_MS = 72 * 3_600_000
+
+/** How long an inbox item waits for a human decision before it fails
+ * closed (S-INBOX1, next-block spec §7). Aligns with the listener
+ * queue TTL by default; GRIST_INBOX_TTL_MS tunes it per deployment. */
+export function inboxTtlMs(env: Record<string, string | undefined> = process.env): number {
+  const parsed = Number(env.GRIST_INBOX_TTL_MS)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_INBOX_TTL_MS
+}
+
+/** Run one inbox expiry pass now (S-INBOX1): undecided items expire —
+ * the timeout fails closed, never open; envelope parks refuse their
+ * requests exactly like a denial. Rides the same in-process timer as
+ * the other sweeps. */
+export function runInboxExpirySweep(
+  store: GatewayStore,
+  opts?: { now?: number },
+): { expired: number } {
+  const rows = store.expireInboxItems({ now: opts?.now ?? Date.now() })
+  return { expired: rows.length }
+}
+
 /** Run one sweep now. Unset knobs fall back to the env configuration. */
 export function runTeamMemoryPolicySweep(
   store: GatewayStore,
@@ -153,13 +175,14 @@ export function startTeamMemoryPolicy(
       const objects = runTeamObjectPolicySweep(store)
       const listeners = runListenerExpirySweep(store)
       const leases = runListenerClaimLeaseSweep(store)
+      const inbox = runInboxExpirySweep(store)
       console.info(
         `[grist-gateway] team memory policy sweep: ${teams.length} team(s), ` +
           `merged ${totals.merged}, flagged ${totals.flagged}, ` +
           `decayed ${totals.decayed}, archived ${totals.archived}; ` +
           `objects archived ${objects.totals.archived}, objects flagged ${objects.totals.flagged}; ` +
           `listener requests expired ${listeners.expired}, claims requeued ${leases.requeued}, ` +
-          `stale claims expired ${leases.expired}`,
+          `stale claims expired ${leases.expired}; inbox items expired ${inbox.expired}`,
       )
     } catch (error) {
       console.error("[grist-gateway] team memory policy sweep failed", error)

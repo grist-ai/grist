@@ -72,6 +72,11 @@ export function generateRunRequestId(): string {
   return `glr_${randomCrockford(12)}`
 }
 
+/** Inbox item IDs look like `gi_` plus 12 Crockford chars. */
+export function generateInboxItemId(): string {
+  return `gi_${randomCrockford(12)}`
+}
+
 /** Invite codes look like `grist-XXXX-XXXX`. */
 export function generateInviteCode(): string {
   const chars = randomCrockford(8)
