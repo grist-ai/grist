@@ -55,19 +55,20 @@ import { gristLog, gristWarn } from "@grist-ai/logic"
 import { GRIST_PROVIDER_ID, publicRungFor, type Rung } from "@grist-ai/logic"
 
 import { truncateHistory } from "./history-truncation.js"
-
-/** v1 ToolPartLike shape, accumulated per session from `tool.execute.after`. */
-type ToolPartLike = {
-  type: string
-  tool?: string
-  state?: {
-    status?: string
-    error?: string
-    output?: string
-    input?: Record<string, unknown>
-    metadata?: Record<string, unknown>
-  }
-}
+import {
+  appendCompressionSessionRecord,
+  clearCompressionSession,
+  compressHistory,
+  compressionSessionTotals,
+  recordCompressionReport,
+  resolveContextCompression,
+} from "./context-compression.js"
+import {
+  asRecord,
+  toolPartFromError,
+  toolPartFromResult,
+  type ToolPartLike,
+} from "./capture.js"
 
 const toolHistory = new Map<string, ToolPartLike[]>()
 const primarySteps = new Map<string, number>()
@@ -99,6 +100,19 @@ function handleSessionEvent(
   }
   const mapped = outcomeForExecution(event.type)
   if (!mapped) return
+  // Context compression: flush the session's totals at its terminal
+  // outcome — one log line plus one journal record per repo (.grist/
+  // context-compression.jsonl), so savings are inspectable after the fact.
+  const compressionTotals = compressionSessionTotals(sessionID)
+  if (compressionTotals) {
+    clearCompressionSession(sessionID)
+    gristLog(
+      `[grist:hooks] context compression totals session=${sessionID} requests=${compressionTotals.requests} saved=${compressionTotals.bytesSaved} parts=${compressionTotals.partsCompressed}`,
+    )
+    void resolveSessionSink(ctx, sessionID, learningMemory).then((sink) => {
+      if (sink?.directory) appendCompressionSessionRecord(sink.directory, sessionID, compressionTotals)
+    })
+  }
   const notes =
     event.type === "session.execution.interrupted" && typeof data.reason === "string"
       ? `interrupted:${data.reason}`
@@ -289,26 +303,6 @@ function historyFor(sessionID: string): ToolPartLike[] {
   return fresh
 }
 
-function resultSnippet(result: Tool.Result): string {
-  const content = result.content
-  if (typeof content === "string") return content.slice(0, 500)
-  if (Array.isArray(content)) {
-    return content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join("\n")
-      .slice(0, 500)
-  }
-  return ""
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>
-  }
-  return undefined
-}
-
 /** Never let a hook failure break the session; only `tool.execute.before` may fail by design. */
 function guarded(label: string, run: () => Promise<void>): Effect.Effect<void> {
   return Effect.promise(run).pipe(
@@ -425,8 +419,23 @@ export function registerGristHooks(
           )
           gristLog(`[grist:hooks] memory auto-recall injected session=${input.sessionID}`)
         }
-        // Keep the serialized history under the gateway's 256 KB body cap; only
-        // old tool output is shrunk, never the recent tail.
+        // Shrink old tool output so the serialized history stays well under
+        // the gateway's 256 KB body cap. With context compression opted in
+        // for this repo, old outputs compress by shape against a soft
+        // budget first and tombstones remain the backstop; otherwise the
+        // tombstone guard runs exactly as before. Either way the recent
+        // tail and the stored session are never touched.
+        const compression = resolveContextCompression(ctx.location.directory)
+        if (compression.enabled) {
+          const report = compressHistory(input.messages, { budgetBytes: compression.budgetBytes })
+          if (!report.compressed && !report.truncated) return
+          input.messages = report.messages
+          recordCompressionReport(input.sessionID, report)
+          gristLog(
+            `[grist:hooks] context compressed session=${input.sessionID} saved=${report.bytesSaved} parts=${report.partsCompressed} kinds=${JSON.stringify(report.byKind)} tombstoned=${report.truncatedParts} size=${report.bytesAfter}`,
+          )
+          return
+        }
         const report = truncateHistory(input.messages)
         if (!report.truncated) return
         input.messages = report.messages
@@ -506,16 +515,7 @@ export function registerGristHooks(
         const history = historyFor(input.sessionID)
         const args = asRecord(input.input)
         if (input.status === "completed") {
-          history.push({
-            type: "tool",
-            tool: input.tool,
-            state: {
-              status: "completed",
-              output: resultSnippet(input.result),
-              input: args,
-              metadata: asRecord(input.result.metadata),
-            },
-          })
+          history.push(toolPartFromResult(input.tool, args, input.result))
           // v2 edit/write take `path` (v1 used `filePath`) — accept both.
           const editedPath =
             typeof args?.path === "string" ? args.path : typeof args?.filePath === "string" ? args.filePath : undefined
@@ -561,15 +561,7 @@ export function registerGristHooks(
             }
           }
         } else {
-          history.push({
-            type: "tool",
-            tool: input.tool,
-            state: {
-              status: "error",
-              error: input.error.message,
-              input: args,
-            },
-          })
+          history.push(toolPartFromError(input.tool, args, input.error.message))
         }
       }),
     )

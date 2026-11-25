@@ -89,7 +89,7 @@ export function truncateHistory(
 }
 
 /** Index of the latest user message; everything from here onward is protected. */
-function protectedTailStart(messages: ReadonlyArray<Message>): number {
+export function protectedTailStart(messages: ReadonlyArray<Message>): number {
   for (let index = messages.length - 1; index >= 0; index--) {
     if (messages[index].role === "user") return index
   }
@@ -113,7 +113,7 @@ function shrinkToolResult(part: ToolResultPart): ShrinkResult | undefined {
   return { part: shrunk, dropped: text.length - tombstone.length }
 }
 
-function toolResultText(part: ToolResultPart): string | undefined {
+export function toolResultText(part: ToolResultPart): string | undefined {
   if (part.result.type === "text") {
     return typeof part.result.value === "string" ? part.result.value : undefined
   }
