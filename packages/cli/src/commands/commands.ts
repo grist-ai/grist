@@ -328,6 +328,66 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         Spec.make("watch", {
           description: "Poll for queued listener requests and execute them as they arrive (Ctrl-C to stop)",
         }),
+        Spec.make("ask", {
+          description:
+            "Post a question to the approvals inbox from inside an unattended run — a human decides, and the answer resumes the session",
+          params: {
+            boundary: Argument.String("boundary").pipe(
+              Argument.withDescription(
+                "The cross-boundary action needing a decision: send | deploy | spend-beyond-envelope | write-outside-environment",
+              ),
+            ),
+            question: Argument.String("question").pipe(
+              Argument.withDescription("The question for the human"),
+            ),
+            session: Flag.String("session").pipe(
+              Flag.withDescription("Session id the answer should resume (defaults to $GRIST_LISTENER_SESSION_ID)"),
+              Flag.optional,
+            ),
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+      ],
+    }),
+    Spec.make("inbox", {
+      description: "The approvals inbox: cross-boundary decisions from unattended runs, waiting on a human",
+      commands: [
+        Spec.make("list", {
+          description: "List your team's inbox items, newest first",
+          params: {
+            state: Flag.Literals("state", ["pending", "approved", "denied", "expired"]).pipe(
+              Flag.withDescription("Only show items in this state"),
+              Flag.optional,
+            ),
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+        Spec.make("decide", {
+          description:
+            "Approve or deny an inbox item — account sign-in only; a delegated API key cannot decide",
+          params: {
+            item: Argument.String("item-id").pipe(
+              Argument.withDescription("The inbox item id (gi_…)"),
+            ),
+            decision: Argument.String("decision").pipe(
+              Argument.withDescription("approve | deny"),
+            ),
+            answer: Flag.String("answer").pipe(
+              Flag.withDescription("For question items: the human's answer — it resumes the run's session"),
+              Flag.optional,
+            ),
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
       ],
     }),
     Spec.make("env", {

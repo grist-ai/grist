@@ -87,6 +87,11 @@ const Handlers = Runtime.handlers(Commands, {
     status: () => import("./commands/handlers/listener/status"),
     "run-once": () => import("./commands/handlers/listener/run-once"),
     watch: () => import("./commands/handlers/listener/watch"),
+    ask: () => import("./commands/handlers/listener/ask"),
+  },
+  inbox: {
+    list: () => import("./commands/handlers/inbox/list"),
+    decide: () => import("./commands/handlers/inbox/decide"),
   },
   env: {
     list: () => import("./commands/handlers/env/list"),

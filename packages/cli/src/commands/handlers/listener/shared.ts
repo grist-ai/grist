@@ -50,6 +50,12 @@ export function formatCycleResult(result: ListenerCycleResult): string {
       return `Request ${result.requestId} was claimed by another runner first.`
     case "refused":
       return `Request ${result.requestId} refused at claim: ${result.reason} (the creator was notified).`
+    case "parked":
+      return `Request ${result.requestId} parked in the approvals inbox (${result.inboxItemId}): ${result.reason} — a human decides; approval makes it claimable again.`
+    case "question_parked":
+      return `Request ${result.requestId} stopped on an unanswered ask — the question is parked in the approvals inbox (${result.itemId}); the answer resumes session ${result.sessionId ?? ""}.`
+    case "resumed":
+      return `Inbox answer resumed session ${result.sessionId ?? ""}: the run ${result.ok ? "completed" : "failed"} (item ${result.itemId}).`
     case "expired":
       return `Request ${result.requestId} expired before it could be claimed.`
     case "completed":
@@ -81,13 +87,20 @@ export const execListenerRun: ListenerExecRun = (input) =>
       ...(input.environment ? ["--env", input.environment] : []),
       ...(input.conversation ? ["--conversation", input.conversation] : []),
       ...(input.agent ? ["--agent", input.agent] : []),
+      ...(input.sessionId ? ["--session", input.sessionId] : []),
       input.prompt,
     ]
     const command = selfCommand()
     const child = spawn(command[0] as string, [...command.slice(1), ...args], {
       cwd: input.directory,
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env: {
+        ...process.env,
+        // How a run links its inbox questions back to the claimed
+        // request (and, on a resume, to the session being resumed).
+        ...(input.requestId ? { GRIST_LISTENER_REQUEST_ID: input.requestId } : {}),
+        ...(input.sessionId ? { GRIST_LISTENER_SESSION_ID: input.sessionId } : {}),
+      },
     })
     let stdout = ""
     let stderr = ""
@@ -101,17 +114,36 @@ export const execListenerRun: ListenerExecRun = (input) =>
     child.on("close", (code) => {
       let sessionId: string | undefined
       let streamError: string | undefined
+      let permissionAsk: { action: string; resources: string[] } | undefined
       for (const line of stdout.split("\n")) {
         if (!line.trim().startsWith("{")) continue
         try {
           const event = JSON.parse(line) as {
             type?: string
             sessionID?: string
+            action?: string
+            resources?: unknown
+            properties?: { action?: string; resources?: unknown }
             error?: { data?: { message?: string }; name?: string }
           }
           if (typeof event.sessionID === "string") sessionId = event.sessionID
           if (event.type === "error") {
             streamError = event.error?.data?.message ?? event.error?.name ?? "the run reported an error"
+          }
+          // A permission ask in a headless run is never answered —
+          // the deferred fails and the run stops. Remember the ask
+          // so the cycle can park it in the approvals inbox.
+          if (event.type === "permission.asked") {
+            const action = event.action ?? event.properties?.action
+            const rawResources = event.resources ?? event.properties?.resources
+            if (typeof action === "string") {
+              permissionAsk = {
+                action,
+                resources: Array.isArray(rawResources)
+                  ? rawResources.filter((r): r is string => typeof r === "string")
+                  : [],
+              }
+            }
           }
         } catch {
           // Non-JSON lines are not run events; the exit code decides.
@@ -122,10 +154,24 @@ export const execListenerRun: ListenerExecRun = (input) =>
         return
       }
       const tail = stderr.trim().split("\n").slice(-3).join(" ").slice(0, 500)
+      // Only the outside-the-environment ask maps onto a
+      // cross-boundary kind in v1 (spec §7): the run wanted paths
+      // beyond its environment and nobody was present to answer.
+      const escalation =
+        permissionAsk?.action === "external_directory"
+          ? {
+              boundary: "write-outside-environment" as const,
+              question:
+                `An unattended run stopped on an unanswered permission ask: it wanted access outside its environment` +
+                (permissionAsk.resources.length > 0 ? ` (${permissionAsk.resources.join(", ")})` : "") +
+                ` and nobody was present to answer. Your answer resumes the session — say what it may do, or what to do instead.`,
+            }
+          : undefined
       resolve({
         ...(sessionId ? { sessionId } : {}),
         ok: false,
         error: streamError ?? tail ?? `grist run exited with code ${code ?? "unknown"}`,
+        ...(escalation ? { escalation } : {}),
       })
     })
   })
