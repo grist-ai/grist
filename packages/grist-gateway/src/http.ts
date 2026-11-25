@@ -13,9 +13,12 @@ import { firebasePublicConfig, verifyFirebaseIdToken, type FirebaseUser } from "
 import { isLadderModel, publicLadderID, priceForModel, usdForUsage } from "./prices.js"
 import {
   ACCOUNT_TTL_MS,
+  INBOX_BOUNDARIES,
   openGatewayStore,
   type ApiKeyKind,
   type GatewayStore,
+  type InboxBoundary,
+  type InboxItemRow,
   type InviteRow,
   type ListenerRunRequestRow,
   type NotificationRow,
@@ -25,6 +28,7 @@ import {
   type TeamObjectPushInput,
   type TeamObjectRow,
 } from "./store.js"
+import { inboxTtlMs } from "./policy.js"
 import {
   envelopeExceedsCeiling,
   listenerEventSummary,
@@ -72,6 +76,7 @@ const SITE_PAGES = new Set([
   "/dashboard/models",
   "/dashboard/provider",
   "/dashboard/team",
+  "/dashboard/inbox",
   "/plans",
   "/admin",
   "/docs",
@@ -218,6 +223,16 @@ const DEFAULT_LISTENER_REQUEST_TTL_MS = 72 * 3_600_000
  * working runner.
  */
 const LISTENER_RUNNER_RATE_LIMIT = { limit: 600, windowMs: 3_600_000 }
+/**
+ * Inbox writes (S-INBOX1): posting a question rides the runner bucket
+ * shape (a polling runner may post as it works); decisions are human
+ * actions, so their bucket is far tighter — it bounds a script
+ * driving the account holder's credential, not a person clicking.
+ */
+const INBOX_POST_RATE_LIMIT = { limit: 600, windowMs: 3_600_000 }
+const INBOX_DECIDE_RATE_LIMIT = { limit: 120, windowMs: 3_600_000 }
+const INBOX_QUESTION_MAX_CHARS = 2000
+const INBOX_ANSWER_MAX_CHARS = 4000
 const HOURLY_ABUSE_USD = 2
 const DEFAULT_GLOBAL_BUDGET = 250
 const DEVICE_TTL_MS = 10 * 60 * 1000
@@ -450,6 +465,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     Number.isFinite(parsedListenerTtl) && parsedListenerTtl > 0
       ? parsedListenerTtl
       : DEFAULT_LISTENER_REQUEST_TTL_MS
+  // How long an inbox park waits for a human before failing closed
+  // (S-INBOX1); aligns with the queue TTL unless configured apart.
+  const inboxParkTtlMs = inboxTtlMs()
   const alert =
     opts.alert ??
     ((message: string) => {
@@ -564,6 +582,9 @@ export function createGateway(opts: GatewayOptions = {}) {
     }
     if (pathname === "/v1/listeners" || pathname.startsWith("/v1/listeners/")) {
       return listenerRequests(req, pathname)
+    }
+    if (pathname === "/v1/inbox" || pathname.startsWith("/v1/inbox/")) {
+      return inbox(req, pathname)
     }
 
     if (pathname === "/v1/rung-models") {
@@ -1773,11 +1794,14 @@ export function createGateway(opts: GatewayOptions = {}) {
       if (pathname === "/v1/listeners/requests/claim") {
         // The store decides mechanically (spec §6.3): envelope caps,
         // the kill switch, creator membership — a refusal is a
-        // successful decision, reported as one, not an error.
+        // successful decision, reported as one, not an error. An
+        // envelope breach parks in the inbox instead (S-INBOX1): also
+        // a successful decision, reported with its item id.
         const result = store.claimListenerRunRequest({
           teamId: mine.team.id,
           requestId,
           claimantUid: account.firebase_uid,
+          parkTtlMs: inboxParkTtlMs,
         })
         if (result.status === "not_found") return json(404, { error: "request not found" })
         if (result.status === "not_claimable") {
@@ -1787,6 +1811,15 @@ export function createGateway(opts: GatewayOptions = {}) {
           return json(200, {
             claimed: false,
             expired: true,
+            request: publicListenerRunRequest(result.request),
+          })
+        }
+        if (result.status === "parked") {
+          return json(200, {
+            claimed: false,
+            parked: true,
+            reason: result.reason,
+            inbox_item_id: result.item.id,
             request: publicListenerRunRequest(result.request),
           })
         }
@@ -1827,6 +1860,170 @@ export function createGateway(opts: GatewayOptions = {}) {
         request: publicListenerRunRequest(result.request),
       })
     }
+    return json(404, { error: "not found" })
+  }
+
+  /**
+   * The approvals inbox (next-block spec §7, D6 Option 2, S-INBOX1).
+   * Only cross-boundary actions from UNATTENDED runs live here —
+   * envelope-breach parks (written by the claim path itself, never
+   * postable), Jev ask_human escalations, and questions a run
+   * deliberately posts. Reads follow the queue surface's auth
+   * (resolveInvite; connector keys read-only). Two writes differ:
+   *
+   * - Posting (the run side) takes the runner's credential like
+   *   claim/complete — but never a connector key, and never the
+   *   `envelope_breach` source: a breach park exists only because the
+   *   claim path computed one.
+   * - Deciding is HUMAN-only, on the S-LIS1 enabling precedent: the
+   *   account holder's own credential (Firebase session or invite
+   *   code — `keyId === null`), never a delegated API key. The honest
+   *   limit is the same as enabling's: an invite code is a bearer
+   *   account credential, so the gateway cannot distinguish the human
+   *   from an agent holding the code. Standing is scoped per item:
+   *   the run's creator, or a team owner/admin.
+   */
+  async function inbox(req: Request, pathname: string): Promise<Response> {
+    if (req.method !== "POST") return json(405, { error: "method not allowed" })
+    const invite = await resolveInvite(req)
+    if (invite instanceof Response) return invite
+    const account = store.getAccountByInvite(invite.code)
+    if (!account) return json(403, { error: "an account is required for the inbox" })
+    const uid = account.firebase_uid
+    const mine = store.getTeamForUser(uid)
+
+    if (pathname === "/v1/inbox/list" || pathname === "/v1/inbox/get") {
+      if (!mine) return json(409, { error: "not in a team" })
+      const body = await readJson(req)
+      if (pathname === "/v1/inbox/get") {
+        const itemId = typeof body?.item_id === "string" ? body.item_id : ""
+        if (!itemId) return json(400, { error: "item_id is required" })
+        const item = store.getInboxItem(mine.team.id, itemId)
+        if (!item) return json(404, { error: "inbox item not found" })
+        return json(200, { item: publicInboxItem(item) })
+      }
+      const rows = store.listInboxItems(mine.team.id, {
+        state: typeof body?.state === "string" ? body.state : undefined,
+        limit: typeof body?.limit === "number" ? body.limit : undefined,
+      })
+      return json(200, { items: rows.map(publicInboxItem) })
+    }
+
+    if (pathname === "/v1/inbox/items") {
+      if (invite.keyKind === "connector") {
+        return json(403, { error: "connector keys cannot post inbox items" })
+      }
+      if (!mine) return json(409, { error: "not in a team" })
+      if (
+        !allowWindow(`inboxpost:${invite.code}`, INBOX_POST_RATE_LIMIT.limit, INBOX_POST_RATE_LIMIT.windowMs)
+      ) {
+        return json(429, { error: "too many inbox posts — try again later" })
+      }
+      const body = await readJson(req)
+      const source = body?.source
+      if (source !== "ask_human" && source !== "question") {
+        return json(400, {
+          error: "source must be ask_human or question — envelope parks are written by the claim path",
+        })
+      }
+      const boundary = body?.boundary
+      if (typeof boundary !== "string" || !(INBOX_BOUNDARIES as readonly string[]).includes(boundary)) {
+        return json(400, {
+          error: `boundary must be one of: ${INBOX_BOUNDARIES.join(", ")}`,
+        })
+      }
+      const question = typeof body?.question === "string" ? body.question.trim() : ""
+      if (!question || question.length > INBOX_QUESTION_MAX_CHARS) {
+        return json(400, { error: `question must be 1–${INBOX_QUESTION_MAX_CHARS} characters` })
+      }
+      // A posted item belongs to the run it names: linked to a queue
+      // request, its creator is the request's creator (the run
+      // executes as them, D14), whoever's runner posts it. Unlinked,
+      // it is the poster's own run and they are its creator.
+      let creatorUid = uid
+      let creatorUserId = account.user_id
+      const requestId = typeof body?.request_id === "string" ? body.request_id : null
+      if (requestId) {
+        const request = store.getListenerRunRequest(mine.team.id, requestId)
+        if (!request) return json(404, { error: "request not found" })
+        creatorUid = request.creator_uid
+        creatorUserId = request.creator_user_id
+      }
+      const item = store.createInboxItem({
+        teamId: mine.team.id,
+        source,
+        boundary: boundary as InboxBoundary,
+        creatorUid,
+        creatorUserId,
+        requestId,
+        sessionId: typeof body?.session_id === "string" ? body.session_id : null,
+        question,
+        actorUid: uid,
+        ttlMs: inboxParkTtlMs,
+      })
+      return json(200, { item: publicInboxItem(item) })
+    }
+
+    if (pathname === "/v1/inbox/decide") {
+      if (invite.keyId !== null) {
+        return json(403, {
+          error:
+            "inbox decisions require the account holder's own credential — a delegated API key cannot decide",
+          reason: "deciding_requires_account_auth",
+        })
+      }
+      if (!mine) return json(409, { error: "not in a team" })
+      if (
+        !allowWindow(`inboxdecide:${uid}`, INBOX_DECIDE_RATE_LIMIT.limit, INBOX_DECIDE_RATE_LIMIT.windowMs)
+      ) {
+        return json(429, { error: "too many inbox decisions — try again later" })
+      }
+      const body = await readJson(req)
+      const itemId = typeof body?.item_id === "string" ? body.item_id : ""
+      if (!itemId) return json(400, { error: "item_id is required" })
+      const decision = body?.decision
+      if (decision !== "approve" && decision !== "deny") {
+        return json(400, { error: "decision must be approve or deny" })
+      }
+      const item = store.getInboxItem(mine.team.id, itemId)
+      if (!item) return json(404, { error: "inbox item not found" })
+      // Standing: the run's creator decides their own parks; team
+      // owner/admins decide anything on the team. A plain member
+      // cannot decide another member's run.
+      const canDecide =
+        item.creator_uid === uid || mine.membership.role === "owner" || mine.membership.role === "admin"
+      if (!canDecide) {
+        return json(403, { error: "only the run's creator or a team owner/admin can decide this item" })
+      }
+      const answer = typeof body?.answer === "string" ? body.answer.trim() : ""
+      if (decision === "approve" && item.source !== "envelope_breach") {
+        // Approving a question IS answering it — the answer is what
+        // resumes the parked session. An approval without one would
+        // release a run with nothing to go on.
+        if (!answer) return json(400, { error: "an answer is required to approve a question" })
+        if (answer.length > INBOX_ANSWER_MAX_CHARS) {
+          return json(400, { error: `answer must be at most ${INBOX_ANSWER_MAX_CHARS} characters` })
+        }
+      }
+      const result = store.decideInboxItem({
+        teamId: mine.team.id,
+        itemId,
+        deciderUid: uid,
+        decision,
+        ...(decision === "approve" && item.source !== "envelope_breach" ? { answer } : {}),
+        requeueTtlMs: listenerRequestTtlMs,
+      })
+      if (result.status === "not_found") return json(404, { error: "inbox item not found" })
+      if (result.status === "not_pending") {
+        return json(409, { error: `inbox item is ${result.state}, not pending` })
+      }
+      return json(200, {
+        decided: true,
+        item: publicInboxItem(result.item),
+        ...(result.request ? { request: publicListenerRunRequest(result.request) } : {}),
+      })
+    }
+
     return json(404, { error: "not found" })
   }
 
@@ -2821,6 +3018,31 @@ function publicListenerRunRequest(row: ListenerRunRequestRow) {
     updated_at: row.updated_at,
     expires_at: row.expires_at,
     completed_at: row.completed_at,
+  }
+}
+
+/**
+ * An inbox item as the inbox surface returns it (S-INBOX1): the
+ * question and — once decided — the answer are the run's own content
+ * and belong to the team's deciders; attribution is by public user
+ * ID, and firebase_uids (creator, decider) never leave the server.
+ */
+function publicInboxItem(row: InboxItemRow) {
+  return {
+    id: row.id,
+    source: row.source,
+    boundary: row.boundary,
+    state: row.state,
+    creator_user_id: row.creator_user_id,
+    request_id: row.request_id,
+    session_id: row.session_id,
+    question: row.question,
+    detail: row.detail ? (JSON.parse(row.detail) as Record<string, unknown>) : null,
+    answer: row.answer,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    expires_at: row.expires_at,
+    decided_at: row.decided_at,
   }
 }
 
