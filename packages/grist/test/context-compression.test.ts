@@ -194,6 +194,30 @@ describe("compressToolOutputText — generic", () => {
     expect(result?.text.endsWith("TAIL")).toBe(true)
   })
 
+  test("read-tool numbered envelope: JSON payload compresses structurally", () => {
+    const raw = jsonRows(30)
+    const numbered = raw
+      .split("\n")
+      .map((line, i) => `${i + 1}: ${line}`)
+      .join("\n")
+    const text = `Read file /repo/data.json, lines 1-100\n${numbered}`
+    const result = compressToolOutputText(text)
+    expect(result).toBeDefined()
+    expect(result?.kinds).toContain("json")
+    expect(result?.text).toContain("Read file /repo/data.json")
+    expect(result?.text).toContain("similar items omitted")
+  })
+
+  test("read-tool numbered envelope: log payload collapses repeats, error line kept", () => {
+    const body = [...Array(60).fill("INFO worker heartbeat ok"), "ERROR worker 2 failed to heartbeat at tick 299"]
+    const text = body.map((line, i) => `${i + 1}: ${line}`).join("\n")
+    const result = compressToolOutputText(text)
+    expect(result).toBeDefined()
+    expect(result?.kinds).toContain("log")
+    expect(result?.text).toContain("ERROR worker 2 failed to heartbeat at tick 299")
+    expect(result?.text).toContain("repeated 59 more times")
+  })
+
   test("leaves an unrecognized moderate shape alone", () => {
     const prose = Array.from({ length: 25 }, (_, i) => `A distinct sentence number ${i} about nothing in particular.`).join("\n")
     expect(compressToolOutputText(prose)).toBeUndefined()

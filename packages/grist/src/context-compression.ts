@@ -513,6 +513,39 @@ function savingsEnough(before: string, after: string): boolean {
  * unrecognized or nothing saves enough — the caller leaves the part alone.
  */
 export function compressToolOutputText(text: string): { text: string; kinds: Array<CompressorKind> } | undefined {
+  const direct = compressText(text)
+  // The read tool wraps file content in a numbered envelope ("Read file …,
+  // lines A-B" + one "N: " prefix per line), which hides the payload's real
+  // shape from every compressor. When the envelope is unmistakable, also
+  // try the de-numbered payload and keep whichever result is smaller; the
+  // header is retained with a note that the numbers are gone.
+  const envelope = stripLineNumberEnvelope(text)
+  if (!envelope) return direct
+  const inner = compressText(envelope.body)
+  if (!inner) return direct
+  const rebuilt = envelope.header ? `${envelope.header} (compressed; line numbers removed)\n${inner.text}` : inner.text
+  if (direct && direct.text.length <= rebuilt.length) return direct
+  return { text: rebuilt, kinds: inner.kinds }
+}
+
+/**
+ * Detect the read tool's numbered envelope: an optional "Read file …,
+ * lines A-B" header, then ≥90% of lines carrying a "N: " prefix. Returns
+ * the header and the de-numbered body, or undefined when the shape is not
+ * unmistakably an envelope (a false positive would corrupt real content).
+ */
+function stripLineNumberEnvelope(text: string): { header?: string; body: string } | undefined {
+  const lines = text.split("\n")
+  const header = /^Read file .+, lines \d+-\d+$/.test(lines[0] ?? "") ? lines[0] : undefined
+  const body = header ? lines.slice(1) : lines
+  if (body.length < 10) return undefined
+  let numbered = 0
+  for (const line of body) if (/^\d+: /.test(line)) numbered++
+  if (numbered / body.length < 0.9) return undefined
+  return { header, body: body.map((line) => line.replace(/^\d+: /, "")).join("\n") }
+}
+
+function compressText(text: string): { text: string; kinds: Array<CompressorKind> } | undefined {
   const parsed = tryParseJson(text)
   if (parsed.ok) {
     // A JSON payload compresses structurally or not at all; running the
