@@ -227,6 +227,28 @@ describe("compressHistory — verbatim rules", () => {
     for (const index of [4, 6, 8, 10]) expect(outputText(report.messages[index])).toBe(noisyLog())
   })
 
+  test("a large log containing error lines still compresses, error lines verbatim", () => {
+    const lines: Array<string> = []
+    for (let block = 0; block < 20; block++) {
+      for (let i = 0; i < 60; i++) lines.push("INFO worker heartbeat ok")
+      if (block < 7) lines.push(`ERROR worker ${block} failed to heartbeat at tick ${block}`)
+      for (let i = 0; i < 30; i++) lines.push(`INFO processed batch ${block * 100 + i} in 3ms`)
+    }
+    const messages = [
+      Message.user("task"),
+      toolCall("c1", "read"),
+      toolOutput("c1", "read", lines.join("\n")),
+      ...fillers(60),
+      Message.user("next"),
+    ]
+    const report = compressHistory(messages, { budgetBytes: 1_000 })
+    expect(report.compressed).toBe(true)
+    const text = outputText(report.messages[2])
+    for (let block = 0; block < 7; block++) {
+      expect(text).toContain(`ERROR worker ${block} failed to heartbeat at tick ${block}`)
+    }
+  })
+
   test("never compresses an output bearing error signals", () => {
     const failing = ["step one", ...Array(80).fill("retrying request"), "exit code: 1"].join("\n")
     const messages = [

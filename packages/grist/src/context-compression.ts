@@ -95,7 +95,17 @@ const STRONG_ERROR_PATTERNS: ReadonlyArray<RegExp> = [
 ]
 
 /** Weaker per-line signals: these lines stay byte-for-byte inside compressed output. */
-const ERROR_LINE_PATTERN = /\b(?:error|fatal|exception|traceback|panic|failed|failure|assertion|assert)\b|✗|✘|\(fail\)/i
+const ERROR_LINE_PATTERN = /\b(?:error|fatal|exception|traceback|panic|fail|failed|failure|assertion|assert)\b|✗|✘/i
+
+/**
+ * Outputs at or below this size whose text carries a hard error signal are
+ * error REPORTS (a failed command's output, a failing-test summary) and are
+ * never compressed. In a longer output the same signals are just lines —
+ * the line-level verbatim rules protect them while the bulk compresses
+ * around them; skipping every log that merely mentions a failure would
+ * exempt exactly the outputs compression exists for.
+ */
+const ERROR_REPORT_MAX_CHARS = 4_096
 const STACK_FRAME_PATTERN = /^\s+at\s+[\w$.<]+\s*\(/
 
 function isProtectedLine(line: string): boolean {
@@ -111,7 +121,9 @@ function partBearsError(part: ToolResultPart, text: string | undefined): boolean
       if (typeof value === "number" && value !== 0) return true
     }
   }
-  if (text !== undefined) return STRONG_ERROR_PATTERNS.some((pattern) => pattern.test(text))
+  if (text !== undefined && text.length <= ERROR_REPORT_MAX_CHARS) {
+    return STRONG_ERROR_PATTERNS.some((pattern) => pattern.test(text))
+  }
   return false
 }
 
@@ -571,7 +583,11 @@ function compressToolResultPart(part: ToolResultPart): PartShrink | undefined {
     if (isPlainObject(value) && ("error" in value || value.ok === false)) return undefined
     const serialized = JSON.stringify(value) ?? ""
     if (serialized.length < MIN_COMPRESSIBLE_BYTES) return undefined
-    if (STRONG_ERROR_PATTERNS.some((pattern) => pattern.test(serialized))) return undefined
+    // Same rule as text: a small payload carrying a hard error signal is an
+    // error report; in a large payload the signal is just data.
+    if (serialized.length <= ERROR_REPORT_MAX_CHARS && STRONG_ERROR_PATTERNS.some((pattern) => pattern.test(serialized))) {
+      return undefined
+    }
     const collapsed = compressJsonValue(value)
     if (!collapsed.changed) return undefined
     const next: ToolResultPart = { ...part, result: { type: "json", value: collapsed.value } }
